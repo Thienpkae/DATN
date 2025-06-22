@@ -1,0 +1,1267 @@
+{
+    "info": {
+        "name": "Auction API Full Test",
+        "description": "Test suite for Auction API with seller and 4 bidders across Org1 and Org2, including OTP resend",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Register Users",
+            "item": [
+                {
+                    "name": "Register Seller1 (Org1)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"org\":\"Org1\",\"userId\":\"seller1\",\"cccd\":\"123456789\",\"phone\":\"+84987654321\",\"fullName\":\"Seller One\",\"role\":\"auctioneer\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/register"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Register Seller1 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.include(\"User registered successfully\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Register Bidder1 (Org1)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"org\":\"Org1\",\"userId\":\"bidder1\",\"cccd\":\"123456790\",\"phone\":\"+84987654322\",\"fullName\":\"Bidder One\",\"role\":\"bidder\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/register"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Register Bidder1 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.include(\"User registered successfully\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Register Bidder2 (Org1)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"org\":\"Org1\",\"userId\":\"bidder2\",\"cccd\":\"123456791\",\"phone\":\"+84987654323\",\"fullName\":\"Bidder Two\",\"role\":\"bidder\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/register"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Register Bidder2 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.include(\"User registered successfully\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Register Bidder3 (Org2)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"org\":\"Org2\",\"userId\":\"bidder3\",\"cccd\":\"123456792\",\"phone\":\"+84987654324\",\"fullName\":\"Bidder Three\",\"role\":\"bidder\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/register"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Register Bidder3 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.include(\"User registered successfully\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Register Bidder4 (Org2)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"org\":\"Org2\",\"userId\":\"bidder4\",\"cccd\":\"123456793\",\"phone\":\"+84987654325\",\"fullName\":\"Bidder Four\",\"role\":\"bidder\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/register"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Register Bidder4 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.include(\"User registered successfully\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Resend OTP",
+            "item": [
+                {
+                    "name": "Resend OTP Seller1",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"seller1\"}"
+                        },
+                        "url": "{{baseUrl}}/resend-otp"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Resend OTP Seller1 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"OTP resent to phone\");",
+                                    "    pm.expect(pm.response.json().phone).to.equal(\"+84987654321\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Resend OTP Bidder1",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"bidder1\"}"
+                        },
+                        "url": "{{baseUrl}}/resend-otp"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Resend OTP Bidder1 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"OTP resent to phone\");",
+                                    "    pm.expect(pm.response.json().phone).to.equal(\"+84987654322\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Resend OTP Bidder2",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"bidder2\"}"
+                        },
+                        "url": "{{baseUrl}}/resend-otp"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Resend OTP Bidder2 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"OTP resent to phone\");",
+                                    "    pm.expect(pm.response.json().phone).to.equal(\"+84987654323\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Resend OTP Bidder3",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"bidder3\"}"
+                        },
+                        "url": "{{baseUrl}}/resend-otp"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Resend OTP Bidder3 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"OTP resent to phone\");",
+                                    "    pm.expect(pm.response.json().phone).to.equal(\"+84987654324\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Resend OTP Bidder4",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"bidder4\"}"
+                        },
+                        "url": "{{baseUrl}}/resend-otp"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Resend OTP Bidder4 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"OTP resent to phone\");",
+                                    "    pm.expect(pm.response.json().phone).to.equal(\"+84987654325\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Verify OTP",
+            "item": [
+                {
+                    "name": "Verify OTP Seller1",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"seller1\",\"otp\":\"123456\"}"
+                        },
+                        "url": "{{baseUrl}}/verify-otp"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Verify OTP Seller1 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Phone verified successfully\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Verify OTP Bidder1",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"bidder1\",\"otp\":\"123456\"}"
+                        },
+                        "url": "{{baseUrl}}/verify-otp"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Verify OTP Bidder1 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Phone verified successfully\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Verify OTP Bidder2",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"bidder2\",\"otp\":\"123456\"}"
+                        },
+                        "url": "{{baseUrl}}/verify-otp"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Verify OTP Bidder2 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Phone verified successfully\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Verify OTP Bidder3",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"bidder3\",\"otp\":\"123456\"}"
+                        },
+                        "url": "{{baseUrl}}/verify-otp"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Verify OTP Bidder3 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Phone verified successfully\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Verify OTP Bidder4",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"bidder4\",\"otp\":\"123456\"}"
+                        },
+                        "url": "{{baseUrl}}/verify-otp"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Verify OTP Bidder4 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Phone verified successfully\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Login Users",
+            "item": [
+                {
+                    "name": "Login Seller1",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"seller1\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/login"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Login Seller1 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().token).to.be.a('string');",
+                                    "    pm.environment.set(\"seller1_token\", pm.response.json().token);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Login Bidder1",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"bidder1\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/login"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Login Bidder1 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().token).to.be.a('string');",
+                                    "    pm.environment.set(\"bidder1_token\", pm.response.json().token);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Login Bidder2",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"bidder2\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/login"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Login Bidder2 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().token).to.be.a('string');",
+                                    "    pm.environment.set(\"bidder2_token\", pm.response.json().token);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Login Bidder3",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"bidder3\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/login"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Login Bidder3 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().token).to.be.a('string');",
+                                    "    pm.environment.set(\"bidder3_token\", pm.response.json().token);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Login Bidder4",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"bidder4\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/login"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Login Bidder4 Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().token).to.be.a('string');",
+                                    "    pm.environment.set(\"bidder4_token\", pm.response.json().token);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Create Auction",
+            "request": {
+                "method": "POST",
+                "header": [
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Authorization", "value": "Bearer {{seller1_token}}" }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\"auctionID\":\"auction1\",\"item\":\"Antique Vase\"}"
+                },
+                "url": "{{baseUrl}}/auctions"
+            },
+            "response": [],
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"Create Auction Success\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    pm.expect(pm.response.json().message).to.equal(\"Auction created\");",
+                            "    pm.expect(pm.response.json().auction.auctionID).to.equal(\"auction1\");",
+                            "    pm.expect(pm.response.json().auction.item).to.equal(\"Antique Vase\");",
+                            "});"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Place Bids",
+            "item": [
+                {
+                    "name": "Bidder1 Places Bid",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{bidder1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"price\":100}"
+                        },
+                        "url": "{{baseUrl}}/auctions/auction1/bids"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder1 Places Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Bid created\");",
+                                    "    pm.expect(pm.response.json().bidID).to.be.a('string');",
+                                    "    pm.expect(pm.response.json().bid.price).to.equal(100);",
+                                    "    pm.environment.set(\"bidder1_bidID\", pm.response.json().bidID);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Bidder2 Places Bid",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{bidder2_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"price\":120}"
+                        },
+                        "url": "{{baseUrl}}/auctions/auction1/bids"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder2 Places Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Bid created\");",
+                                    "    pm.expect(pm.response.json().bidID).to.be.a('string');",
+                                    "    pm.expect(pm.response.json().bid.price).to.equal(120);",
+                                    "    pm.environment.set(\"bidder2_bidID\", pm.response.json().bidID);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Bidder3 Places Bid",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{bidder3_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"price\":150}"
+                        },
+                        "url": "{{baseUrl}}/auctions/auction1/bids"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder3 Places Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Bid created\");",
+                                    "    pm.expect(pm.response.json().bidID).to.be.a('string');",
+                                    "    pm.expect(pm.response.json().bid.price).to.equal(150);",
+                                    "    pm.environment.set(\"bidder3_bidID\", pm.response.json().bidID);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Bidder4 Places Bid",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{bidder4_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"price\":130}"
+                        },
+                        "url": "{{baseUrl}}/auctions/auction1/bids"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder4 Places Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Bid created\");",
+                                    "    pm.expect(pm.response.json().bidID).to.be.a('string');",
+                                    "    pm.expect(pm.response.json().bid.price).to.equal(130);",
+                                    "    pm.environment.set(\"bidder4_bidID\", pm.response.json().bidID);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Submit Bids",
+            "item": [
+                {
+                    "name": "Bidder1 Submits Bid",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{bidder1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": "{{baseUrl}}/auctions/auction1/bids/{{bidder1_bidID}}/submit"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder1 Submits Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Bid submitted\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Bidder2 Submits Bid",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{bidder2_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": "{{baseUrl}}/auctions/auction1/bids/{{bidder2_bidID}}/submit"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder2 Submits Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Bid submitted\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Bidder3 Submits Bid",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{bidder3_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": "{{baseUrl}}/auctions/auction1/bids/{{bidder3_bidID}}/submit"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder3 Submits Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Bid submitted\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Bidder4 Submits Bid",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{bidder4_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": "{{baseUrl}}/auctions/auction1/bids/{{bidder4_bidID}}/submit"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder4 Submits Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Bid submitted\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Reveal Bids",
+            "item": [
+                {
+                    "name": "Bidder1 Reveals Bid",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{bidder1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": "{{baseUrl}}/auctions/auction1/bids/{{bidder1_bidID}}/reveal"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder1 Reveals Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Bid revealed\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Bidder2 Reveals Bid",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{bidder2_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": "{{baseUrl}}/auctions/auction1/bids/{{bidder2_bidID}}/reveal"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder2 Reveals Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Bid revealed\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Bidder3 Reveals Bid",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{bidder3_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": "{{baseUrl}}/auctions/auction1/bids/{{bidder3_bidID}}/reveal"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder3 Reveals Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Bid revealed\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Bidder4 Reveals Bid",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{bidder4_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": "{{baseUrl}}/auctions/auction1/bids/{{bidder4_bidID}}/reveal"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder4 Reveals Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal(\"Bid revealed\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Close Auction",
+            "request": {
+                "method": "POST",
+                "header": [
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Authorization", "value": "Bearer {{seller1_token}}" }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{}"
+                },
+                "url": "{{baseUrl}}/auctions/auction1/close"
+            },
+            "response": [],
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"Close Auction Success\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    pm.expect(pm.response.json().message).to.equal(\"Auction closed\");",
+                            "});"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "End Auction",
+            "request": {
+                "method": "POST",
+                "header": [
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Authorization", "value": "Bearer {{seller1_token}}" }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{}"
+                },
+                "url": "{{baseUrl}}/auctions/auction1/end"
+            },
+            "response": [],
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"End Auction Success\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    pm.expect(pm.response.json().message).to.equal(\"Auction ended\");",
+                            "});"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Query Auction",
+            "item": [
+                {
+                    "name": "Seller1 Queries Auction",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{seller1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/auctions/auction1"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Seller1 Queries Auction Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().auction.auctionID).to.equal(\"auction1\");",
+                                    "    pm.expect(pm.response.json().auction.item).to.equal(\"Antique Vase\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Bidder1 Queries Auction",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{bidder1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/auctions/auction1"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder1 Queries Auction Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().auction.auctionID).to.equal(\"auction1\");",
+                                    "    pm.expect(pm.response.json().auction.item).to.equal(\"Antique Vase\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Query Bids",
+            "item": [
+                {
+                    "name": "Bidder1 Queries Bid",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{bidder1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/auctions/auction1/bids/{{bidder1_bidID}}"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder1 Queries Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().bid.price).to.equal(100);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Bidder2 Queries Bid",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{bidder2_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/auctions/auction1/bids/{{bidder2_bidID}}"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder2 Queries Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().bid.price).to.equal(120);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Bidder3 Queries Bid",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{bidder3_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/auctions/auction1/bids/{{bidder3_bidID}}"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder3 Queries Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().bid.price).to.equal(150);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Bidder4 Queries Bid",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{bidder4_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/auctions/auction1/bids/{{bidder4_bidID}}"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Bidder4 Queries Bid Success\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().bid.price).to.equal(130);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:3000",
+            "type": "string"
+        }
+    ]
+}

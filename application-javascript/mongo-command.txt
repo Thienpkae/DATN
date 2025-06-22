@@ -1,0 +1,10 @@
+mongosh mongodb://admin:admin123@localhost:27017/auction?authSource=admin
+
+use auction
+show collections
+
+db.logs.find().pretty()
+db.users.find().pretty()
+
+db.logs.drop()
+db.users.drop()
