@@ -1,6 +1,6 @@
-mongosh mongodb://admin:admin123@localhost:27017/auction?authSource=admin
+mongosh mongodb://admin:admin123@localhost:27017/land?authSource=admin
 
-use auction
+use land
 show collections
 
 db.logs.find().pretty()

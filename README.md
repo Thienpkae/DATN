@@ -16,42 +16,45 @@ cd addOrg3
 
 cd ..
 
-./network.sh deployCC -ccn auction -ccp ../chaincode-go -ccl go
+./network.sh deployCC -ccn land-cc -ccp ../land-chaincode/ -ccl go -ccep "OR('Org1MSP.peer','Org2MSP.peer','Org3MSP.peer')"
 ```
 
 <h3> Deploy Backend </h3>
 
-Install packages
+Enroll Admin for 3 Org
 
 ```shell
 cd ../application-javascript
 
-npm i
-```
-
-Enroll Admin for 3 Org
-
-```shell
 cd enroll
 
 node enrollAdmin.js org1
 node enrollAdmin.js org2
 node enrollAdmin.js org3
+
+cd ..
 ```
 
+If an error occurs because the wallet already exists, remove wallet folder.
+
+If missing packages
+
+```shell
+npm i
+```
 Run server
 
 ```shell
-cd ..
 
-node app.js 
+node server.js 
 ```
 
-This is Postman test: [Auction Fabric test](https://www.postman.com/research-administrator-81537314/workspace/n-tt-nghip/collection/37567808-4ba15873-7906-42aa-8f1f-610c8678b67d?action=share&creator=37567808)
+Test Postman: [API](https://www.postman.com/research-administrator-81537314/workspace/n-tt-nghip/collection/37567808-7d58adb8-3a6e-410e-b4f6-0faaf3f17c2a?action=share&creator=37567808)
+
 
 <h3> Down Fabric network </h3>
 
 ```shell 
-cd test-network
+cd ../test-network
 ./network.sh down
 ```

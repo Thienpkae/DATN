@@ -1,5 +1,5 @@
 Loaded the network configuration located at /home/kym/Blockchain/fabric-samples/test-network-k8s/build/application/gateways/org1_ccp.json
-Built a file system wallet at /home/kym/Blockchain/auction-simple/application-javascript/wallet/org1
+Built a file system wallet at /home/kym/Blockchain/land-simple/application-javascript/wallet/org1
 2025-06-13T07:17:03.691Z - error: [ServiceEndpoint]: Error: Failed to connect before the deadline on Committer- name: org0-orderer1.test-network.svc.cluster.local:6050, url:grpcs://localhost:6050, connected:false, connectAttempted:true
 2025-06-13T07:17:03.692Z - error: [ServiceEndpoint]: waitForReady - Failed to connect to remote gRPC server org0-orderer1.test-network.svc.cluster.local:6050 url:grpcs://localhost:6050 timeout:3000
 2025-06-13T07:17:03.692Z - error: [DiscoveryResultsProcessor]: _buildOrderer[mychannel] - Unable to connect to the discovered orderer org0-orderer1.test-network.svc.cluster.local:6050 due to Error: Failed to connect before the deadline on Committer- name: org0-orderer1.test-network.svc.cluster.local:6050, url:grpcs://localhost:6050, connected:false, connectAttempted:true

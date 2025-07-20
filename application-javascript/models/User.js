@@ -4,14 +4,14 @@ const bcrypt = require('bcrypt');
 const userSchema = new mongoose.Schema({
     userId: { type: String, required: true, unique: true },
     cccd: { type: String, required: true, unique: true },
-    phone: { type: String, required: true, unique: true }, // Đảm bảo phone là duy nhất
+    phone: { type: String, required: true, unique: true }, 
     fullName: { type: String, required: true },
-    role: { type: String, required: true, enum: ['admin', 'auctioneer', 'bidder'] },
     org: { type: String, required: true, enum: ['Org1', 'Org2', 'Org3'] },
     password: { type: String },
-    otp: { type: String }, // Lưu mã OTP
-    otpExpires: { type: Date }, // Thời gian hết hạn OTP
-    isPhoneVerified: { type: Boolean, default: false }, // Trạng thái xác thực số điện thoại
+    otp: { type: String }, 
+    otpExpires: { type: Date }, 
+    isPhoneVerified: { type: Boolean, default: false }, 
+    isLocked: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 });
 

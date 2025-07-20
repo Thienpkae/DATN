@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const admin = require('../models/firebaseConfig'); 
 const { buildCAClient, registerAndEnrollUser } = require('./CAUtil.js');
 const { buildCCPOrg1, buildCCPOrg2, buildCCPOrg3, buildWallet } = require('./AppUtil.js');  
+const { validatePassword, validateCCCD, validatePhone, sanitizeInput, validateOrg } = require('./validation');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 const User = require('../models/User');
@@ -31,14 +32,17 @@ async function connectMongoDB() {
     }
 }
 
+
 async function sendOTP(phone) {
     try {
+        validatePhone(phone);
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         console.log(`Generated OTP for ${phone}: ${otp}`);
         const otpExpires = new Date(Date.now() + 5 * 60 * 1000);
         return { otp, otpExpires, phone };
     } catch (error) {
-        throw new Error(`Error preparing OTP: ${error.message}`);
+        console.error(`Error preparing OTP: ${error.message}`);
+        throw error;
     }
 }
 
@@ -48,46 +52,63 @@ async function verifyOTP(phone, otp, userId) {
         if (!user || user.phone !== phone) {
             throw new Error('User or phone not found');
         }
+        if (user.otpAttempts >= 5) {
+            throw new Error('Too many OTP attempts. Please try again later.');
+        }
         if (user.otp !== otp) {
+            user.otpAttempts = (user.otpAttempts || 0) + 1;
+            await user.save();
             throw new Error('Invalid OTP');
         }
         return true;
     } catch (error) {
-        throw new Error(`Error verifying OTP: ${error.message}`);
+        console.error(`Error verifying OTP for user ${userId}: ${error.message}`);
+        throw error;
     }
 }
 
-async function registerUser(org, userId, cccd, phone, fullName, role, password) {
+async function registerUser(org, userId, cccd, phone, fullName, password) {
     try {
-        const existingUser = await User.findOne({ $or: [{ userId }, { cccd }, { phone }] });
+        validateOrg(org);
+        validateCCCD(cccd);
+        validatePhone(phone);
+        validatePassword(password);
+
+        const sanitizedUserId = sanitizeInput(userId);
+        const sanitizedCccd = sanitizeInput(cccd);
+        const sanitizedPhone = sanitizeInput(phone);
+        const sanitizedFullName = sanitizeInput(fullName);
+
+        const existingUser = await User.findOne({ $or: [{ userId: sanitizedUserId }, { cccd: sanitizedCccd }, { phone: sanitizedPhone }] });
         if (existingUser) {
-            if (existingUser.userId === userId) {
+            if (existingUser.userId === sanitizedUserId) {
                 throw new Error('User ID already exists');
-            } else if (existingUser.cccd === cccd) {
+            } else if (existingUser.cccd === sanitizedCccd) {
                 throw new Error('CCCD already exists');
-            } else if (existingUser.phone === phone) {
+            } else if (existingUser.phone === sanitizedPhone) {
                 throw new Error('Phone number already exists');
             }
         }
 
-        const { otp, otpExpires } = await sendOTP(phone);
+        const { otp, otpExpires } = await sendOTP(sanitizedPhone);
 
         const tempUser = new User({
-            userId,
-            cccd,
-            phone,
-            fullName,
-            role,
+            userId: sanitizedUserId,
+            cccd: sanitizedCccd,
+            phone: sanitizedPhone,
+            fullName: sanitizedFullName,
             org,
             password,
             otp,
             otpExpires,
-            isPhoneVerified: false
+            otpAttempts: 0,
+            isPhoneVerified: false,
+            isLocked: false
         });
         await tempUser.save();
-        console.log(`Saved temporary user ${userId} to MongoDB with OTP`);
+        console.log(`Saved temporary user ${sanitizedUserId} to MongoDB with OTP`);
 
-        return { message: 'OTP sent to phone', userId, phone };
+        return { message: 'OTP sent to phone', userId: sanitizedUserId, phone: sanitizedPhone };
     } catch (error) {
         console.error(`Error in registering user: ${error}`);
         throw error;
@@ -109,10 +130,7 @@ async function verifyUser(userId, otp) {
             throw new Error('OTP expired');
         }
 
-        const isValidOTP = await verifyOTP(user.phone, otp, userId);
-        if (!isValidOTP) {
-            throw new Error('Invalid OTP');
-        }
+        await verifyOTP(user.phone, otp, userId);
 
         let ccp, caClient, walletPath, msp, affiliation;
         if (user.org === 'Org1') {
@@ -127,26 +145,26 @@ async function verifyUser(userId, otp) {
             walletPath = path.join(__dirname, '../wallet/org2');
             msp = mspOrg2;
             affiliation = 'org2.department1';
-        } else if (user.org === 'Org3') { 
+        } else if (user.org === 'Org3') {
             ccp = buildCCPOrg3();
             caClient = buildCAClient(FabricCAServices, ccp, 'ca.org3.example.com');
             walletPath = path.join(__dirname, '../wallet/org3');
             msp = mspOrg3;
             affiliation = 'org3.department1';
         } else {
-            throw new Error('Organization must be Org1, Org2 or Org3');
+            throw new Error('Invalid organization');
         }
 
         const wallet = await buildWallet(Wallets, walletPath);
         const attributes = [
-            { name: 'cccd', value: user.cccd, ecert: true },
-            { name: 'role', value: user.role, ecert: true }
+            { name: 'cccd', value: user.cccd, ecert: true }
         ];
         await registerAndEnrollUser(caClient, wallet, msp, user.userId, affiliation, attributes);
 
         user.isPhoneVerified = true;
         user.otp = undefined;
         user.otpExpires = undefined;
+        user.otpAttempts = 0;
         await user.save();
 
         const log = new Log({
@@ -169,7 +187,7 @@ module.exports = { registerUser, verifyUser, sendOTP };
 async function main() {
     try {
         if (process.argv.length < 9) {
-            console.log('Usage: node registerUser.js <Org> <userId> <cccd> <phone> <fullName> <role> <password>');
+            console.log('Usage: node registerUser.js <Org> <userId> <cccd> <phone> <fullName> <password> <confirmPassword>');
             process.exit(1);
         }
         await connectMongoDB();
@@ -178,9 +196,9 @@ async function main() {
         const cccd = process.argv[4];
         const phone = process.argv[5];
         const fullName = process.argv[6];
-        const role = process.argv[7];
-        const password = process.argv[8];
-        await registerUser(org, userId, cccd, phone, fullName, role, password);
+        const password = process.argv[7];
+        const confirmPassword = process.argv[8];
+        await registerUser(org, userId, cccd, phone, fullName, password, confirmPassword);
         mongoose.disconnect();
     } catch (error) {
         console.error(`Error: ${error}`);

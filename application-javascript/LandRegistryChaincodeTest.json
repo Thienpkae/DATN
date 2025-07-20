@@ -1,0 +1,1911 @@
+{
+    "info": {
+        "name": "Land Registry Chaincode Test",
+        "description": "Test suite for Land Registry Chaincode and user management APIs integrated with server.js. Tests users from Org1, Org2, and Org3, covering registration, authentication, account management, and chaincode operations with organization-based authorization and robust error handling.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "User Registration",
+            "description": "Register users across Org1, Org2, and Org3 with OTP flow.",
+            "item": [
+                {
+                    "name": "Register UserOrg1_1 (Org1)",
+                    "description": "Register a user in Org1 and verify OTP is sent.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"org\":\"Org1\",\"userId\":\"userOrg1_1\",\"cccd\":\"123456789\",\"phone\":\"+84987654321\",\"fullName\":\"Nguyen Van A\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/register"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Register UserOrg1_1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('OTP sent to phone');",
+                                    "    pm.expect(jsonData.userId).to.equal('userOrg1_1');",
+                                    "    pm.expect(jsonData.phone).to.equal('+84987654321');",
+                                    "    pm.environment.set('userOrg1_1_id', jsonData.userId);",
+                                    "});",
+                                    "pm.test('Register UserOrg1_1 Duplicate User', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/register',",
+                                    "        method: 'POST',",
+                                    "        header: {'Content-Type': 'application/json'},",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({\"org\":\"Org1\",\"userId\":\"userOrg1_1\",\"cccd\":\"123456789\",\"phone\":\"+84987654321\",\"fullName\":\"Nguyen Van A\",\"password\":\"password123\"})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(400);",
+                                    "        pm.expect(res.json().error).to.include('already exists');",
+                                    "    });",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Register UserOrg2_1 (Org2)",
+                    "description": "Register a user in Org2 and verify OTP is sent.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"org\":\"Org2\",\"userId\":\"userOrg2_1\",\"cccd\":\"987654321\",\"phone\":\"+84987654322\",\"fullName\":\"Tran Thi B\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/register"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Register UserOrg2_1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('OTP sent to phone');",
+                                    "    pm.expect(jsonData.userId).to.equal('userOrg2_1');",
+                                    "    pm.expect(jsonData.phone).to.equal('+84987654322');",
+                                    "    pm.environment.set('userOrg2_1_id', jsonData.userId);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Register UserOrg3_1 (Org3)",
+                    "description": "Register a user in Org3 and verify OTP is sent.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"org\":\"Org3\",\"userId\":\"userOrg3_1\",\"cccd\":\"456789123\",\"phone\":\"+84987654323\",\"fullName\":\"Le Van C\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/register"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Register UserOrg3_1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('OTP sent to phone');",
+                                    "    pm.expect(jsonData.userId).to.equal('userOrg3_1');",
+                                    "    pm.expect(jsonData.phone).to.equal('+84987654323');",
+                                    "    pm.environment.set('userOrg3_1_id', jsonData.userId);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Register with Invalid Data",
+                    "description": "Test registration with invalid data to verify validation functions.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"org\":\"InvalidOrg\",\"userId\":\"testUser\",\"cccd\":\"123\",\"phone\":\"invalid\",\"fullName\":\"Test User\",\"password\":\"weak\"}"
+                        },
+                        "url": "{{baseUrl}}/register"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Register with Invalid Org', function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "    pm.expect(pm.response.json().error).to.include('Organization must be Org1, Org2, or Org3');",
+                                    "});",
+                                    "pm.test('Register with Invalid CCCD', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/register',",
+                                    "        method: 'POST',",
+                                    "        header: {'Content-Type': 'application/json'},",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({\"org\":\"Org1\",\"userId\":\"testUser\",\"cccd\":\"123\",\"phone\":\"+84987654324\",\"fullName\":\"Test User\",\"password\":\"Password123!\"})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(400);",
+                                    "        pm.expect(res.json().error).to.include('CCCD must be 9 or 12 digits');",
+                                    "    });",
+                                    "});",
+                                    "pm.test('Register with Invalid Phone', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/register',",
+                                    "        method: 'POST',",
+                                    "        header: {'Content-Type': 'application/json'},",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({\"org\":\"Org1\",\"userId\":\"testUser\",\"cccd\":\"123456789012\",\"phone\":\"invalid\",\"fullName\":\"Test User\",\"password\":\"Password123!\"})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(400);",
+                                    "        pm.expect(res.json().error).to.include('Invalid Vietnamese phone number');",
+                                    "    });",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Verify OTP",
+            "description": "Verify OTP for registered users to complete registration.",
+            "item": [
+                {
+                    "name": "Verify OTP UserOrg1_1",
+                    "description": "Verify OTP for userOrg1_1 to complete registration.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"{{userOrg1_1_id}}\",\"otp\":\"123456\"}"
+                        },
+                        "url": "{{baseUrl}}/verify-otp"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Verify OTP UserOrg1_1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('User registered successfully');",
+                                    "});",
+                                    "pm.test('Verify OTP UserOrg1_1 Invalid OTP', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/verify-otp',",
+                                    "        method: 'POST',",
+                                    "        header: {'Content-Type': 'application/json'},",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({\"userId\":\"{{userOrg1_1_id}}\",\"otp\":\"999999\"})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(400);",
+                                    "        pm.expect(res.json().error).to.equal('Invalid OTP');",
+                                    "    });",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Verify OTP UserOrg2_1",
+                    "description": "Verify OTP for userOrg2_1 to complete registration.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"{{userOrg2_1_id}}\",\"otp\":\"123456\"}"
+                        },
+                        "url": "{{baseUrl}}/verify-otp"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Verify OTP UserOrg2_1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('User registered successfully');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Verify OTP UserOrg3_1",
+                    "description": "Verify OTP for userOrg3_1 to complete registration.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"{{userOrg3_1_id}}\",\"otp\":\"123456\"}"
+                        },
+                        "url": "{{baseUrl}}/verify-otp"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Verify OTP UserOrg3_1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('User registered successfully');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Login Users",
+            "description": "Login users to obtain JWT tokens.",
+            "item": [
+                {
+                    "name": "Login UserOrg1_1",
+                    "description": "Login userOrg1_1 to obtain JWT token.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"{{userOrg1_1_id}}\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/login"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Login UserOrg1_1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().token).to.be.a('string');",
+                                    "    pm.environment.set('userOrg1_1_token', pm.response.json().token);",
+                                    "});",
+                                    "pm.test('Login UserOrg1_1 Invalid Password', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/login',",
+                                    "        method: 'POST',",
+                                    "        header: {'Content-Type': 'application/json'},",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({\"userId\":\"{{userOrg1_1_id}}\",\"password\":\"wrongpassword\"})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(401);",
+                                    "        pm.expect(res.json().error).to.equal('Invalid credentials');",
+                                    "    });",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Login UserOrg2_1",
+                    "description": "Login userOrg2_1 to obtain JWT token.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"{{userOrg2_1_id}}\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/login"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Login UserOrg2_1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().token).to.be.a('string');",
+                                    "    pm.environment.set('userOrg2_1_token', pm.response.json().token);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Login UserOrg3_1",
+                    "description": "Login userOrg3_1 to obtain JWT token.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"{{userOrg3_1_id}}\",\"password\":\"password123\"}"
+                        },
+                        "url": "{{baseUrl}}/login"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Login UserOrg3_1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().token).to.be.a('string');",
+                                    "    pm.environment.set('userOrg3_1_token', pm.response.json().token);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Account Management",
+            "description": "Manage user accounts: change password, forgot password, reset password, lock/unlock account. Only Org1 (Authority) can lock/unlock accounts.",
+            "item": [
+                {
+                    "name": "Change Password UserOrg1_1",
+                    "description": "Change password for userOrg1_1.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg1_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"oldPassword\":\"password123\",\"newPassword\":\"newpassword123\",\"confirmPassword\":\"newpassword123\"}"
+                        },
+                        "url": "{{baseUrl}}/change-password"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Change Password UserOrg1_1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Password changed successfully');",
+                                    "});",
+                                    "pm.test('Change Password UserOrg1_1 Invalid Old Password', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/change-password',",
+                                    "        method: 'POST',",
+                                    "        header: {",
+                                    "            'Content-Type': 'application/json',",
+                                    "            'Authorization': 'Bearer {{userOrg1_1_token}}'",
+                                    "        },",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({\"oldPassword\":\"wrongpassword\",\"newPassword\":\"newpassword123\",\"confirmPassword\":\"newpassword123\"})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(400);",
+                                    "        pm.expect(res.json().error).to.equal('Incorrect old password');",
+                                    "    });",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Change Password with Validation",
+                    "description": "Test password change with validation errors.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg1_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"oldPassword\":\"newpassword123\",\"newPassword\":\"weak\",\"confirmPassword\":\"different\"}"
+                        },
+                        "url": "{{baseUrl}}/change-password"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Change Password Validation Error', function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "    pm.expect(pm.response.json().error).to.include('Passwords do not match');",
+                                    "});",
+                                    "pm.test('Change Password Weak Password', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/change-password',",
+                                    "        method: 'POST',",
+                                    "        header: {",
+                                    "            'Content-Type': 'application/json',",
+                                    "            'Authorization': 'Bearer {{userOrg1_1_token}}'",
+                                    "        },",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({\"oldPassword\":\"newpassword123\",\"newPassword\":\"weak\",\"confirmPassword\":\"weak\"})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(400);",
+                                    "        pm.expect(res.json().error).to.include('Password must be at least 8 characters long');",
+                                    "    });",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Forgot Password UserOrg1_1",
+                    "description": "Request password reset OTP for userOrg1_1.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"{{userOrg1_1_id}}\",\"phone\":\"+84987654321\"}"
+                        },
+                        "url": "{{baseUrl}}/forgot-password"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Forgot Password UserOrg1_1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.equal('OTP sent to phone for password reset');",
+                                    "    pm.expect(jsonData.userId).to.equal('userOrg1_1');",
+                                    "    pm.expect(jsonData.phone).to.equal('+84987654321');",
+                                    "    pm.environment.set('userOrg1_1_reset_otp', '123456'); // Static OTP for testing",
+                                    "});",
+                                    "pm.test('Forgot Password UserOrg1_1 Invalid Phone', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/forgot-password',",
+                                    "        method: 'POST',",
+                                    "        header: {'Content-Type': 'application/json'},",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({\"userId\":\"{{userOrg1_1_id}}\",\"phone\":\"+84999999999\"})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(400);",
+                                    "        pm.expect(res.json().error).to.equal('User or phone not found');",
+                                    "    });",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Reset Password UserOrg1_1",
+                    "description": "Reset password for userOrg1_1 using OTP.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"{{userOrg1_1_id}}\",\"otp\":\"{{userOrg1_1_reset_otp}}\",\"newPassword\":\"newpassword123456\"}"
+                        },
+                        "url": "{{baseUrl}}/reset-password"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Reset Password UserOrg1_1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Password reset successfully');",
+                                    "});",
+                                    "pm.test('Reset Password UserOrg1_1 Invalid OTP', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/reset-password',",
+                                    "        method: 'POST',",
+                                    "        header: {'Content-Type': 'application/json'},",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({\"userId\":\"{{userOrg1_1_id}}\",\"otp\":\"999999\",\"newPassword\":\"newpassword123456\"})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(400);",
+                                    "        pm.expect(res.json().error).to.equal('Invalid or expired OTP');",
+                                    "    });",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Lock Account UserOrg3_1 (Authority Org1)",
+                    "description": "Lock userOrg3_1's account using userOrg1_1 (Org1 - Authority).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg1_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"targetUserId\":\"{{userOrg3_1_id}}\",\"lock\":true}"
+                        },
+                        "url": "{{baseUrl}}/account/lock-unlock"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Lock Account UserOrg3_1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('User userOrg3_1 locked successfully');",
+                                    "});",
+                                    "pm.test('Lock Account UserOrg3_1 Already Locked', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/account/lock-unlock',",
+                                    "        method: 'POST',",
+                                    "        header: {",
+                                    "            'Content-Type': 'application/json',",
+                                    "            'Authorization': 'Bearer {{userOrg1_1_token}}'",
+                                    "        },",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({\"targetUserId\":\"{{userOrg3_1_id}}\",\"lock\":true})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(400);",
+                                    "        pm.expect(res.json().error).to.equal('User userOrg3_1 is already locked');",
+                                    "    });",
+                                    "});",
+                                    "pm.test('Login UserOrg3_1 After Lock', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/login',",
+                                    "        method: 'POST',",
+                                    "        header: {'Content-Type': 'application/json'},",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({\"userId\":\"{{userOrg3_1_id}}\",\"password\":\"password123\"})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(403);",
+                                    "        pm.expect(res.json().error).to.equal('Account is locked');",
+                                    "    });",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Unlock Account UserOrg3_1 (Authority Org1)",
+                    "description": "Unlock userOrg3_1's account using userOrg1_1 (Org1 - Authority).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg1_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"targetUserId\":\"{{userOrg3_1_id}}\",\"lock\":false}"
+                        },
+                        "url": "{{baseUrl}}/account/lock-unlock"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Unlock Account UserOrg3_1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('User userOrg3_1 unlocked successfully');",
+                                    "});",
+                                    "pm.test('Login UserOrg3_1 After Unlock', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/login',",
+                                    "        method: 'POST',",
+                                    "        header: {'Content-Type': 'application/json'},",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({\"userId\":\"{{userOrg3_1_id}}\",\"password\":\"password123\"})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(200);",
+                                    "        pm.expect(res.json().token).to.be.a('string');",
+                                    "        pm.environment.set('userOrg3_1_token', res.json().token);",
+                                    "    });",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Lock Account Unauthorized (Citizen Org3)",
+                    "description": "Attempt to lock account using userOrg3_1 (Org3 - Citizen, unauthorized).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg3_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"targetUserId\":\"{{userOrg2_1_id}}\",\"lock\":true}"
+                        },
+                        "url": "{{baseUrl}}/account/lock-unlock"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Lock Account Unauthorized Org3', function () {",
+                                    "    pm.response.to.have.status(403);",
+                                    "    pm.expect(pm.response.json().error).to.include('Access denied, organization Org3 not allowed');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Lock Account Unauthorized (Officer Org2)",
+                    "description": "Attempt to lock account using userOrg2_1 (Org2 - Officer, unauthorized).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg2_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"targetUserId\":\"{{userOrg3_1_id}}\",\"lock\":true}"
+                        },
+                        "url": "{{baseUrl}}/account/lock-unlock"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Lock Account Unauthorized Org2', function () {",
+                                    "    pm.response.to.have.status(403);",
+                                    "    pm.expect(pm.response.json().error).to.include('Access denied, organization Org2 not allowed');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Resend OTP",
+            "description": "Resend OTP for users who need to retry verification.",
+            "item": [
+                {
+                    "name": "Resend OTP UserOrg1_1",
+                    "description": "Resend OTP for userOrg1_1.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"userId\":\"{{userOrg1_1_id}}\"}"
+                        },
+                        "url": "{{baseUrl}}/resend-otp"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Resend OTP UserOrg1_1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('OTP resent to phone');",
+                                    "    pm.expect(pm.response.json().phone).to.equal('+84987654321');",
+                                    "});",
+                                    "pm.test('Resend OTP UserOrg1_1 Already Verified', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/resend-otp',",
+                                    "        method: 'POST',",
+                                    "        header: {'Content-Type': 'application/json'},",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({\"userId\":\"{{userOrg1_1_id}}\"})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(400);",
+                                    "        pm.expect(res.json().error).to.equal('Phone number already verified');",
+                                    "    });",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Chaincode Operations",
+            "description": "Test chaincode functions for land registry operations. Org1 (Authority) - highest privileges, Org2 (Officer) - operational privileges, Org3 (Citizen) - basic operations.",
+            "item": [
+                {
+                    "name": "Create Land Parcel (Org1)",
+                    "description": "Create a land parcel by userOrg1_1 (Org1).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg1_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"id\":\"LAND001\",\"ownerID\":\"userOrg1_1\",\"location\":\"Hanoi\",\"landUsePurpose\":\"Đất ở\",\"legalStatus\":\"Sổ đỏ\",\"area\":100}"
+                        },
+                        "url": "{{baseUrl}}/land-parcels"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Create Land Parcel Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Land parcel created');",
+                                    "    pm.expect(pm.response.json().landParcel).to.have.property('ID', 'LAND001');",
+                                    "});",
+                                    "pm.test('Create Land Parcel Unauthorized (Org3)', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/land-parcels',",
+                                    "        method: 'POST',",
+                                    "        header: {",
+                                    "            'Content-Type': 'application/json',",
+                                    "            'Authorization': 'Bearer {{userOrg3_1_token}}'",
+                                    "        },",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({\"id\":\"LAND002\",\"ownerID\":\"userOrg3_1\",\"location\":\"Ho Chi Minh City\",\"landUsePurpose\":\"Đất ở\",\"legalStatus\":\"Sổ đỏ\",\"area\":100})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(403);",
+                                    "        pm.expect(res.json().error).to.include('Access denied, organization Org3MSP not allowed');",
+                                    "    });",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Create Land Parcel (Org2)",
+                    "description": "Create a land parcel by userOrg2_1 (Org2) to verify Org2 also has authority.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg2_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"id\":\"LAND002\",\"ownerID\":\"userOrg2_1\",\"location\":\"Ho Chi Minh City\",\"landUsePurpose\":\"Đất nông nghiệp\",\"legalStatus\":\"Có giấy chứng nhận\",\"area\":200}"
+                        },
+                        "url": "{{baseUrl}}/land-parcels"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Create Land Parcel Org2 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Land parcel created');",
+                                    "    pm.expect(pm.response.json().landParcel).to.have.property('ID', 'LAND002');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Upload Document (Org3)",
+                    "description": "Upload a document by userOrg3_1 (Org3).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg3_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"docID\":\"DOC001\",\"landParcelID\":\"LAND001\",\"txID\":\"TX001\",\"ipfsHash\":\"Qm...\",\"description\":\"Land title document\"}"
+                        },
+                        "url": "{{baseUrl}}/documents"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Upload Document Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Document uploaded');",
+                                    "    pm.expect(pm.response.json().document).to.have.property('DocID', 'DOC001');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Verify Document (Org2, Nghị định 121/2025/NĐ-CP)",
+                    "description": "Verify a document by userOrg2_1 (Org2).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg2_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": "{{baseUrl}}/documents/DOC001/verify"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Verify Document Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Document verified');",
+                                    "    pm.expect(pm.response.json().document).to.have.property('DocID', 'DOC001');",
+                                    "    pm.expect(pm.response.json().document.verified).to.be.true;",
+                                    "});",
+                                    "pm.test('Verify Document Unauthorized (Org3)', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/documents/DOC001/verify',",
+                                    "        method: 'POST',",
+                                    "        header: {",
+                                    "            'Content-Type': 'application/json',",
+                                    "            'Authorization': 'Bearer {{userOrg3_1_token}}'",
+                                    "        },",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(403);",
+                                    "        pm.expect(res.json().error).to.include('Access denied, organization Org3 not allowed');",
+                                    "    });",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Verify Document (Org1)",
+                    "description": "Verify a document by userOrg1_1 (Org1) to show Org1 also has verification authority.",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg1_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": "{{baseUrl}}/documents/DOC001/verify"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Verify Document Org1 Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Document verified');",
+                                    "    pm.expect(pm.response.json().document).to.have.property('DocID', 'DOC001');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Process Transaction (Org2)",
+                    "description": "Process a transaction by userOrg2_1 (Org2).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg2_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": "{{baseUrl}}/transactions/TX001/process"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Process Transaction Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Transaction processed');",
+                                    "    pm.expect(pm.response.json().transaction).to.have.property('TxID', 'TX001');",
+                                    "    pm.expect(pm.response.json().transaction.Status).to.be.oneOf(['VERIFIED', 'SUPPLEMENT_REQUESTED']);",
+                                    "});",
+                                    "pm.test('Process Transaction Invalid Transaction', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/transactions/INVALID_TX/process',",
+                                    "        method: 'POST',",
+                                    "        header: {",
+                                    "            'Content-Type': 'application/json',",
+                                    "            'Authorization': 'Bearer {{userOrg2_1_token}}'",
+                                    "        },",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(500);",
+                                    "        pm.expect(res.json().error).to.include('transaction');",
+                                    "    });",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Create Transfer Request (Org3)",
+                    "description": "Create a transfer request by userOrg3_1 (Org3).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg3_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"txID\":\"TX002\",\"landParcelID\":\"LAND001\",\"fromOwnerID\":\"userOrg1_1\",\"toOwnerID\":\"userOrg3_1\",\"details\":\"Transfer request for LAND001\",\"signature\":\"SIG_TRANSFER_001\"}"
+                        },
+                        "url": "{{baseUrl}}/transfer-requests"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Create Transfer Request Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Transfer request created');",
+                                    "    pm.expect(pm.response.json().transaction).to.have.property('TxID', 'TX002');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Confirm Transfer Request (Org3)",
+                    "description": "Confirm a transfer request by userOrg3_1 (Org3).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg3_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"toOwnerID\":\"userOrg3_1\",\"signature\":\"SIG_CONFIRM_001\",\"agree\":true}"
+                        },
+                        "url": "{{baseUrl}}/transfer-requests/TX002/confirm"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Confirm Transfer Request Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Transfer confirmed');",
+                                    "    pm.expect(pm.response.json().transaction).to.have.property('TxID', 'TX002');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Create Split Request (Org3)",
+                    "description": "Create a split request by userOrg3_1 (Org3).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg3_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"txID\":\"TX003\",\"landParcelID\":\"LAND001\",\"ownerID\":\"userOrg3_1\",\"signature\":\"SIG_SPLIT_001\",\"newParcels\":[{\"id\":\"LAND001A\",\"area\":50},{\"id\":\"LAND001B\",\"area\":50}]}"
+                        },
+                        "url": "{{baseUrl}}/split-requests"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Create Split Request Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Split request created');",
+                                    "    pm.expect(pm.response.json().transaction).to.have.property('TxID', 'TX003');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Create Merge Request (Org3)",
+                    "description": "Create a merge request by userOrg3_1 (Org3).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg3_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"txID\":\"TX004\",\"ownerID\":\"userOrg3_1\",\"signature\":\"SIG_MERGE_001\",\"parcelIDs\":[\"LAND001A\",\"LAND001B\"],\"newParcel\":{\"id\":\"LAND001_MERGED\",\"area\":100}}"
+                        },
+                        "url": "{{baseUrl}}/merge-requests"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Create Merge Request Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Merge request created');",
+                                    "    pm.expect(pm.response.json().transaction).to.have.property('TxID', 'TX004');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Create Change Purpose Request (Org3)",
+                    "description": "Create a change purpose request by userOrg3_1 (Org3).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg3_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"txID\":\"TX005\",\"landParcelID\":\"LAND001\",\"ownerID\":\"userOrg3_1\",\"newPurpose\":\"Đất thương mại\",\"details\":\"Change from residential to commercial use\",\"signature\":\"SIG_CHANGE_001\"}"
+                        },
+                        "url": "{{baseUrl}}/change-purpose-requests"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Create Change Purpose Request Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Change purpose request created');",
+                                    "    pm.expect(pm.response.json().transaction).to.have.property('TxID', 'TX005');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Create Reissue Request (Org3)",
+                    "description": "Create a reissue request by userOrg3_1 (Org3).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg3_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"txID\":\"TX006\",\"landParcelID\":\"LAND001\",\"ownerID\":\"userOrg3_1\",\"details\":\"Request reissue due to lost certificate\",\"signature\":\"SIG_REISSUE_001\"}"
+                        },
+                        "url": "{{baseUrl}}/reissue-requests"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Create Reissue Request Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Reissue request created');",
+                                    "    pm.expect(pm.response.json().transaction).to.have.property('TxID', 'TX006');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Forward Transaction (Org2)",
+                    "description": "Forward a transaction by userOrg2_1 (Org2).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg2_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"forwardDetails\":\"Forwarding to authority for final approval\"}"
+                        },
+                        "url": "{{baseUrl}}/transactions/TX001/forward"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Forward Transaction Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Transaction forwarded');",
+                                    "    pm.expect(pm.response.json().transaction).to.have.property('TxID', 'TX001');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Approve Transaction (Org1)",
+                    "description": "Approve a transaction by userOrg1_1 (Org1).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg1_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"approveDetails\":\"Transaction approved by authority\"}"
+                        },
+                        "url": "{{baseUrl}}/transactions/TX001/approve"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Approve Transaction Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Transaction approved');",
+                                    "    pm.expect(pm.response.json().transaction).to.have.property('TxID', 'TX001');",
+                                    "});",
+                                    "pm.test('Approve Transaction Unauthorized (Org2)', function () {",
+                                    "    pm.sendRequest({",
+                                    "        url: '{{baseUrl}}/transactions/TX001/approve',",
+                                    "        method: 'POST',",
+                                    "        header: {",
+                                    "            'Content-Type': 'application/json',",
+                                    "            'Authorization': 'Bearer {{userOrg2_1_token}}'",
+                                    "        },",
+                                    "        body: {",
+                                    "            mode: 'raw',",
+                                    "            raw: JSON.stringify({\"approveDetails\":\"Unauthorized approval\"})",
+                                    "        }",
+                                    "    }, function (err, res) {",
+                                    "        pm.expect(res).to.have.status(403);",
+                                    "        pm.expect(res.json().error).to.include('Access denied, organization Org2 not allowed');",
+                                    "    });",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Reject Transaction (Org1)",
+                    "description": "Reject a transaction by userOrg1_1 (Org1).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg1_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"rejectDetails\":\"Transaction rejected due to incomplete documentation\"}"
+                        },
+                        "url": "{{baseUrl}}/transactions/TX002/reject"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Reject Transaction Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Transaction rejected');",
+                                    "    pm.expect(pm.response.json().transaction).to.have.property('TxID', 'TX002');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Issue Certificate (Org1)",
+                    "description": "Issue a land certificate by userOrg1_1 (Org1).",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Authorization", "value": "Bearer {{userOrg1_1_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\"certificateID\":\"CERT001\",\"landParcelID\":\"LAND001\",\"ownerID\":\"userOrg1_1\",\"legalInfo\":\"Sổ đỏ issued\",\"signature\":\"SIG001\"}"
+                        },
+                        "url": "{{baseUrl}}/certificates"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Issue Certificate Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().message).to.equal('Certificate issued');",
+                                    "    pm.expect(pm.response.json().certificate).to.have.property('CertificateID', 'CERT001');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Query Operations",
+            "description": "Test query endpoints for land parcels, certificates, transactions, and documents.",
+            "item": [
+                {
+                    "name": "Query Land Parcel by ID",
+                    "description": "Query land parcel LAND001 by userOrg1_1 (Org1).",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg1_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/land-parcels/LAND001"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Land Parcel Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().landParcel).to.have.property('ID', 'LAND001');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Land Parcels by Purpose",
+                    "description": "Query land parcels by purpose 'Đất ở' by userOrg2_1 (Org2).",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg2_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/land-parcels/purpose/%C4%90%E1%BA%A5t%20%E1%BB%9F"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Land Parcels by Purpose Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().landParcels).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Land Parcels by Owner",
+                    "description": "Query land parcels by owner userOrg1_1.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg3_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/land-parcels/owner/userOrg1_1"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Land Parcels by Owner Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().landParcels).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Land Parcels by Location",
+                    "description": "Query land parcels by location 'Hanoi'.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg2_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/land-parcels/location/Hanoi"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Land Parcels by Location Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().landParcels).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Land Parcels by Legal Status",
+                    "description": "Query land parcels by legal status 'Sổ đỏ'.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg1_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/land-parcels/legal-status/S%E1%BB%95%20%C4%91%E1%BB%8F"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Land Parcels by Legal Status Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().landParcels).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Certificate by ID",
+                    "description": "Query certificate CERT001 by userOrg3_1.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg3_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/certificates/CERT001"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Certificate by ID Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().certificate).to.have.property('CertificateID', 'CERT001');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Certificates by Owner",
+                    "description": "Query certificates by owner userOrg1_1.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg2_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/certificates/owner/userOrg1_1"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Certificates by Owner Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().certificates).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Certificates by Land Parcel",
+                    "description": "Query certificates by land parcel LAND001.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg1_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/certificates/land-parcel/LAND001"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Certificates by Land Parcel Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().certificates).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Certificates by Issue Date",
+                    "description": "Query certificates by issue date range.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg2_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/certificates/issue-date?startDate=2024-01-01&endDate=2025-12-31"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Certificates by Issue Date Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().certificates).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Transaction by ID",
+                    "description": "Query transaction TX001 by userOrg3_1.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg3_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/transactions/TX001"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Transaction by ID Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().transaction).to.have.property('TxID', 'TX001');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Transactions by Criteria",
+                    "description": "Query transactions by status and type criteria.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg1_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/transactions/criteria?status=PENDING&txType=TRANSFER&startTime=2024-01-01&endTime=2025-12-31"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Transactions by Criteria Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().transactions).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Transactions by Land Parcel",
+                    "description": "Query transactions by land parcel LAND001.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg2_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/transactions/land-parcel/LAND001"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Transactions by Land Parcel Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().transactions).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Transactions by Owner",
+                    "description": "Query transactions by owner userOrg1_1.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg3_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/transactions/owner/userOrg1_1"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Transactions by Owner Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().transactions).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Document by ID",
+                    "description": "Query document DOC001 by userOrg1_1.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg1_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/documents/DOC001"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Document by ID Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().document).to.have.property('DocID', 'DOC001');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Documents by Land Parcel",
+                    "description": "Query documents by land parcel LAND001.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg2_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/documents/land-parcel/LAND001"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Documents by Land Parcel Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().documents).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Documents by Transaction",
+                    "description": "Query documents by transaction TX001.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg3_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/documents/transaction/TX001"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Documents by Transaction Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().documents).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Documents by IPFS Hash",
+                    "description": "Query documents by IPFS hash.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg1_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/documents/ipfs/Qm..."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Documents by IPFS Hash Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().documents).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Query Logs by Transaction",
+                    "description": "Query logs by transaction TX001.",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Authorization", "value": "Bearer {{userOrg2_1_token}}" }
+                        ],
+                        "url": "{{baseUrl}}/logs/transaction/TX001"
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Query Logs by Transaction Success', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    pm.expect(pm.response.json().logs).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    "// Set base URL if not already set",
+                    "if (!pm.environment.get('baseUrl')) {",
+                    "    pm.environment.set('baseUrl', 'http://localhost:3000');",
+                    "}"
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:3000",
+            "type": "string",
+            "description": "Base URL for the server"
+        }
+    ]
+}
