@@ -6,12 +6,12 @@ const Log = require('../models/Log');
 const { sendOTP } = require('./registerUser');
 const { validatePassword, validatePhone, sanitizeInput } = require('./validation');
 
-async function changePassword(userId, oldPassword, newPassword) {
+async function changePassword(cccd, oldPassword, newPassword) {
     try {
         validatePassword(newPassword);
-        const sanitizedUserId = sanitizeInput(userId);
+        const sanitizedCccd = sanitizeInput(cccd);
 
-        const user = await User.findOne({ userId: sanitizedUserId });
+        const user = await User.findOne({ cccd: sanitizedCccd });
         if (!user) {
             throw new Error('User not found');
         }
@@ -33,13 +33,13 @@ async function changePassword(userId, oldPassword, newPassword) {
         await user.save();
 
         const log = new Log({
-            userId: sanitizedUserId,
+            cccd: sanitizedCccd,
             action: 'Change Password',
-            details: `User ${sanitizedUserId} changed their password`
+            details: `User with CCCD ${sanitizedCccd} changed their password`
         });
         await log.save();
 
-        console.log(`Password changed successfully for user ${sanitizedUserId}`);
+        console.log(`Password changed successfully for user with CCCD ${sanitizedCccd}`);
         return { message: 'Password changed successfully' };
     } catch (error) {
         console.error(`Error in changePassword: ${error.message}`);
@@ -47,13 +47,13 @@ async function changePassword(userId, oldPassword, newPassword) {
     }
 }
 
-async function forgotPassword(userId, phone) {
+async function forgotPassword(cccd, phone) {
     try {
         validatePhone(phone);
-        const sanitizedUserId = sanitizeInput(userId);
+        const sanitizedCccd = sanitizeInput(cccd);
         const sanitizedPhone = sanitizeInput(phone);
 
-        const user = await User.findOne({ userId: sanitizedUserId, phone: sanitizedPhone });
+        const user = await User.findOne({ cccd: sanitizedCccd, phone: sanitizedPhone });
         if (!user) {
             throw new Error('User or phone not found');
         }
@@ -69,26 +69,26 @@ async function forgotPassword(userId, phone) {
         await user.save();
 
         const log = new Log({
-            userId: sanitizedUserId,
+            cccd: sanitizedCccd,
             action: 'Forgot Password Request',
-            details: `User ${sanitizedUserId} requested password reset OTP`
+            details: `User with CCCD ${sanitizedCccd} requested password reset OTP`
         });
         await log.save();
 
-        console.log(`OTP sent for password reset for user ${sanitizedUserId}`);
-        return { message: 'OTP sent to phone for password reset', userId: sanitizedUserId, phone: sanitizedPhone };
+        console.log(`OTP sent for password reset for user with CCCD ${sanitizedCccd}`);
+        return { message: 'OTP sent to phone for password reset', cccd: sanitizedCccd, phone: sanitizedPhone };
     } catch (error) {
         console.error(`Error in forgotPassword: ${error.message}`);
         throw error;
     }
 }
 
-async function resetPassword(userId, otp, newPassword) {
+async function resetPassword(cccd, otp, newPassword) {
     try {
         validatePassword(newPassword);
-        const sanitizedUserId = sanitizeInput(userId);
+        const sanitizedCccd = sanitizeInput(cccd);
 
-        const user = await User.findOne({ userId: sanitizedUserId });
+        const user = await User.findOne({ cccd: sanitizedCccd });
         if (!user) {
             throw new Error('User not found');
         }
@@ -106,13 +106,13 @@ async function resetPassword(userId, otp, newPassword) {
         await user.save();
 
         const log = new Log({
-            userId: sanitizedUserId,
+            cccd: sanitizedCccd,
             action: 'Reset Password',
-            details: `User ${sanitizedUserId} reset their password`
+            details: `User with CCCD ${sanitizedCccd} reset their password`
         });
         await log.save();
 
-        console.log(`Password reset successfully for user ${sanitizedUserId}`);
+        console.log(`Password reset successfully for user with CCCD ${sanitizedCccd}`);
         return { message: 'Password reset successfully' };
     } catch (error) {
         console.error(`Error in resetPassword: ${error.message}`);
@@ -120,17 +120,17 @@ async function resetPassword(userId, otp, newPassword) {
     }
 }
 
-async function lockUnlockAccount(authorityUserId, targetUserId, lock) {
+async function lockUnlockAccount(authorityCccd, targetCccd, lock) {
     try {
-        const sanitizedAuthorityUserId = sanitizeInput(authorityUserId);
-        const sanitizedTargetUserId = sanitizeInput(targetUserId);
+        const sanitizedAuthorityCccd = sanitizeInput(authorityCccd);
+        const sanitizedTargetCccd = sanitizeInput(targetCccd);
 
-        const authority = await User.findOne({ userId: sanitizedAuthorityUserId, org: 'Org1' });
+        const authority = await User.findOne({ cccd: sanitizedAuthorityCccd, org: 'Org1' });
         if (!authority) {
             throw new Error('Only Org1 users can lock/unlock accounts');
         }
 
-        const user = await User.findOne({ userId: sanitizedTargetUserId });
+        const user = await User.findOne({ cccd: sanitizedTargetCccd });
         if (!user) {
             throw new Error('Target user not found');
         }
@@ -140,18 +140,49 @@ async function lockUnlockAccount(authorityUserId, targetUserId, lock) {
 
         const action = lock ? 'Lock Account' : 'Unlock Account';
         const log = new Log({
-            userId: sanitizedAuthorityUserId,
+            cccd: sanitizedAuthorityCccd,
             action,
-            details: `User ${sanitizedTargetUserId} ${lock ? 'locked' : 'unlocked'} by ${sanitizedAuthorityUserId}`
+            details: `User with CCCD ${sanitizedTargetCccd} ${lock ? 'locked' : 'unlocked'} by ${sanitizedAuthorityCccd}`
         });
         await log.save();
 
-        console.log(`User ${sanitizedTargetUserId} ${lock ? 'locked' : 'unlocked'} successfully`);
-        return { message: `User ${sanitizedTargetUserId} ${lock ? 'locked' : 'unlocked'} successfully` };
+        console.log(`User with CCCD ${sanitizedTargetCccd} ${lock ? 'locked' : 'unlocked'} successfully`);
+        return { message: `User with CCCD ${sanitizedTargetCccd} ${lock ? 'locked' : 'unlocked'} successfully` };
     } catch (error) {
         console.error(`Error in lockUnlockAccount: ${error.message}`);
         throw error;
     }
 }
 
-module.exports = { changePassword, forgotPassword, resetPassword, lockUnlockAccount };
+async function deleteAccount(adminCccd, targetCccd) {
+    try {
+        const sanitizedAdminCccd = sanitizeInput(adminCccd);
+        const sanitizedTargetCccd = sanitizeInput(targetCccd);
+
+        const admin = await User.findOne({ cccd: sanitizedAdminCccd, role: 'admin' });
+        if (!admin) {
+            throw new Error('Only admin can delete accounts');
+        }
+        if (sanitizedAdminCccd === sanitizedTargetCccd) {
+            throw new Error('Admin cannot delete their own account');
+        }
+        const user = await User.findOne({ cccd: sanitizedTargetCccd });
+        if (!user) {
+            throw new Error('User not found');
+        }
+        await User.deleteOne({ cccd: sanitizedTargetCccd });
+        const log = new Log({
+            cccd: sanitizedAdminCccd,
+            action: 'Delete Account',
+            details: `User with CCCD ${sanitizedTargetCccd} deleted by admin ${sanitizedAdminCccd}`
+        });
+        await log.save();
+        console.log(`User with CCCD ${sanitizedTargetCccd} deleted by admin ${sanitizedAdminCccd}`);
+        return { message: `User with CCCD ${sanitizedTargetCccd} deleted successfully` };
+    } catch (error) {
+        console.error(`Error in deleteAccount: ${error.message}`);
+        throw error;
+    }
+}
+
+module.exports = { changePassword, forgotPassword, resetPassword, lockUnlockAccount, deleteAccount };

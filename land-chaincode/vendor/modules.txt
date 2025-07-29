@@ -29,7 +29,6 @@ github.com/golang/protobuf/ptypes/timestamp
 ## explicit; go 1.20
 github.com/hyperledger/fabric-chaincode-go/pkg/attrmgr
 github.com/hyperledger/fabric-chaincode-go/pkg/cid
-github.com/hyperledger/fabric-chaincode-go/pkg/statebased
 github.com/hyperledger/fabric-chaincode-go/shim
 github.com/hyperledger/fabric-chaincode-go/shim/internal
 # github.com/hyperledger/fabric-contract-api-go v1.2.1

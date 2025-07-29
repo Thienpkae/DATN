@@ -34,11 +34,11 @@ exports.enrollAdmin = async (caClient, wallet, orgMspId) => {
 	}
 };
 
-exports.registerAndEnrollUser = async (caClient, wallet, orgMspId, userId, affiliation, attributes) => {
+exports.registerAndEnrollUser = async (caClient, wallet, orgMspId, cccd, affiliation, attributes) => {
 	try {
-		const userIdentity = await wallet.get(userId);
+		const userIdentity = await wallet.get(cccd);
 		if (userIdentity) {
-			console.log(`An identity for the user ${userId} already exists in the wallet`);
+			console.log(`An identity for the user with CCCD ${cccd} already exists in the wallet`);
 			return;
 		}
 		const adminIdentity = await wallet.get(adminUserId);
@@ -51,12 +51,12 @@ exports.registerAndEnrollUser = async (caClient, wallet, orgMspId, userId, affil
 		const adminUser = await provider.getUserContext(adminIdentity, adminUserId);
 		const secret = await caClient.register({
 			affiliation: affiliation,
-			enrollmentID: userId,
+			enrollmentID: cccd,
 			role: 'client',
 			attrs: attributes
 		}, adminUser);
 		const enrollment = await caClient.enroll({
-			enrollmentID: userId,
+			enrollmentID: cccd,
 			enrollmentSecret: secret,
 			attr_reqs: attributes.map(attr => ({ name: attr.name, optional: false }))
 		});
@@ -68,9 +68,9 @@ exports.registerAndEnrollUser = async (caClient, wallet, orgMspId, userId, affil
 			mspId: orgMspId,
 			type: 'X.509',
 		};
-		await wallet.put(userId, x509Identity);
-		console.log(`Successfully registered and enrolled user ${userId} with attributes`);
+		await wallet.put(cccd, x509Identity);
+		console.log(`Successfully registered and enrolled user with CCCD ${cccd} with attributes`);
 	} catch (error) {
-		console.error(`Failed to register user ${userId}: ${error}`);
+		console.error(`Failed to register user with CCCD ${cccd}: ${error}`);
 	}
 };

@@ -32,7 +32,6 @@ async function connectMongoDB() {
     }
 }
 
-
 async function sendOTP(phone) {
     try {
         validatePhone(phone);
@@ -46,9 +45,9 @@ async function sendOTP(phone) {
     }
 }
 
-async function verifyOTP(phone, otp, userId) {
+async function verifyOTP(phone, otp, cccd) {
     try {
-        const user = await User.findOne({ userId });
+        const user = await User.findOne({ cccd });
         if (!user || user.phone !== phone) {
             throw new Error('User or phone not found');
         }
@@ -62,28 +61,25 @@ async function verifyOTP(phone, otp, userId) {
         }
         return true;
     } catch (error) {
-        console.error(`Error verifying OTP for user ${userId}: ${error.message}`);
+        console.error(`Error verifying OTP for CCCD ${cccd}: ${error.message}`);
         throw error;
     }
 }
 
-async function registerUser(org, userId, cccd, phone, fullName, password) {
+async function registerUser(org, cccd, phone, fullName, password, role = 'user') {
     try {
         validateOrg(org);
         validateCCCD(cccd);
         validatePhone(phone);
         validatePassword(password);
 
-        const sanitizedUserId = sanitizeInput(userId);
         const sanitizedCccd = sanitizeInput(cccd);
         const sanitizedPhone = sanitizeInput(phone);
         const sanitizedFullName = sanitizeInput(fullName);
 
-        const existingUser = await User.findOne({ $or: [{ userId: sanitizedUserId }, { cccd: sanitizedCccd }, { phone: sanitizedPhone }] });
+        const existingUser = await User.findOne({ $or: [{ cccd: sanitizedCccd }, { phone: sanitizedPhone }] });
         if (existingUser) {
-            if (existingUser.userId === sanitizedUserId) {
-                throw new Error('User ID already exists');
-            } else if (existingUser.cccd === sanitizedCccd) {
+            if (existingUser.cccd === sanitizedCccd) {
                 throw new Error('CCCD already exists');
             } else if (existingUser.phone === sanitizedPhone) {
                 throw new Error('Phone number already exists');
@@ -93,11 +89,11 @@ async function registerUser(org, userId, cccd, phone, fullName, password) {
         const { otp, otpExpires } = await sendOTP(sanitizedPhone);
 
         const tempUser = new User({
-            userId: sanitizedUserId,
             cccd: sanitizedCccd,
             phone: sanitizedPhone,
             fullName: sanitizedFullName,
             org,
+            role,
             password,
             otp,
             otpExpires,
@@ -106,18 +102,18 @@ async function registerUser(org, userId, cccd, phone, fullName, password) {
             isLocked: false
         });
         await tempUser.save();
-        console.log(`Saved temporary user ${sanitizedUserId} to MongoDB with OTP`);
+        console.log(`Saved temporary user with CCCD ${sanitizedCccd} to MongoDB with OTP`);
 
-        return { message: 'OTP sent to phone', userId: sanitizedUserId, phone: sanitizedPhone };
+        return { message: 'OTP sent to phone', cccd: sanitizedCccd, phone: sanitizedPhone };
     } catch (error) {
         console.error(`Error in registering user: ${error}`);
         throw error;
     }
 }
 
-async function verifyUser(userId, otp) {
+async function verifyUser(cccd, otp) {
     try {
-        const user = await User.findOne({ userId });
+        const user = await User.findOne({ cccd });
         if (!user) {
             throw new Error('User not found');
         }
@@ -130,7 +126,7 @@ async function verifyUser(userId, otp) {
             throw new Error('OTP expired');
         }
 
-        await verifyOTP(user.phone, otp, userId);
+        await verifyOTP(user.phone, otp, cccd);
 
         let ccp, caClient, walletPath, msp, affiliation;
         if (user.org === 'Org1') {
@@ -159,7 +155,7 @@ async function verifyUser(userId, otp) {
         const attributes = [
             { name: 'cccd', value: user.cccd, ecert: true }
         ];
-        await registerAndEnrollUser(caClient, wallet, msp, user.userId, affiliation, attributes);
+        await registerAndEnrollUser(caClient, wallet, msp, user.cccd, affiliation, attributes);
 
         user.isPhoneVerified = true;
         user.otp = undefined;
@@ -168,13 +164,13 @@ async function verifyUser(userId, otp) {
         await user.save();
 
         const log = new Log({
-            userId,
+            cccd,
             action: 'User Registration',
-            details: `User ${userId} successfully registered and verified phone`
+            details: `User with CCCD ${cccd} successfully registered and verified phone`
         });
         await log.save();
 
-        console.log(`Successfully registered user ${userId} for ${user.org}`);
+        console.log(`Successfully registered user with CCCD ${cccd} for ${user.org}`);
         return { message: 'User registered successfully' };
     } catch (error) {
         console.error(`Error in verifying user: ${error}`);
@@ -186,19 +182,18 @@ module.exports = { registerUser, verifyUser, sendOTP };
 
 async function main() {
     try {
-        if (process.argv.length < 9) {
-            console.log('Usage: node registerUser.js <Org> <userId> <cccd> <phone> <fullName> <password> <confirmPassword>');
+        if (process.argv.length < 7) {
+            console.log('Usage: node registerUser.js <Org> <cccd> <phone> <fullName> <password> <role>');
             process.exit(1);
         }
         await connectMongoDB();
         const org = process.argv[2];
-        const userId = process.argv[3];
-        const cccd = process.argv[4];
-        const phone = process.argv[5];
-        const fullName = process.argv[6];
-        const password = process.argv[7];
-        const confirmPassword = process.argv[8];
-        await registerUser(org, userId, cccd, phone, fullName, password, confirmPassword);
+        const cccd = process.argv[3];
+        const phone = process.argv[4];
+        const fullName = process.argv[5];
+        const password = process.argv[6];
+        const role = process.argv[7];
+        await registerUser(org, cccd, phone, fullName, password, role);
         mongoose.disconnect();
     } catch (error) {
         console.error(`Error: ${error}`);

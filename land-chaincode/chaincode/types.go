@@ -22,7 +22,6 @@ type LandCertificate struct {
 	OwnerID       string    `json:"ownerId"`       // CCCD của chủ sở hữu
 	IssueDate     time.Time `json:"issueDate"`     // Ngày cấp
 	LegalInfo     string    `json:"legalInfo"`     // Thông tin pháp lý
-	Signature     string    `json:"signature"`     // Chữ ký số
 	CreatedAt     time.Time `json:"createdAt"`     // Thời gian tạo
 	UpdatedAt     time.Time `json:"updatedAt"`     // Thời gian cập nhật
 }
@@ -36,7 +35,6 @@ type LandTransaction struct {
 	ToOwnerID    string    `json:"toOwnerId"`    // CCCD người nhận chuyển nhượng (nếu có)
 	Status       string    `json:"status"`       // Trạng thái (PENDING, CONFIRMED, FORWARDED, VERIFIED, SUPPLEMENT_REQUESTED, APPROVED, REJECTED)
 	Details      string    `json:"details"`      // Chi tiết giao dịch
-	Signature    string    `json:"signature"`    // Chữ ký số
 	CreatedAt    time.Time `json:"createdAt"`    // Thời gian tạo
 	UpdatedAt    time.Time `json:"updatedAt"`    // Thời gian cập nhật
 }

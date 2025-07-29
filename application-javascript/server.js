@@ -7,9 +7,10 @@ const { Gateway, Wallets } = require('fabric-network');
 const path = require('path');
 const { buildCCPOrg1, buildCCPOrg2, buildCCPOrg3, buildWallet } = require('./enroll/AppUtil.js');
 const { registerUser, verifyUser, sendOTP } = require('./enroll/registerUser.js');
-const { changePassword, forgotPassword, resetPassword, lockUnlockAccount } = require('./enroll/accountManager.js');
+const { changePassword, forgotPassword, resetPassword, lockUnlockAccount, deleteAccount } = require('./enroll/accountManager.js');
 const { validatePassword, validateCCCD, validatePhone, sanitizeInput, validateOrg } = require('./enroll/validation.js');
 const User = require('./models/User');
+const cors = require('cors');
 require('dotenv').config({ path: path.resolve(__dirname, './.env') });
 
 const app = express();
@@ -25,6 +26,14 @@ if (!jwtSecret) {
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// CORS configuration
+app.use(cors({
+    origin: ['http://localhost:5000', 'http://localhost:3000'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Kết nối MongoDB
 async function connectMongoDB() {
@@ -42,6 +51,102 @@ async function connectMongoDB() {
     }
 }
 
+// Initialize admin accounts for each organization
+async function initializeAdminAccounts() {
+    try {
+        console.log('Checking for admin accounts...');
+        
+        const adminAccounts = [
+            {
+                cccd: '000000000001',
+                phone: '+84900000001',
+                fullName: 'Admin Organization 1',
+                org: 'Org1',
+                role: 'admin',
+                password: 'Admin123!',
+                isPhoneVerified: true,
+                isLocked: false
+            },
+            {
+                cccd: '000000000002',
+                phone: '+84900000002',
+                fullName: 'Admin Organization 2',
+                org: 'Org2',
+                role: 'admin',
+                password: 'Admin123!',
+                isPhoneVerified: true,
+                isLocked: false
+            },
+            {
+                cccd: '000000000003',
+                phone: '+84900000003',
+                fullName: 'Admin Organization 3',
+                org: 'Org3',
+                role: 'admin',
+                password: 'Admin123!',
+                isPhoneVerified: true,
+                isLocked: false
+            }
+        ];
+
+        for (const adminData of adminAccounts) {
+            const existingAdmin = await User.findOne({ cccd: adminData.cccd });
+            
+            if (!existingAdmin) {
+                // Create admin in MongoDB
+                const admin = new User(adminData);
+                await admin.save();
+                console.log(`Created admin account for ${adminData.org}: ${adminData.cccd}`);
+                
+                // Register admin with Fabric network
+                try {
+                    await registerAdminWithFabric(adminData.org, adminData.cccd);
+                    console.log(`Registered ${adminData.cccd} with Fabric network for ${adminData.org}`);
+                } catch (fabricError) {
+                    console.log(`Admin ${adminData.cccd} may already be registered with Fabric: ${fabricError.message}`);
+                }
+            } else {
+                console.log(`Admin account already exists for ${adminData.org}: ${adminData.cccd}`);
+            }
+        }
+        
+        console.log('Admin accounts initialization completed');
+    } catch (error) {
+        console.error(`Failed to initialize admin accounts: ${error.message}`);
+    }
+}
+
+// Register admin with Fabric network
+async function registerAdminWithFabric(org, cccd) {
+    const { registerAndEnrollUser } = require('./enroll/CAUtil.js');
+    
+    let ccp, walletPath, msp;
+    if (org === 'Org1') {
+        ccp = buildCCPOrg1();
+        walletPath = path.join(__dirname, './wallet/org1');
+        msp = 'Org1MSP';
+    } else if (org === 'Org2') {
+        ccp = buildCCPOrg2();
+        walletPath = path.join(__dirname, './wallet/org2');
+        msp = 'Org2MSP';
+    } else if (org === 'Org3') {
+        ccp = buildCCPOrg3();
+        walletPath = path.join(__dirname, './wallet/org3');
+        msp = 'Org3MSP';
+    } else {
+        throw new Error('Invalid organization');
+    }
+
+    const caClient = require('./enroll/CAUtil.js').buildCAClient(
+        require('fabric-ca-client'), 
+        ccp, 
+        `ca.${org.toLowerCase()}.example.com`
+    );
+    const wallet = await buildWallet(Wallets, walletPath);
+    
+    await registerAndEnrollUser(caClient, wallet, msp, cccd, `${org.toLowerCase()}.department1`, []);
+}
+
 // Middleware xác thực JWT
 const authenticateJWT = async (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -52,7 +157,7 @@ const authenticateJWT = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     try {
         const decoded = jwt.verify(token, jwtSecret);
-        const user = await User.findOne({ userId: decoded.userId });
+        const user = await User.findOne({ cccd: decoded.cccd });
         if (!user) {
             return res.status(401).json({ error: 'Invalid token' });
         }
@@ -66,6 +171,14 @@ const authenticateJWT = async (req, res, next) => {
     }
 };
 
+// Middleware kiểm tra quyền admin
+const requireAdmin = (req, res, next) => {
+    if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Admin privileges required' });
+    }
+    next();
+};
+
 // Middleware kiểm tra quyền truy cập theo tổ chức
 const checkOrg = (allowedOrgs) => (req, res, next) => {
     if (!allowedOrgs.includes(req.user.org)) {
@@ -75,7 +188,7 @@ const checkOrg = (allowedOrgs) => (req, res, next) => {
 };
 
 // Kết nối với Hyperledger Fabric
-async function connectToNetwork(org, userId) {
+async function connectToNetwork(org, cccd) {
     let ccp, walletPath;
     if (org === 'Org1') {
         ccp = buildCCPOrg1();
@@ -92,7 +205,7 @@ async function connectToNetwork(org, userId) {
 
     const wallet = await buildWallet(Wallets, walletPath);
     const gateway = new Gateway();
-    await gateway.connect(ccp, { wallet, identity: userId, discovery: { enabled: true, asLocalhost: true } });
+    await gateway.connect(ccp, { wallet, identity: cccd, discovery: { enabled: true, asLocalhost: true } });
     const network = await gateway.getNetwork(myChannel);
     const contract = network.getContract(myChaincodeName);
 
@@ -100,33 +213,46 @@ async function connectToNetwork(org, userId) {
 }
 
 // Đăng ký người dùng
-app.post('/register', async (req, res) => {
-    const { org, userId, cccd, phone, fullName, password } = req.body;
-    try {
-        // Validate organization
-        validateOrg(org);
-        
-        // Validate inputs
-        validateCCCD(cccd);
-        validatePhone(phone);
-        validatePassword(password);
-        
-        // Sanitize inputs
-        const sanitizedUserId = sanitizeInput(userId);
-        const sanitizedFullName = sanitizeInput(fullName);
-        
-        const result = await registerUser(org, sanitizedUserId, cccd, phone, sanitizedFullName, password);
-        res.json(result);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
+app.post('/register', async (req, res, next) => {
+    const { org, cccd, phone, fullName, password, role } = req.body;
+    // If not authenticated, only allow citizen registration (Org3, role user)
+    if (!req.headers.authorization) {
+        // Citizen self-register
+        try {
+            if (org && org !== 'Org3') {
+                return res.status(403).json({ error: 'Citizens can only register for Org3' });
+            }
+            const result = await registerUser('Org3', cccd, phone, fullName, password, 'user');
+            res.json(result);
+        } catch (error) {
+            res.status(400).json({ error: error.message });
+        }
+        return;
     }
+    // If authenticated, require admin
+    authenticateJWT(req, res, async () => {
+        requireAdmin(req, res, async () => {
+            try {
+                validateOrg(org);
+                validateCCCD(cccd);
+                validatePhone(phone);
+                validatePassword(password);
+                const sanitizedFullName = sanitizeInput(fullName);
+                const userRole = role === 'admin' ? 'admin' : 'user';
+                const result = await registerUser(org, cccd, phone, sanitizedFullName, password, userRole);
+                res.json(result);
+            } catch (error) {
+                res.status(400).json({ error: error.message });
+            }
+        });
+    });
 });
 
 // Gửi lại OTP
 app.post('/resend-otp', async (req, res) => {
-    const { userId } = req.body;
+    const { cccd } = req.body;
     try {
-        const user = await User.findOne({ userId });
+        const user = await User.findOne({ cccd });
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
@@ -145,9 +271,9 @@ app.post('/resend-otp', async (req, res) => {
 
 // Xác minh OTP
 app.post('/verify-otp', async (req, res) => {
-    const { userId, otp } = req.body;
+    const { cccd, otp } = req.body;
     try {
-        const result = await verifyUser(userId, otp);
+        const result = await verifyUser(cccd, otp);
         res.json(result);
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -156,9 +282,14 @@ app.post('/verify-otp', async (req, res) => {
 
 // Đăng nhập
 app.post('/login', async (req, res) => {
-    const { userId, password } = req.body;
+    const { phone, cccd, password } = req.body;
     try {
-        const user = await User.findOne({ userId });
+        let user;
+        if (phone) {
+            user = await User.findOne({ phone });
+        } else if (cccd) {
+            user = await User.findOne({ cccd });
+        }
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
@@ -172,7 +303,7 @@ app.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        const token = jwt.sign({ userId: user.userId, org: user.org }, jwtSecret, { expiresIn: '1h' });
+        const token = jwt.sign({ cccd: user.cccd, org: user.org }, jwtSecret, { expiresIn: '1h' });
         res.json({ message: 'Login successful', token });
     } catch (error) {
         res.status(500).json({ error: `Login failed: ${error.message}` });
@@ -193,7 +324,7 @@ app.post('/logout', authenticateJWT, async (req, res) => {
 // Đổi mật khẩu
 app.post('/change-password', authenticateJWT, async (req, res) => {
     const { oldPassword, newPassword, confirmPassword } = req.body;
-    const { userId } = req.user;
+    const { cccd } = req.user;
     try {
         // Validate new password strength
         validatePassword(newPassword);
@@ -203,7 +334,7 @@ app.post('/change-password', authenticateJWT, async (req, res) => {
             return res.status(400).json({ error: 'Passwords do not match' });
         }
         
-        const result = await changePassword(userId, oldPassword, newPassword);
+        const result = await changePassword(cccd, oldPassword, newPassword);
         res.json(result);
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -212,9 +343,9 @@ app.post('/change-password', authenticateJWT, async (req, res) => {
 
 // Quên mật khẩu
 app.post('/forgot-password', async (req, res) => {
-    const { userId, phone } = req.body;
+    const { cccd, phone } = req.body;
     try {
-        const result = await forgotPassword(userId, phone);
+        const result = await forgotPassword(cccd, phone);
         res.json(result);
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -223,12 +354,12 @@ app.post('/forgot-password', async (req, res) => {
 
 // Đặt lại mật khẩu
 app.post('/reset-password', async (req, res) => {
-    const { userId, otp, newPassword } = req.body;
+    const { cccd, otp, newPassword } = req.body;
     try {
         // Validate new password strength
         validatePassword(newPassword);
         
-        const result = await resetPassword(userId, otp, newPassword);
+        const result = await resetPassword(cccd, otp, newPassword);
         res.json(result);
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -236,28 +367,42 @@ app.post('/reset-password', async (req, res) => {
 });
 
 // Khóa/Mở khóa tài khoản (chỉ Org1 - Authority có quyền)
-app.post('/account/lock-unlock', authenticateJWT, checkOrg(['Org1']), async (req, res) => {
-    const { targetUserId, lock } = req.body;
-    const { userId } = req.user;
+app.post('/account/lock-unlock', authenticateJWT, requireAdmin, async (req, res) => {
+    const { targetCccd, lock } = req.body;
+    const { cccd } = req.user;
     try {
-        const result = await lockUnlockAccount(userId, targetUserId, lock);
+        const result = await lockUnlockAccount(cccd, targetCccd, lock);
         res.json(result);
     } catch (error) {
-        res.status(error.message.includes('Org1') ? 403 : 400).json({ error: error.message });
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Xóa tài khoản (chỉ admin)
+app.delete('/account/delete', authenticateJWT, requireAdmin, async (req, res) => {
+    const { targetCccd } = req.body;
+    if (!targetCccd) {
+        return res.status(400).json({ error: 'targetCccd is required' });
+    }
+    try {
+        const result = await deleteAccount(req.user.cccd, targetCccd);
+        res.json(result);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
     }
 });
 
 // Tạo thửa đất (Org1 - authority organizations)
 app.post('/land-parcels', authenticateJWT, checkOrg(['Org1']), async (req, res) => {
     const { id, ownerID, location, landUsePurpose, legalStatus, area } = req.body;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
         const statefulTxn = contract.createTransaction('CreateLandParcel');
         statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org2MSP');
-        await statefulTxn.submit(id, ownerID, location, landUsePurpose, legalStatus, area.toString(), userId);
-        const result = await contract.evaluateTransaction('QueryLandParcelByID', id, userId);
+        await statefulTxn.submit(id, ownerID, location, landUsePurpose, legalStatus, area.toString(), cccd);
+        const result = await contract.evaluateTransaction('QueryLandParcelByID', id, cccd);
         gateway.disconnect();
         res.json({ message: 'Land parcel created', landParcel: JSON.parse(result.toString()) });
     } catch (error) {
@@ -265,17 +410,36 @@ app.post('/land-parcels', authenticateJWT, checkOrg(['Org1']), async (req, res) 
     }
 });
 
+// Update Land Parcel endpoint
+app.put('/land-parcels/:landParcelID', authenticateJWT, checkOrg(['Org1']), async (req, res) => {
+    const { landParcelID } = req.params;
+    const { area, location, purpose, ownerID } = req.body;
+    const { cccd, org } = req.user;
+
+    try {
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const statefulTxn = contract.createTransaction('UpdateLandParcel');
+        statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org2MSP');
+        await statefulTxn.submit(landParcelID, area.toString(), location, purpose, ownerID);
+        const result = await contract.evaluateTransaction('QueryLandParcelByID', landParcelID, cccd);
+        gateway.disconnect();
+        res.json({ message: 'Land parcel updated successfully', landParcel: JSON.parse(result.toString()) });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to update land parcel: ${error.message}` });
+    }
+});
+
 // Tải lên tài liệu (tất cả các tổ chức)
 app.post('/documents', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), async (req, res) => {
     const { docID, landParcelID, txID, ipfsHash, description } = req.body;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
         const statefulTxn = contract.createTransaction('UploadDocument');
         statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org2MSP');
-        await statefulTxn.submit(docID, landParcelID, txID || '', ipfsHash, description, userId);
-        const result = await contract.evaluateTransaction('QueryDocumentByID', docID, userId);
+        await statefulTxn.submit(docID, landParcelID, txID || '', ipfsHash, description, cccd);
+        const result = await contract.evaluateTransaction('QueryDocumentByID', docID, cccd);
         gateway.disconnect();
         res.json({ message: 'Document uploaded', document: JSON.parse(result.toString()) });
     } catch (error) {
@@ -286,14 +450,14 @@ app.post('/documents', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), asyn
 // Chứng thực tài liệu (Org1, Org2 - officer organizations)
 app.post('/documents/:docID/verify', authenticateJWT, checkOrg(['Org1', 'Org2']), async (req, res) => {
     const { docID } = req.params;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
         const statefulTxn = contract.createTransaction('VerifyDocument');
         statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org2MSP');
         await statefulTxn.submit(docID);
-        const result = await contract.evaluateTransaction('QueryDocumentByID', docID, userId);
+        const result = await contract.evaluateTransaction('QueryDocumentByID', docID, cccd);
         gateway.disconnect();
         res.json({ message: 'Document verified', document: JSON.parse(result.toString()) });
     } catch (error) {
@@ -301,16 +465,35 @@ app.post('/documents/:docID/verify', authenticateJWT, checkOrg(['Org1', 'Org2'])
     }
 });
 
-app.post('/transactions/:txID/process', authenticateJWT, checkOrg(['Org2']), async (req, res) => {
-    const { txID } = req.params;
-    const { userId, org } = req.user;
+// Update Document endpoint
+app.put('/documents/:documentID', authenticateJWT, checkOrg(['Org1']), async (req, res) => {
+    const { documentID } = req.params;
+    const { ipfsHash, metadata } = req.body;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const statefulTxn = contract.createTransaction('UpdateDocument');
+        statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org2MSP');
+        await statefulTxn.submit(documentID, ipfsHash, JSON.stringify(metadata));
+        const result = await contract.evaluateTransaction('QueryDocumentByID', documentID, cccd);
+        gateway.disconnect();
+        res.json({ message: 'Document updated successfully', document: JSON.parse(result.toString()) });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to update document: ${error.message}` });
+    }
+});
+
+app.post('/transactions/:txID/process', authenticateJWT, checkOrg(['Org2']), async (req, res) => {
+    const { txID } = req.params;
+    const { cccd, org } = req.user;
+
+    try {
+        const { gateway, contract } = await connectToNetwork(org, cccd);
         const statefulTxn = contract.createTransaction('ProcessTransaction');
         statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org2MSP');
         await statefulTxn.submit(txID);
-        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, userId);
+        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, cccd);
         gateway.disconnect();
         res.json({ message: 'Transaction processed', transaction: JSON.parse(result.toString()) });
     } catch (error) {
@@ -320,15 +503,15 @@ app.post('/transactions/:txID/process', authenticateJWT, checkOrg(['Org2']), asy
 
 // Other existing routes remain unchanged
 app.post('/certificates', authenticateJWT, checkOrg(['Org1']), async (req, res) => {
-    const { certificateID, landParcelID, ownerID, legalInfo, signature } = req.body;
-    const { userId, org } = req.user;
+    const { certificateID, landParcelID, ownerID, legalInfo } = req.body;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
         const statefulTxn = contract.createTransaction('IssueLandCertificate');
         statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org2MSP');
-        await statefulTxn.submit(certificateID, landParcelID, ownerID, legalInfo, signature);
-        const result = await contract.evaluateTransaction('QueryCertificateByID', certificateID, userId);
+        await statefulTxn.submit(certificateID, landParcelID, ownerID, legalInfo);
+        const result = await contract.evaluateTransaction('QueryCertificateByID', certificateID, cccd);
         gateway.disconnect();
         res.json({ message: 'Certificate issued', certificate: JSON.parse(result.toString()) });
     } catch (error) {
@@ -337,15 +520,15 @@ app.post('/certificates', authenticateJWT, checkOrg(['Org1']), async (req, res) 
 });
 
 app.post('/transfer-requests', authenticateJWT, checkOrg(['Org3']), async (req, res) => {
-    const { txID, landParcelID, fromOwnerID, toOwnerID, details, signature } = req.body;
-    const { userId, org } = req.user;
+    const { txID, landParcelID, fromOwnerID, toOwnerID, details } = req.body;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
         const statefulTxn = contract.createTransaction('CreateTransferRequest');
         statefulTxn.setEndorsingOrganizations('Org2MSP', 'Org3MSP');
-        await statefulTxn.submit(txID, landParcelID, fromOwnerID, toOwnerID, details, signature);
-        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, userId);
+        await statefulTxn.submit(txID, landParcelID, fromOwnerID, toOwnerID, details);
+        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, cccd);
         gateway.disconnect();
         res.json({ message: 'Transfer request created', transaction: JSON.parse(result.toString()) });
     } catch (error) {
@@ -355,15 +538,15 @@ app.post('/transfer-requests', authenticateJWT, checkOrg(['Org3']), async (req, 
 
 app.post('/transfer-requests/:txID/confirm', authenticateJWT, checkOrg(['Org3']), async (req, res) => {
     const { txID } = req.params;
-    const { toOwnerID, signature, agree } = req.body;
-    const { userId, org } = req.user;
+    const { toOwnerID, agree } = req.body;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
         const statefulTxn = contract.createTransaction('ConfirmTransfer');
         statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org3MSP');
-        await statefulTxn.submit(txID, toOwnerID, signature, agree.toString());
-        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, userId);
+        await statefulTxn.submit(txID, toOwnerID, agree.toString());
+        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, cccd);
         gateway.disconnect();
         res.json({ message: 'Transfer confirmed', transaction: JSON.parse(result.toString()) });
     } catch (error) {
@@ -372,15 +555,15 @@ app.post('/transfer-requests/:txID/confirm', authenticateJWT, checkOrg(['Org3'])
 });
 
 app.post('/split-requests', authenticateJWT, checkOrg(['Org3']), async (req, res) => {
-    const { txID, landParcelID, ownerID, signature, newParcels } = req.body;
-    const { userId, org } = req.user;
+    const { txID, landParcelID, ownerID, newParcels } = req.body;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
         const statefulTxn = contract.createTransaction('CreateSplitRequest');
         statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org3MSP');
-        await statefulTxn.submit(txID, landParcelID, ownerID, signature, JSON.stringify(newParcels));
-        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, userId);
+        await statefulTxn.submit(txID, landParcelID, ownerID, JSON.stringify(newParcels));
+        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, cccd);
         gateway.disconnect();
         res.json({ message: 'Split request created', transaction: JSON.parse(result.toString()) });
     } catch (error) {
@@ -389,15 +572,15 @@ app.post('/split-requests', authenticateJWT, checkOrg(['Org3']), async (req, res
 });
 
 app.post('/merge-requests', authenticateJWT, checkOrg(['Org3']), async (req, res) => {
-    const { txID, ownerID, signature, parcelIDs, newParcel } = req.body;
-    const { userId, org } = req.user;
+    const { txID, ownerID, parcelIDs, newParcel } = req.body;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
         const statefulTxn = contract.createTransaction('CreateMergeRequest');
         statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org3MSP');
-        await statefulTxn.submit(txID, ownerID, signature, JSON.stringify(parcelIDs), JSON.stringify(newParcel));
-        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, userId);
+        await statefulTxn.submit(txID, ownerID, JSON.stringify(parcelIDs), JSON.stringify(newParcel));
+        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, cccd);
         gateway.disconnect();
         res.json({ message: 'Merge request created', transaction: JSON.parse(result.toString()) });
     } catch (error) {
@@ -406,15 +589,15 @@ app.post('/merge-requests', authenticateJWT, checkOrg(['Org3']), async (req, res
 });
 
 app.post('/change-purpose-requests', authenticateJWT, checkOrg(['Org3']), async (req, res) => {
-    const { txID, landParcelID, ownerID, newPurpose, details, signature } = req.body;
-    const { userId, org } = req.user;
+    const { txID, landParcelID, ownerID, newPurpose, details } = req.body;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
         const statefulTxn = contract.createTransaction('CreateChangePurposeRequest');
         statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org3MSP');
-        await statefulTxn.submit(txID, landParcelID, ownerID, newPurpose, details, signature);
-        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, userId);
+        await statefulTxn.submit(txID, landParcelID, ownerID, newPurpose, details);
+        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, cccd);
         gateway.disconnect();
         res.json({ message: 'Change purpose request created', transaction: JSON.parse(result.toString()) });
     } catch (error) {
@@ -423,15 +606,15 @@ app.post('/change-purpose-requests', authenticateJWT, checkOrg(['Org3']), async 
 });
 
 app.post('/reissue-requests', authenticateJWT, checkOrg(['Org3']), async (req, res) => {
-    const { txID, landParcelID, ownerID, details, signature } = req.body;
-    const { userId, org } = req.user;
+    const { txID, landParcelID, ownerID, details } = req.body;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
         const statefulTxn = contract.createTransaction('CreateReissueRequest');
         statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org3MSP');
-        await statefulTxn.submit(txID, landParcelID, ownerID, details, signature);
-        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, userId);
+        await statefulTxn.submit(txID, landParcelID, ownerID, details);
+        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, cccd);
         gateway.disconnect();
         res.json({ message: 'Reissue request created', transaction: JSON.parse(result.toString()) });
     } catch (error) {
@@ -442,14 +625,14 @@ app.post('/reissue-requests', authenticateJWT, checkOrg(['Org3']), async (req, r
 app.post('/transactions/:txID/forward', authenticateJWT, checkOrg(['Org2']), async (req, res) => {
     const { txID } = req.params;
     const { forwardDetails } = req.body;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
         const statefulTxn = contract.createTransaction('ForwardTransaction');
         statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org2MSP');
         await statefulTxn.submit(txID, forwardDetails);
-        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, userId);
+        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, cccd);
         gateway.disconnect();
         res.json({ message: 'Transaction forwarded', transaction: JSON.parse(result.toString()) });
     } catch (error) {
@@ -460,14 +643,14 @@ app.post('/transactions/:txID/forward', authenticateJWT, checkOrg(['Org2']), asy
 app.post('/transactions/:txID/approve', authenticateJWT, checkOrg(['Org1']), async (req, res) => {
     const { txID } = req.params;
     const { approveDetails } = req.body;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
         const statefulTxn = contract.createTransaction('ApproveTransaction');
         statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org2MSP');
         await statefulTxn.submit(txID, approveDetails);
-        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, userId);
+        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, cccd);
         gateway.disconnect();
         res.json({ message: 'Transaction approved', transaction: JSON.parse(result.toString()) });
     } catch (error) {
@@ -478,14 +661,14 @@ app.post('/transactions/:txID/approve', authenticateJWT, checkOrg(['Org1']), asy
 app.post('/transactions/:txID/reject', authenticateJWT, checkOrg(['Org1']), async (req, res) => {
     const { txID } = req.params;
     const { rejectDetails } = req.body;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
         const statefulTxn = contract.createTransaction('RejectTransaction');
         statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org2MSP');
         await statefulTxn.submit(txID, rejectDetails);
-        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, userId);
+        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, cccd);
         gateway.disconnect();
         res.json({ message: 'Transaction rejected', transaction: JSON.parse(result.toString()) });
     } catch (error) {
@@ -495,11 +678,11 @@ app.post('/transactions/:txID/reject', authenticateJWT, checkOrg(['Org1']), asyn
 
 app.get('/land-parcels/:id', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), async (req, res) => {
     const { id } = req.params;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryLandParcelByID', id, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryLandParcelByID', id, cccd);
         gateway.disconnect();
         res.json({ landParcel: JSON.parse(result.toString()) });
     } catch (error) {
@@ -509,11 +692,11 @@ app.get('/land-parcels/:id', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3'])
 
 app.get('/land-parcels/owner/:ownerID', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), async (req, res) => {
     const { ownerID } = req.params;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryLandParcelsByOwner', ownerID, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'landparcel', '', JSON.stringify({ ownerId: ownerID }), cccd);
         gateway.disconnect();
         res.json({ landParcels: JSON.parse(result.toString()) });
     } catch (error) {
@@ -521,64 +704,27 @@ app.get('/land-parcels/owner/:ownerID', authenticateJWT, checkOrg(['Org1', 'Org2
     }
 });
 
-app.get('/land-parcels/location/:location', authenticateJWT, async (req, res) => {
-    const { location } = req.params;
-    const { userId, org } = req.user;
-    if (!['Org1', 'Org2'].includes(org)) {
-        return res.status(403).json({ error: 'Access denied, required organization: Org1 or Org2' });
-    }
+app.get('/land-parcels/search', authenticateJWT, checkOrg(['Org1', 'Org2']), async (req, res) => {
+    const { keyword } = req.query;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryLandParcelsByLocation', location);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'landparcel', keyword || '', '{}', cccd);
         gateway.disconnect();
         res.json({ landParcels: JSON.parse(result.toString()) });
     } catch (error) {
-        res.status(500).json({ error: `Failed to query land parcels by location: ${error.message}` });
-    }
-});
-
-app.get('/land-parcels/purpose/:landUsePurpose', authenticateJWT, async (req, res) => {
-    const { landUsePurpose } = req.params;
-    const { userId, org } = req.user;
-    if (!['Org1', 'Org2'].includes(org)) {
-        return res.status(403).json({ error: 'Access denied, required organization: Org1 or Org2' });
-    }
-
-    try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryLandParcelsByPurpose', landUsePurpose);
-        gateway.disconnect();
-        res.json({ landParcels: JSON.parse(result.toString()) });
-    } catch (error) {
-        res.status(500).json({ error: `Failed to query land parcels by purpose: ${error.message}` });
-    }
-});
-
-app.get('/land-parcels/legal-status/:legalStatus', authenticateJWT, async (req, res) => {
-    const { legalStatus } = req.params;
-    const { userId, org } = req.user;
-    if (!['Org1', 'Org2'].includes(org)) {
-        return res.status(403).json({ error: 'Access denied, required organization: Org1 or Org2' });
-    }
-
-    try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryLandParcelsByLegalStatus', legalStatus);
-        gateway.disconnect();
-        res.json({ landParcels: JSON.parse(result.toString()) });
-    } catch (error) {
-        res.status(500).json({ error: `Failed to query land parcels by legal status: ${error.message}` });
+        res.status(500).json({ error: `Failed to search land parcels: ${error.message}` });
     }
 });
 
 app.get('/certificates/owner/:ownerID', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), async (req, res) => {
     const { ownerID } = req.params;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryCertificatesByOwner', ownerID, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'landcertificate', '', JSON.stringify({ ownerId: ownerID }), cccd);
         gateway.disconnect();
         res.json({ certificates: JSON.parse(result.toString()) });
     } catch (error) {
@@ -588,11 +734,11 @@ app.get('/certificates/owner/:ownerID', authenticateJWT, checkOrg(['Org1', 'Org2
 
 app.get('/certificates/:certificateID', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), async (req, res) => {
     const { certificateID } = req.params;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryCertificateByID', certificateID, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryCertificateByID', certificateID, cccd);
         gateway.disconnect();
         res.json({ certificate: JSON.parse(result.toString()) });
     } catch (error) {
@@ -602,11 +748,11 @@ app.get('/certificates/:certificateID', authenticateJWT, checkOrg(['Org1', 'Org2
 
 app.get('/certificates/land-parcel/:landParcelID', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), async (req, res) => {
     const { landParcelID } = req.params;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryCertificatesByLandParcel', landParcelID, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'landcertificate', '', JSON.stringify({ landParcelId: landParcelID }), cccd);
         gateway.disconnect();
         res.json({ certificates: JSON.parse(result.toString()) });
     } catch (error) {
@@ -614,30 +760,28 @@ app.get('/certificates/land-parcel/:landParcelID', authenticateJWT, checkOrg(['O
     }
 });
 
-app.get('/certificates/issue-date', authenticateJWT, async (req, res) => {
-    const { startDate, endDate } = req.query;
-    const { userId, org } = req.user;
-    if (!['Org1', 'Org2'].includes(org)) {
-        return res.status(403).json({ error: 'Access denied, required organization: Org1 or Org2' });
-    }
+app.get('/certificates/search', authenticateJWT, checkOrg(['Org1', 'Org2']), async (req, res) => {
+    const { keyword, startDate, endDate } = req.query;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryCertificatesByIssueDate', startDate, endDate);
+        const filters = { startDate, endDate };
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'landcertificate', keyword || '', JSON.stringify(filters), cccd);
         gateway.disconnect();
         res.json({ certificates: JSON.parse(result.toString()) });
     } catch (error) {
-        res.status(500).json({ error: `Failed to query certificates by issue date: ${error.message}` });
+        res.status(500).json({ error: `Failed to search certificates: ${error.message}` });
     }
 });
 
 app.get('/transactions/:txID', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), async (req, res) => {
     const { txID } = req.params;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryTransactionByID', txID, cccd);
         gateway.disconnect();
         res.json({ transaction: JSON.parse(result.toString()) });
     } catch (error) {
@@ -645,30 +789,28 @@ app.get('/transactions/:txID', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3'
     }
 });
 
-app.get('/transactions/criteria', authenticateJWT, async (req, res) => {
-    const { status, txType, startTime, endTime } = req.query;
-    const { userId, org } = req.user;
-    if (!['Org1', 'Org2'].includes(org)) {
-        return res.status(403).json({ error: 'Access denied, required organization: Org1 or Org2' });
-    }
+app.get('/transactions/search', authenticateJWT, checkOrg(['Org1', 'Org2']), async (req, res) => {
+    const { keyword, status, txType, startTime, endTime } = req.query;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryTransactionsByCriteria', status, txType, startTime, endTime);
+        const filters = { status, type: txType, startTime, endTime };
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'landtransaction', keyword || '', JSON.stringify(filters), cccd);
         gateway.disconnect();
         res.json({ transactions: JSON.parse(result.toString()) });
     } catch (error) {
-        res.status(500).json({ error: `Failed to query transactions by criteria: ${error.message}` });
+        res.status(500).json({ error: `Failed to search transactions: ${error.message}` });
     }
 });
 
 app.get('/transactions/land-parcel/:landParcelID', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), async (req, res) => {
     const { landParcelID } = req.params;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryTransactionsByLandParcel', landParcelID, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'landtransaction', '', JSON.stringify({ landParcelId: landParcelID }), cccd);
         gateway.disconnect();
         res.json({ transactions: JSON.parse(result.toString()) });
     } catch (error) {
@@ -678,11 +820,11 @@ app.get('/transactions/land-parcel/:landParcelID', authenticateJWT, checkOrg(['O
 
 app.get('/transactions/owner/:ownerID', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), async (req, res) => {
     const { ownerID } = req.params;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryTransactionsByOwner', ownerID, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'landtransaction', '', JSON.stringify({ ownerId: ownerID }), cccd);
         gateway.disconnect();
         res.json({ transactions: JSON.parse(result.toString()) });
     } catch (error) {
@@ -692,11 +834,11 @@ app.get('/transactions/owner/:ownerID', authenticateJWT, checkOrg(['Org1', 'Org2
 
 app.get('/documents/:docID', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), async (req, res) => {
     const { docID } = req.params;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryDocumentByID', docID, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryDocumentByID', docID, cccd);
         gateway.disconnect();
         res.json({ document: JSON.parse(result.toString()) });
     } catch (error) {
@@ -704,27 +846,29 @@ app.get('/documents/:docID', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3'])
     }
 });
 
-app.get('/documents/land-parcel/:landParcelID', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), async (req, res) => {
-    const { landParcelID } = req.params;
-    const { userId, org } = req.user;
+app.get('/documents/search/:id', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), async (req, res) => {
+    const { id } = req.params;
+    const { keyword } = req.query;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryDocumentsByLandParcel', landParcelID, userId);
+        const filters = { landParcelId: id };
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'document', keyword || '', JSON.stringify(filters), cccd);
         gateway.disconnect();
         res.json({ documents: JSON.parse(result.toString()) });
     } catch (error) {
-        res.status(500).json({ error: `Failed to query documents by land parcel: ${error.message}` });
+        res.status(500).json({ error: `Failed to search documents: ${error.message}` });
     }
 });
 
 app.get('/documents/transaction/:txID', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), async (req, res) => {
     const { txID } = req.params;
-    const { userId, org } = req.user;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryDocumentsByTransaction', txID, userId);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'document', txID, '{}', cccd);
         gateway.disconnect();
         res.json({ documents: JSON.parse(result.toString()) });
     } catch (error) {
@@ -732,16 +876,13 @@ app.get('/documents/transaction/:txID', authenticateJWT, checkOrg(['Org1', 'Org2
     }
 });
 
-app.get('/documents/ipfs/:ipfsHash', authenticateJWT, async (req, res) => {
-    const { ipfsHash } = req.params;
-    const { userId, org } = req.user;
-    if (!['Org1', 'Org2'].includes(org)) {
-        return res.status(403).json({ error: 'Access denied, required organization: Org1 or Org2' });
-    }
+app.get('/documents/ipfs/:keyword', authenticateJWT, checkOrg(['Org1', 'Org2']), async (req, res) => {
+    const { keyword } = req.params;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryDocumentsByIPFSHash', ipfsHash);
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'document', keyword, '{}', cccd);
         gateway.disconnect();
         res.json({ documents: JSON.parse(result.toString()) });
     } catch (error) {
@@ -749,20 +890,19 @@ app.get('/documents/ipfs/:ipfsHash', authenticateJWT, async (req, res) => {
     }
 });
 
-app.get('/logs/transaction/:txID', authenticateJWT, async (req, res) => {
+app.get('/logs/search/:txID', authenticateJWT, checkOrg(['Org1', 'Org2']), async (req, res) => {
     const { txID } = req.params;
-    const { userId, org } = req.user;
-    if (!['Org1', 'Org2'].includes(org)) {
-        return res.status(403).json({ error: 'Access denied, required organization: Org1 or Org2' });
-    }
+    const { keyword } = req.query;
+    const { cccd, org } = req.user;
 
     try {
-        const { gateway, contract } = await connectToNetwork(org, userId);
-        const result = await contract.evaluateTransaction('QueryLogsByTransaction', txID, userId);
+        const filters = { txId: txID };
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'transactionlog', keyword || txID, JSON.stringify(filters), cccd);
         gateway.disconnect();
         res.json({ logs: JSON.parse(result.toString()) });
     } catch (error) {
-        res.status(500).json({ error: `Failed to query logs by transaction: ${error.message}` });
+        res.status(500).json({ error: `Failed to query logs by identifier: ${error.message}` });
     }
 });
 
@@ -770,6 +910,7 @@ app.get('/logs/transaction/:txID', authenticateJWT, async (req, res) => {
 async function main() {
     try {
         await connectMongoDB();
+        await initializeAdminAccounts();
         app.listen(port, () => {
             console.log(`Server is running on port ${port}`);
         });

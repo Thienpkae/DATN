@@ -1,0 +1,8 @@
+{
+  "index": {
+    "fields": ["logId", "txId", "action", "userId", "timestamp", "details"]
+  },
+  "ddoc": "log_doc",
+  "name": "log_index",
+  "type": "json"
+}

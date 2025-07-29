@@ -2,11 +2,11 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
 const userSchema = new mongoose.Schema({
-    userId: { type: String, required: true, unique: true },
     cccd: { type: String, required: true, unique: true },
     phone: { type: String, required: true, unique: true }, 
     fullName: { type: String, required: true },
     org: { type: String, required: true, enum: ['Org1', 'Org2', 'Org3'] },
+    role: { type: String, required: true, enum: ['admin', 'user'], default: 'user' },
     password: { type: String },
     otp: { type: String }, 
     otpExpires: { type: Date }, 

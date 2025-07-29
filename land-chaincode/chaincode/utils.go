@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/hyperledger/fabric-chaincode-go/pkg/cid"
-	"github.com/hyperledger/fabric-chaincode-go/pkg/statebased"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
@@ -69,15 +68,17 @@ func ValidateIPFSHash(hash string) error {
 	return nil
 }
 
-// GetTxTimestampAsTime lấy timestamp của transaction và chuyển đổi thành time.Time
+// GetTxTimestampAsTime lấy timestamp của transaction và chuyển đổi thành time.Time ở múi giờ Việt Nam (+07:00)
 func GetTxTimestampAsTime(ctx contractapi.TransactionContextInterface) (time.Time, error) {
 	txTimestamp, err := ctx.GetStub().GetTxTimestamp()
 	if err != nil {
 		return time.Time{}, fmt.Errorf("không thể lấy timestamp của transaction: %v", err)
 	}
 
-	// Chuyển đổi từ protobuf timestamp sang time.Time
-	return time.Unix(txTimestamp.Seconds, int64(txTimestamp.Nanos)), nil
+	// Chuyển đổi sang time.Time và đặt múi giờ Việt Nam (+07:00)
+	vietnamTimeZone, _ := time.LoadLocation("Asia/Ho_Chi_Minh")
+	txTime := time.Unix(txTimestamp.Seconds, int64(txTimestamp.Nanos)).In(vietnamTimeZone)
+	return txTime, nil
 }
 
 // ValidateLandParcel kiểm tra tính hợp lệ của thửa đất
@@ -169,23 +170,23 @@ func CheckRequiredDocuments(ctx contractapi.TransactionContextInterface, txID, t
 		return nil, fmt.Errorf("loại giao dịch %s không hợp lệ", txType)
 	}
 
-	queryString := fmt.Sprintf(`{"selector":{"txId":"%s"}}`, txID)
-	resultsIterator, err := ctx.GetStub().GetQueryResult(queryString)
+	// Sử dụng QueryByKeyword để truy vấn tài liệu
+	userID, err := GetCallerID(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("lỗi khi kiểm tra tài liệu cho giao dịch %s: %v", txID, err)
+		return nil, fmt.Errorf("lỗi khi lấy userID: %v", err)
 	}
-	defer resultsIterator.Close()
+	documents, err := (&LandRegistryChaincode{}).QueryByKeyword(ctx, "document", "", map[string]string{"txId": txID}, userID)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi truy vấn tài liệu cho giao dịch %s: %v", txID, err)
+	}
+
+	docs, ok := documents.([]*Document)
+	if !ok {
+		return nil, fmt.Errorf("lỗi khi ép kiểu danh sách tài liệu")
+	}
 
 	foundDocs := make(map[string]bool)
-	for resultsIterator.HasNext() {
-		queryResponse, err := resultsIterator.Next()
-		if err != nil {
-			return nil, fmt.Errorf("lỗi khi duyệt tài liệu: %v", err)
-		}
-		var doc Document
-		if err := json.Unmarshal(queryResponse.Value, &doc); err != nil {
-			return nil, fmt.Errorf("lỗi khi giải mã tài liệu: %v", err)
-		}
+	for _, doc := range docs {
 		foundDocs[doc.Description] = true
 	}
 
@@ -249,16 +250,6 @@ func CheckTransactionExists(ctx contractapi.TransactionContextInterface, txID st
 	return data != nil, nil
 }
 
-// ValidateSignature kiểm tra chữ ký số (giả lập tích hợp với hệ thống chữ ký số quốc gia)
-func ValidateSignature(ctx contractapi.TransactionContextInterface, signature, userID string) (bool, error) {
-	// Giả lập kiểm tra chữ ký số theo Quyết định 28/2018/QĐ-TTg
-	if signature == "" {
-		return false, fmt.Errorf("chữ ký số không được để trống")
-	}
-	// Ở đây có thể tích hợp API chữ ký số quốc gia
-	return true, nil
-}
-
 // GetCallerID lấy ID của người gọi từ transaction context
 func GetCallerID(ctx contractapi.TransactionContextInterface) (string, error) {
 	clientID, err := cid.GetID(ctx.GetStub())
@@ -312,19 +303,16 @@ func RecordTransactionLog(ctx contractapi.TransactionContextInterface, txID, act
 
 // CheckOrganization kiểm tra quyền truy cập dựa trên tổ chức
 func CheckOrganization(ctx contractapi.TransactionContextInterface, allowedOrgs []string) error {
-	// Tạo client identity để lấy thông tin tổ chức
 	clientIdentity, err := cid.New(ctx.GetStub())
 	if err != nil {
 		return fmt.Errorf("lỗi khi khởi tạo client identity: %v", err)
 	}
 
-	// Lấy MSP ID của người gọi
 	mspID, err := clientIdentity.GetMSPID()
 	if err != nil {
 		return fmt.Errorf("lỗi khi lấy MSP ID: %v", err)
 	}
 
-	// Kiểm tra xem MSP ID có trong danh sách được phép không
 	for _, allowedOrg := range allowedOrgs {
 		if mspID == allowedOrg {
 			return nil
@@ -339,61 +327,4 @@ func parseFloat(s string) (float64, error) {
 	var f float64
 	_, err := fmt.Sscanf(s, "%f", &f)
 	return f, err
-}
-
-// setAssetStateBasedEndorsement thiết lập chính sách chứng thực cấp khóa cho một trạng thái
-func setAssetStateBasedEndorsement(ctx contractapi.TransactionContextInterface, stateID string, orgsToEndorse ...string) error {
-	endorsementPolicy, err := statebased.NewStateEP(nil)
-	if err != nil {
-		return fmt.Errorf("failed to create new state-based endorsement policy: %v", err)
-	}
-
-	for _, org := range orgsToEndorse {
-		err = endorsementPolicy.AddOrgs(statebased.RoleTypePeer, org)
-		if err != nil {
-			return fmt.Errorf("failed to add org %s to endorsement policy: %v", org, err)
-		}
-	}
-
-	policy, err := endorsementPolicy.Policy()
-	if err != nil {
-		return fmt.Errorf("failed to create endorsement policy bytes: %v", err)
-	}
-
-	err = ctx.GetStub().SetStateValidationParameter(stateID, policy)
-	if err != nil {
-		return fmt.Errorf("failed to set validation parameter for state %s: %v", stateID, err)
-	}
-
-	return nil
-}
-
-// addAssetStateBasedEndorsement thêm một tổ chức mới vào chính sách chứng thực cấp khóa hiện có
-func addAssetStateBasedEndorsement(ctx contractapi.TransactionContextInterface, stateID string, orgToEndorse string) error {
-	endorsementPolicyBytes, err := ctx.GetStub().GetStateValidationParameter(stateID)
-	if err != nil {
-		return fmt.Errorf("failed to get existing endorsement policy for state %s: %v", stateID, err)
-	}
-
-	newEndorsementPolicy, err := statebased.NewStateEP(endorsementPolicyBytes)
-	if err != nil {
-		return fmt.Errorf("failed to create new state-based endorsement policy from existing: %v", err)
-	}
-
-	err = newEndorsementPolicy.AddOrgs(statebased.RoleTypePeer, orgToEndorse)
-	if err != nil {
-		return fmt.Errorf("failed to add org %s to endorsement policy: %v", orgToEndorse, err)
-	}
-
-	policy, err := newEndorsementPolicy.Policy()
-	if err != nil {
-		return fmt.Errorf("failed to create endorsement policy bytes: %v", err)
-	}
-
-	err = ctx.GetStub().SetStateValidationParameter(stateID, policy)
-	if err != nil {
-		return fmt.Errorf("failed to set validation parameter for state %s: %v", stateID, err)
-	}
-
-	return nil
 }
