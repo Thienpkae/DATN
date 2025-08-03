@@ -1,0 +1,645 @@
+/* Organization Pages Styling Improvements */
+
+/* ===== GLOBAL PAGE STYLING ===== */
+.org-page-container {
+  padding: 24px !important;
+  background: transparent !important;
+  min-height: 100vh !important;
+}
+
+.org-page-header {
+  margin-bottom: 24px !important;
+  padding: 24px !important;
+  background: #ffffff !important;
+  border-radius: 12px !important;
+  border: 1px solid #e8e8e8 !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+}
+
+.org-page-title {
+  color: #1f1f1f !important;
+  margin: 0 !important;
+  margin-bottom: 8px !important;
+  font-weight: 600 !important;
+}
+
+.org-page-subtitle {
+  color: #666666 !important;
+  font-size: 14px !important;
+}
+
+/* ===== STATISTICS CARDS ===== */
+.org-stats-card {
+  background: #ffffff !important;
+  border: 1px solid #e8e8e8 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+  transition: all 0.3s ease !important;
+}
+
+.org-stats-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+  transform: translateY(-2px) !important;
+  border-color: #1890ff !important;
+}
+
+.org-stats-card .ant-statistic-title {
+  color: #666666 !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  margin-bottom: 8px !important;
+}
+
+.org-stats-card .ant-statistic-content-value {
+  font-weight: 700 !important;
+  font-size: 2rem !important;
+}
+
+/* ===== CONTENT CARDS ===== */
+.org-content-card {
+  background: #ffffff !important;
+  border: 1px solid #e8e8e8 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+  margin-bottom: 24px !important;
+}
+
+.org-content-card .ant-card-body {
+  padding: 24px !important;
+}
+
+/* ===== TABLES ===== */
+.org-table {
+  background: #ffffff !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+
+.org-table .ant-table-thead > tr > th {
+  background: #f8f9fa !important;
+  color: #1f1f1f !important;
+  font-weight: 600 !important;
+  border-bottom: 1px solid #e8e8e8 !important;
+  padding: 16px !important;
+}
+
+.org-table .ant-table-tbody > tr > td {
+  padding: 16px !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+}
+
+.org-table .ant-table-tbody > tr:hover > td {
+  background: #f8f9fa !important;
+}
+
+/* ===== BUTTONS ===== */
+.org-primary-button {
+  background: linear-gradient(135deg, #1890ff, #40a9ff) !important;
+  border: none !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+  font-weight: 500 !important;
+  transition: all 0.3s ease !important;
+}
+
+.org-primary-button:hover {
+  background: linear-gradient(135deg, #40a9ff, #096dd9) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+  transform: translateY(-1px) !important;
+}
+
+.org-secondary-button {
+  background: #ffffff !important;
+  border: 1px solid #d9d9d9 !important;
+  border-radius: 8px !important;
+  color: #1f1f1f !important;
+  font-weight: 500 !important;
+  transition: all 0.3s ease !important;
+}
+
+.org-secondary-button:hover {
+  background: #f8f9fa !important;
+  border-color: #1890ff !important;
+  color: #1890ff !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ===== BEAUTIFUL FORMS ===== */
+.org-form {
+  background: #ffffff !important;
+  padding: 32px !important;
+  border-radius: 16px !important;
+  border: 1px solid #e8e8e8 !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important;
+  margin-bottom: 24px !important;
+}
+
+.org-form .ant-form-item {
+  margin-bottom: 24px !important;
+}
+
+.org-form .ant-form-item-label {
+  padding-bottom: 8px !important;
+}
+
+.org-form .ant-form-item-label > label {
+  color: #1f1f1f !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  letter-spacing: 0.3px !important;
+}
+
+.org-form .ant-form-item-label > label.ant-form-item-required::before {
+  color: #ff4d4f !important;
+  font-weight: bold !important;
+}
+
+.org-form .ant-input,
+.org-form .ant-input-affix-wrapper,
+.org-form .ant-select-selector,
+.org-form .ant-picker {
+  border-radius: 12px !important;
+  border: 2px solid #e8e8e8 !important;
+  padding: 12px 16px !important;
+  font-size: 14px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+
+.org-form .ant-input:hover,
+.org-form .ant-input-affix-wrapper:hover,
+.org-form .ant-select-selector:hover,
+.org-form .ant-picker:hover {
+  border-color: #1890ff !important;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.1) !important;
+  transform: translateY(-1px) !important;
+}
+
+.org-form .ant-input:focus,
+.org-form .ant-input-affix-wrapper:focus,
+.org-form .ant-select-focused .ant-select-selector,
+.org-form .ant-picker-focused {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.15) !important;
+  transform: translateY(-1px) !important;
+  outline: none !important;
+}
+
+.org-form .ant-input-affix-wrapper {
+  padding: 0 !important;
+}
+
+.org-form .ant-input-affix-wrapper > input.ant-input {
+  border: none !important;
+  box-shadow: none !important;
+  padding: 12px 16px !important;
+}
+
+.org-form .ant-select-selector {
+  min-height: 48px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.org-form .ant-select-selection-placeholder {
+  color: #999999 !important;
+  font-style: italic !important;
+}
+
+.org-form .ant-input::placeholder,
+.org-form .ant-input-affix-wrapper input::placeholder {
+  color: #999999 !important;
+  font-style: italic !important;
+}
+
+/* Form validation styling */
+.org-form .ant-form-item-has-error .ant-input,
+.org-form .ant-form-item-has-error .ant-input-affix-wrapper,
+.org-form .ant-form-item-has-error .ant-select-selector {
+  border-color: #ff4d4f !important;
+  box-shadow: 0 0 0 4px rgba(255, 77, 79, 0.15) !important;
+}
+
+.org-form .ant-form-item-has-success .ant-input,
+.org-form .ant-form-item-has-success .ant-input-affix-wrapper,
+.org-form .ant-form-item-has-success .ant-select-selector {
+  border-color: #52c41a !important;
+  box-shadow: 0 0 0 4px rgba(82, 196, 26, 0.15) !important;
+}
+
+.org-form .ant-form-item-explain-error {
+  color: #ff4d4f !important;
+  font-size: 12px !important;
+  margin-top: 4px !important;
+  font-weight: 500 !important;
+}
+
+.org-form .ant-form-item-explain-success {
+  color: #52c41a !important;
+  font-size: 12px !important;
+  margin-top: 4px !important;
+  font-weight: 500 !important;
+}
+
+/* Form buttons */
+.org-form .ant-btn {
+  height: 48px !important;
+  border-radius: 12px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  letter-spacing: 0.3px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+}
+
+.org-form .ant-btn-primary {
+  background: linear-gradient(135deg, #1890ff, #40a9ff) !important;
+  border: none !important;
+  color: #ffffff !important;
+}
+
+.org-form .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #40a9ff, #096dd9) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 16px rgba(24, 144, 255, 0.3) !important;
+}
+
+.org-form .ant-btn-default {
+  background: #ffffff !important;
+  border: 2px solid #e8e8e8 !important;
+  color: #1f1f1f !important;
+}
+
+.org-form .ant-btn-default:hover {
+  background: #f8f9fa !important;
+  border-color: #1890ff !important;
+  color: #1890ff !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Form sections */
+.org-form-section {
+  margin-bottom: 32px !important;
+  padding-bottom: 24px !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+}
+
+.org-form-section:last-child {
+  border-bottom: none !important;
+  margin-bottom: 0 !important;
+}
+
+.org-form-section-title {
+  color: #1f1f1f !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  margin-bottom: 16px !important;
+  padding-bottom: 8px !important;
+  border-bottom: 2px solid #1890ff !important;
+  display: inline-block !important;
+}
+
+/* Textarea styling */
+.org-form .ant-input {
+  resize: vertical !important;
+  min-height: 48px !important;
+}
+
+.org-form textarea.ant-input {
+  min-height: 120px !important;
+  line-height: 1.6 !important;
+  padding: 16px !important;
+}
+
+/* Checkbox and Radio styling */
+.org-form .ant-checkbox-wrapper,
+.org-form .ant-radio-wrapper {
+  font-size: 14px !important;
+  color: #1f1f1f !important;
+  margin-bottom: 8px !important;
+}
+
+.org-form .ant-checkbox,
+.org-form .ant-radio {
+  transform: scale(1.2) !important;
+}
+
+.org-form .ant-checkbox-checked .ant-checkbox-inner,
+.org-form .ant-radio-checked .ant-radio-inner {
+  background-color: #1890ff !important;
+  border-color: #1890ff !important;
+}
+
+/* Upload component styling */
+.org-form .ant-upload {
+  border: 2px dashed #e8e8e8 !important;
+  border-radius: 12px !important;
+  background: #fafafa !important;
+  transition: all 0.3s ease !important;
+}
+
+.org-form .ant-upload:hover {
+  border-color: #1890ff !important;
+  background: #f0f8ff !important;
+}
+
+.org-form .ant-upload-drag {
+  border-radius: 12px !important;
+  background: #fafafa !important;
+}
+
+.org-form .ant-upload-drag:hover {
+  background: #f0f8ff !important;
+}
+
+/* ===== LOGIN FORM SPECIFIC STYLING ===== */
+.login-form .ant-input,
+.login-form .ant-input-affix-wrapper,
+.login-form .ant-input-password {
+  border: 1px solid #d9d9d9 !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  background: #ffffff !important;
+}
+
+.login-form .ant-input-affix-wrapper > input.ant-input,
+.login-form .ant-input-password > input.ant-input {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+}
+
+.login-form .ant-input:focus,
+.login-form .ant-input-affix-wrapper:focus,
+.login-form .ant-input-affix-wrapper-focused,
+.login-form .ant-input-password:focus,
+.login-form .ant-input-password-focused {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1) !important;
+  outline: none !important;
+}
+
+.login-form .ant-input:hover,
+.login-form .ant-input-affix-wrapper:hover,
+.login-form .ant-input-password:hover {
+  border-color: #1890ff !important;
+}
+
+/* Remove any inner input borders */
+.login-form .ant-input-affix-wrapper .ant-input,
+.login-form .ant-input-password .ant-input {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* Clean prefix/suffix styling */
+.login-form .ant-input-prefix,
+.login-form .ant-input-suffix {
+  color: #999999 !important;
+}
+
+/* Form item styling */
+.login-form .ant-form-item {
+  margin-bottom: 20px !important;
+}
+
+.login-form .ant-form-item-label > label {
+  color: #1f1f1f !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+}
+
+/* Button styling */
+.login-form .ant-btn {
+  height: 48px !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  font-size: 16px !important;
+}
+
+.login-form .ant-btn-primary {
+  background: linear-gradient(135deg, #1890ff, #40a9ff) !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3) !important;
+}
+
+.login-form .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #40a9ff, #096dd9) !important;
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ===== MODALS ===== */
+.org-modal .ant-modal-content {
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12) !important;
+}
+
+.org-modal .ant-modal-header {
+  border-radius: 12px 12px 0 0 !important;
+  border-bottom: 1px solid #e8e8e8 !important;
+  padding: 24px !important;
+}
+
+.org-modal .ant-modal-title {
+  color: #1f1f1f !important;
+  font-weight: 600 !important;
+  font-size: 18px !important;
+}
+
+.org-modal .ant-modal-body {
+  padding: 24px !important;
+}
+
+/* ===== TABS ===== */
+.org-tabs .ant-tabs-tab {
+  padding: 12px 24px !important;
+  font-weight: 500 !important;
+  color: #666666 !important;
+  border-radius: 8px 8px 0 0 !important;
+  transition: all 0.3s ease !important;
+}
+
+.org-tabs .ant-tabs-tab:hover {
+  color: #1890ff !important;
+}
+
+.org-tabs .ant-tabs-tab-active {
+  color: #1890ff !important;
+  font-weight: 600 !important;
+}
+
+.org-tabs .ant-tabs-ink-bar {
+  background: #1890ff !important;
+  height: 3px !important;
+  border-radius: 2px !important;
+}
+
+.org-tabs .ant-tabs-content-holder {
+  padding-top: 24px !important;
+}
+
+/* ===== TAGS ===== */
+.org-tag {
+  border-radius: 6px !important;
+  padding: 4px 12px !important;
+  font-weight: 500 !important;
+  border: 1px solid !important;
+}
+
+.org-tag-success {
+  background: rgba(82, 196, 26, 0.1) !important;
+  border-color: #52c41a !important;
+  color: #52c41a !important;
+}
+
+.org-tag-warning {
+  background: rgba(250, 173, 20, 0.1) !important;
+  border-color: #faad14 !important;
+  color: #faad14 !important;
+}
+
+.org-tag-error {
+  background: rgba(255, 77, 79, 0.1) !important;
+  border-color: #ff4d4f !important;
+  color: #ff4d4f !important;
+}
+
+.org-tag-info {
+  background: rgba(24, 144, 255, 0.1) !important;
+  border-color: #1890ff !important;
+  color: #1890ff !important;
+}
+
+/* ===== SEARCH AND FILTERS ===== */
+.org-search-container {
+  background: #ffffff !important;
+  padding: 20px !important;
+  border-radius: 12px !important;
+  border: 1px solid #e8e8e8 !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+  margin-bottom: 24px !important;
+}
+
+.org-search-input {
+  border-radius: 8px !important;
+  border-color: #d9d9d9 !important;
+}
+
+.org-search-input:focus {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1) !important;
+}
+
+/* ===== ALERTS ===== */
+.org-alert {
+  border-radius: 8px !important;
+  border: 1px solid !important;
+  margin-bottom: 16px !important;
+}
+
+.org-alert-success {
+  background: rgba(82, 196, 26, 0.05) !important;
+  border-color: #52c41a !important;
+}
+
+.org-alert-warning {
+  background: rgba(250, 173, 20, 0.05) !important;
+  border-color: #faad14 !important;
+}
+
+.org-alert-error {
+  background: rgba(255, 77, 79, 0.05) !important;
+  border-color: #ff4d4f !important;
+}
+
+.org-alert-info {
+  background: rgba(24, 144, 255, 0.05) !important;
+  border-color: #1890ff !important;
+}
+
+/* ===== RESPONSIVE IMPROVEMENTS ===== */
+@media (max-width: 768px) {
+  .org-page-container {
+    padding: 16px !important;
+  }
+  
+  .org-page-header {
+    padding: 16px !important;
+  }
+  
+  .org-content-card .ant-card-body {
+    padding: 16px !important;
+  }
+  
+  .org-stats-card .ant-statistic-content-value {
+    font-size: 1.5rem !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .org-page-container {
+    padding: 12px !important;
+  }
+  
+  .org-page-header {
+    padding: 12px !important;
+  }
+  
+  .org-content-card .ant-card-body {
+    padding: 12px !important;
+  }
+}
+
+/* ===== LOADING STATES ===== */
+.org-loading-container {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  min-height: 200px !important;
+  background: #ffffff !important;
+  border-radius: 12px !important;
+  border: 1px solid #e8e8e8 !important;
+}
+
+/* ===== EMPTY STATES ===== */
+.org-empty-state {
+  text-align: center !important;
+  padding: 48px 24px !important;
+  background: #ffffff !important;
+  border-radius: 12px !important;
+  border: 1px solid #e8e8e8 !important;
+}
+
+.org-empty-state .ant-empty-description {
+  color: #666666 !important;
+  font-size: 14px !important;
+}
+
+/* ===== ORGANIZATION SPECIFIC COLORS ===== */
+.org1-theme .org-primary-button {
+  background: linear-gradient(135deg, #1677ff, #4096ff) !important;
+}
+
+.org2-theme .org-primary-button {
+  background: linear-gradient(135deg, #52c41a, #73d13d) !important;
+}
+
+.org3-theme .org-primary-button {
+  background: linear-gradient(135deg, #fa8c16, #ffa940) !important;
+}
+
+.org1-theme .org-stats-card:hover {
+  border-color: #1677ff !important;
+}
+
+.org2-theme .org-stats-card:hover {
+  border-color: #52c41a !important;
+}
+
+.org3-theme .org-stats-card:hover {
+  border-color: #fa8c16 !important;
+}

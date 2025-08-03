@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Button, message, Typography, Modal } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
-import { landParcelAPI } from '../../services/api';
+import apiService from '../../services/api';
 
 const { Title } = Typography;
 
@@ -12,16 +12,19 @@ const MyLandParcels = ({ user }) => {
   const [viewingParcel, setViewingParcel] = useState(null);
 
   const fetchMyLandParcels = useCallback(async () => {
+    if (!user?.userId) return;
+
     setLoading(true);
     try {
-      const response = await landParcelAPI.getByOwner(user.userId);
-      setLandParcels(response.data || []);
+      const response = await apiService.getLandParcelsByOwner(user.userId);
+      setLandParcels(Array.isArray(response) ? response : []);
     } catch (error) {
-      message.error('Failed to fetch my land parcels');
+      console.error('Fetch my land parcels error:', error);
+      message.error(error.message || 'Failed to fetch my land parcels');
     } finally {
       setLoading(false);
     }
-  }, [user.userId]);
+  }, [user?.userId]);
 
   useEffect(() => {
     fetchMyLandParcels();

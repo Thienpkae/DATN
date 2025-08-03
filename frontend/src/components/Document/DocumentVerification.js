@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Typography, message, Button, Space } from 'antd';
 import { CheckCircleOutlined, EyeOutlined } from '@ant-design/icons';
-import { documentAPI } from '../../services/api';
+import apiService from '../../services/api';
 
 const { Title } = Typography;
 
@@ -10,21 +10,23 @@ const DocumentVerification = ({ user }) => {
   const [loading, setLoading] = useState(false);
 
   const fetchUnverifiedDocuments = useCallback(async () => {
+    if (!user?.userId) return;
+
     setLoading(true);
     try {
-      const response = await documentAPI.getAll();
-      if (Array.isArray(response.data)) {
-        setDocuments(response.data.filter(doc => !doc.verified));
-      } else {
-        console.error("Unexpected response format for getAll documents in verification:", response.data);
-        setDocuments([]);
-      }
+      // Search documents and filter for unverified ones
+      const response = await apiService.searchDocuments(user.userId, '');
+      const unverifiedDocs = Array.isArray(response)
+        ? response.filter(doc => !doc.verified)
+        : [];
+      setDocuments(unverifiedDocs);
     } catch (error) {
-      message.error('Failed to fetch documents');
+      console.error('Fetch unverified documents error:', error);
+      message.error(error.message || 'Failed to fetch documents');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.userId]);
 
   useEffect(() => {
     fetchUnverifiedDocuments();
@@ -32,11 +34,12 @@ const DocumentVerification = ({ user }) => {
 
   const handleVerifyDocument = async (docId) => {
     try {
-      await documentAPI.verify(docId);
+      await apiService.verifyDocument(docId);
       message.success('Document verified successfully');
       fetchUnverifiedDocuments();
     } catch (error) {
-      message.error(error.response?.data?.error || 'Failed to verify document');
+      console.error('Verify document error:', error);
+      message.error(error.message || 'Failed to verify document');
     }
   };
 

@@ -13,7 +13,7 @@ import {
   Col
 } from 'antd';
 import { PlusOutlined, EyeOutlined } from '@ant-design/icons';
-import { certificateAPI } from '../../services/api';
+import apiService from '../../services/api';
 
 const { Title } = Typography;
 
@@ -27,21 +27,21 @@ const CertificateManagement = ({ user }) => {
 
   useEffect(() => {
     fetchCertificates();
-  }, []);
+  }, [user?.userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchCertificates = async () => {
     setLoading(true);
     try {
-      // This would need system-wide certificate query for Org1
-      const response = await certificateAPI.getAll();
-      if (Array.isArray(response.data)) {
-        setCertificates(response.data);
+      // For now, get certificates by owner since there's no getAll endpoint
+      if (user?.userId) {
+        const response = await apiService.getCertificatesByOwner(user.userId);
+        setCertificates(Array.isArray(response) ? response : []);
       } else {
-        console.error("Unexpected response format for getAll certificates:", response.data);
         setCertificates([]);
       }
     } catch (error) {
-      message.error('Failed to fetch certificates');
+      console.error('Fetch certificates error:', error);
+      message.error(error.message || 'Failed to fetch certificates');
     } finally {
       setLoading(false);
     }
@@ -49,13 +49,14 @@ const CertificateManagement = ({ user }) => {
 
   const handleIssueCertificate = async (values) => {
     try {
-      await certificateAPI.issue(values);
+      await apiService.issueCertificate(values);
       message.success('Certificate issued successfully');
       setModalVisible(false);
       form.resetFields();
       fetchCertificates();
     } catch (error) {
-      message.error(error.response?.data?.error || 'Failed to issue certificate');
+      console.error('Issue certificate error:', error);
+      message.error(error.message || 'Failed to issue certificate');
     }
   };
 

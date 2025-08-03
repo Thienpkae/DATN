@@ -1,0 +1,368 @@
+/* Enhanced Button Styles */
+
+.enhanced-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-weight: var(--font-weight-medium);
+  transition: all var(--transition-normal);
+  cursor: pointer;
+  border: none;
+  outline: none;
+  text-decoration: none;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Remove Ant Design default styles that conflict */
+.enhanced-button.ant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  border: 1px solid transparent;
+}
+
+/* Button Variants */
+.enhanced-button--primary {
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-active));
+  color: var(--color-white);
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.enhanced-button--primary:hover {
+  background: linear-gradient(135deg, var(--primary-hover), var(--primary-color));
+  border-color: var(--primary-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.enhanced-button--primary:active {
+  background: var(--primary-active);
+  border-color: var(--primary-active);
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+.enhanced-button--secondary {
+  background: var(--color-white);
+  color: var(--gray-700);
+  border-color: var(--gray-300);
+  box-shadow: var(--shadow-xs);
+}
+
+.enhanced-button--secondary:hover {
+  background: var(--gray-50);
+  border-color: var(--gray-400);
+  color: var(--gray-800);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.enhanced-button--secondary:active {
+  background: var(--gray-100);
+  border-color: var(--gray-400);
+  transform: translateY(0);
+}
+
+.enhanced-button--danger {
+  background: linear-gradient(135deg, var(--error), var(--error-hover));
+  color: var(--color-white);
+  border-color: var(--error);
+  box-shadow: var(--shadow-sm);
+}
+
+.enhanced-button--danger:hover {
+  background: linear-gradient(135deg, var(--error-hover), var(--error));
+  border-color: var(--error-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.enhanced-button--ghost {
+  background: transparent;
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.enhanced-button--ghost:hover {
+  background: var(--primary-light);
+  color: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.enhanced-button--link {
+  background: transparent;
+  color: var(--primary-color);
+  border: none;
+  box-shadow: none;
+  padding: var(--space-1) var(--space-2);
+}
+
+.enhanced-button--link:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+  background: transparent;
+}
+
+.enhanced-button--text {
+  background: transparent;
+  color: var(--gray-600);
+  border: none;
+  box-shadow: none;
+}
+
+.enhanced-button--text:hover {
+  background: var(--gray-100);
+  color: var(--gray-800);
+}
+
+/* Button Sizes */
+.enhanced-button--small {
+  height: 24px;
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-sm);
+}
+
+.enhanced-button--medium {
+  height: 32px;
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-md);
+}
+
+.enhanced-button--large {
+  height: 40px;
+  padding: 0 var(--space-6);
+  font-size: var(--font-size-base);
+  border-radius: var(--radius-lg);
+}
+
+/* Button States */
+.enhanced-button--loading {
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.enhanced-button--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.enhanced-button--disabled:hover {
+  transform: none;
+  box-shadow: var(--shadow-xs);
+}
+
+/* Button Modifiers */
+.enhanced-button--full-width {
+  width: 100%;
+}
+
+.enhanced-button--rounded {
+  border-radius: var(--radius-full);
+}
+
+.enhanced-button--elevated {
+  box-shadow: var(--shadow-lg);
+}
+
+.enhanced-button--elevated:hover {
+  box-shadow: var(--shadow-xl);
+  transform: translateY(-2px);
+}
+
+.enhanced-button--gradient {
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-hover), var(--primary-active));
+  background-size: 200% 200%;
+  animation: gradientShift 3s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.enhanced-button--pulse {
+  animation: buttonPulse 2s infinite;
+}
+
+@keyframes buttonPulse {
+  0% { box-shadow: 0 0 0 0 rgba(var(--primary-color), 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(var(--primary-color), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--primary-color), 0); }
+}
+
+/* Icon Styles */
+.enhanced-button__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1em;
+  transition: transform var(--transition-fast);
+}
+
+.enhanced-button--icon-right .enhanced-button__icon {
+  order: 2;
+}
+
+.enhanced-button--icon-right .enhanced-button__text {
+  order: 1;
+}
+
+.enhanced-button:hover .enhanced-button__icon {
+  transform: scale(1.1);
+}
+
+.enhanced-button__loading-icon {
+  animation: spin 1s linear infinite;
+}
+
+.enhanced-button__text {
+  display: inline-block;
+  transition: transform var(--transition-fast);
+}
+
+/* Focus States for Accessibility */
+.enhanced-button:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.enhanced-button--danger:focus-visible {
+  outline-color: var(--error);
+}
+
+/* Button Groups */
+.enhanced-button-group {
+  display: flex;
+  align-items: center;
+}
+
+.enhanced-button-group--horizontal {
+  flex-direction: row;
+}
+
+.enhanced-button-group--vertical {
+  flex-direction: column;
+}
+
+.enhanced-button-group--spacing-small > * + * {
+  margin-left: var(--space-2);
+}
+
+.enhanced-button-group--spacing-medium > * + * {
+  margin-left: var(--space-3);
+}
+
+.enhanced-button-group--spacing-large > * + * {
+  margin-left: var(--space-4);
+}
+
+.enhanced-button-group--vertical.enhanced-button-group--spacing-small > * + * {
+  margin-left: 0;
+  margin-top: var(--space-2);
+}
+
+.enhanced-button-group--vertical.enhanced-button-group--spacing-medium > * + * {
+  margin-left: 0;
+  margin-top: var(--space-3);
+}
+
+.enhanced-button-group--vertical.enhanced-button-group--spacing-large > * + * {
+  margin-left: 0;
+  margin-top: var(--space-4);
+}
+
+.enhanced-button-group--actions {
+  justify-content: flex-end;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--gray-200);
+  margin-top: var(--space-6);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .enhanced-button-group--actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  
+  .enhanced-button-group--actions > * + * {
+    margin-left: 0;
+    margin-bottom: var(--space-3);
+  }
+  
+  .enhanced-button--full-width-mobile {
+    width: 100%;
+  }
+}
+
+/* Dark Mode Support (if needed) */
+@media (prefers-color-scheme: dark) {
+  .enhanced-button--secondary {
+    background: var(--gray-800);
+    color: var(--gray-200);
+    border-color: var(--gray-600);
+  }
+  
+  .enhanced-button--secondary:hover {
+    background: var(--gray-700);
+    color: var(--gray-100);
+    border-color: var(--gray-500);
+  }
+  
+  .enhanced-button--text {
+    color: var(--gray-300);
+  }
+  
+  .enhanced-button--text:hover {
+    background: var(--gray-800);
+    color: var(--gray-100);
+  }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  .enhanced-button {
+    border-width: 2px;
+  }
+  
+  .enhanced-button:focus-visible {
+    outline-width: 3px;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .enhanced-button {
+    transition: none;
+  }
+  
+  .enhanced-button--gradient {
+    animation: none;
+    background: var(--primary-color);
+  }
+  
+  .enhanced-button--pulse {
+    animation: none;
+  }
+  
+  .enhanced-button:hover {
+    transform: none;
+  }
+  
+  .enhanced-button__loading-icon {
+    animation: none;
+  }
+}

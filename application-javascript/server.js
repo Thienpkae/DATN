@@ -59,7 +59,7 @@ async function initializeAdminAccounts() {
         const adminAccounts = [
             {
                 cccd: '000000000001',
-                phone: '+84900000001',
+                phone: '0900000001',
                 fullName: 'Admin Organization 1',
                 org: 'Org1',
                 role: 'admin',
@@ -69,7 +69,7 @@ async function initializeAdminAccounts() {
             },
             {
                 cccd: '000000000002',
-                phone: '+84900000002',
+                phone: '0900000002',
                 fullName: 'Admin Organization 2',
                 org: 'Org2',
                 role: 'admin',
@@ -79,7 +79,7 @@ async function initializeAdminAccounts() {
             },
             {
                 cccd: '000000000003',
-                phone: '+84900000003',
+                phone: '0900000003',
                 fullName: 'Admin Organization 3',
                 org: 'Org3',
                 role: 'admin',
@@ -225,6 +225,22 @@ app.post('/register', async (req, res, next) => {
             const result = await registerUser('Org3', cccd, phone, fullName, password, 'user');
             res.json(result);
         } catch (error) {
+            console.error('Registration error:', error);
+            
+            // Handle specific MongoDB duplicate key errors
+            if (error.code === 11000) {
+                const field = Object.keys(error.keyPattern || {})[0];
+                if (field === 'cccd') {
+                    return res.status(400).json({ error: 'CCCD already exists' });
+                } else if (field === 'phone') {
+                    return res.status(400).json({ error: 'Phone number already exists' });
+                } else if (field === 'userId') {
+                    return res.status(400).json({ error: 'User ID already exists' });
+                } else {
+                    return res.status(400).json({ error: 'Duplicate entry found' });
+                }
+            }
+            
             res.status(400).json({ error: error.message });
         }
         return;
@@ -242,6 +258,22 @@ app.post('/register', async (req, res, next) => {
                 const result = await registerUser(org, cccd, phone, sanitizedFullName, password, userRole);
                 res.json(result);
             } catch (error) {
+                console.error('Admin registration error:', error);
+                
+                // Handle specific MongoDB duplicate key errors
+                if (error.code === 11000) {
+                    const field = Object.keys(error.keyPattern || {})[0];
+                    if (field === 'cccd') {
+                        return res.status(400).json({ error: 'CCCD already exists' });
+                    } else if (field === 'phone') {
+                        return res.status(400).json({ error: 'Phone number already exists' });
+                    } else if (field === 'userId') {
+                        return res.status(400).json({ error: 'User ID already exists' });
+                    } else {
+                        return res.status(400).json({ error: 'Duplicate entry found' });
+                    }
+                }
+                
                 res.status(400).json({ error: error.message });
             }
         });
@@ -905,6 +937,725 @@ app.get('/logs/search/:txID', authenticateJWT, checkOrg(['Org1', 'Org2']), async
         res.status(500).json({ error: `Failed to query logs by identifier: ${error.message}` });
     }
 });
+
+// ===== ADDITIONAL COMPREHENSIVE ENDPOINTS =====
+
+// Get all land parcels (Org1, Org2 - for management)
+app.get('/land-parcels', authenticateJWT, checkOrg(['Org1', 'Org2']), async (req, res) => {
+    const { cccd, org } = req.user;
+    const { limit = 50, offset = 0 } = req.query;
+
+    try {
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'landparcel', '', '{}', cccd);
+        gateway.disconnect();
+
+        const landParcels = JSON.parse(result.toString());
+        const startIndex = parseInt(offset);
+        const endIndex = startIndex + parseInt(limit);
+        const paginatedResults = landParcels.slice(startIndex, endIndex);
+
+        res.json({
+            landParcels: paginatedResults,
+            total: landParcels.length,
+            limit: parseInt(limit),
+            offset: parseInt(offset)
+        });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to query all land parcels: ${error.message}` });
+    }
+});
+
+// Get all certificates (Org1, Org2 - for management)
+app.get('/certificates', authenticateJWT, checkOrg(['Org1', 'Org2']), async (req, res) => {
+    const { cccd, org } = req.user;
+    const { limit = 50, offset = 0 } = req.query;
+
+    try {
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'landcertificate', '', '{}', cccd);
+        gateway.disconnect();
+
+        const certificates = JSON.parse(result.toString());
+        const startIndex = parseInt(offset);
+        const endIndex = startIndex + parseInt(limit);
+        const paginatedResults = certificates.slice(startIndex, endIndex);
+
+        res.json({
+            certificates: paginatedResults,
+            total: certificates.length,
+            limit: parseInt(limit),
+            offset: parseInt(offset)
+        });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to query all certificates: ${error.message}` });
+    }
+});
+
+// Get all transactions (Org1, Org2 - for management)
+app.get('/transactions', authenticateJWT, checkOrg(['Org1', 'Org2']), async (req, res) => {
+    const { cccd, org } = req.user;
+    const { limit = 50, offset = 0, status } = req.query;
+
+    try {
+        const filters = status ? { status } : {};
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'landtransaction', '', JSON.stringify(filters), cccd);
+        gateway.disconnect();
+
+        const transactions = JSON.parse(result.toString());
+        const startIndex = parseInt(offset);
+        const endIndex = startIndex + parseInt(limit);
+        const paginatedResults = transactions.slice(startIndex, endIndex);
+
+        res.json({
+            transactions: paginatedResults,
+            total: transactions.length,
+            limit: parseInt(limit),
+            offset: parseInt(offset)
+        });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to query all transactions: ${error.message}` });
+    }
+});
+
+// Get all documents (Org1, Org2 - for management)
+app.get('/documents', authenticateJWT, checkOrg(['Org1', 'Org2']), async (req, res) => {
+    const { cccd, org } = req.user;
+    const { limit = 50, offset = 0, verified } = req.query;
+
+    try {
+        const filters = verified !== undefined ? { verified: verified === 'true' } : {};
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'document', '', JSON.stringify(filters), cccd);
+        gateway.disconnect();
+
+        const documents = JSON.parse(result.toString());
+        const startIndex = parseInt(offset);
+        const endIndex = startIndex + parseInt(limit);
+        const paginatedResults = documents.slice(startIndex, endIndex);
+
+        res.json({
+            documents: paginatedResults,
+            total: documents.length,
+            limit: parseInt(limit),
+            offset: parseInt(offset)
+        });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to query all documents: ${error.message}` });
+    }
+});
+
+// Get pending documents for verification (Org2)
+app.get('/documents/pending', authenticateJWT, checkOrg(['Org2']), async (req, res) => {
+    const { cccd, org } = req.user;
+
+    try {
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('QueryByKeyword', 'document', '', JSON.stringify({ verified: false }), cccd);
+        gateway.disconnect();
+        res.json({ documents: JSON.parse(result.toString()) });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to query pending documents: ${error.message}` });
+    }
+});
+
+// Get dashboard statistics (All orgs)
+app.get('/dashboard/stats', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), async (req, res) => {
+    const { cccd, org } = req.user;
+
+    try {
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+
+        let stats = {};
+
+        if (org === 'Org3') {
+            // Citizens see only their own data
+            const [landParcels, certificates, transactions] = await Promise.all([
+                contract.evaluateTransaction('QueryByKeyword', 'landparcel', '', JSON.stringify({ ownerId: cccd }), cccd),
+                contract.evaluateTransaction('QueryByKeyword', 'landcertificate', '', JSON.stringify({ ownerId: cccd }), cccd),
+                contract.evaluateTransaction('QueryByKeyword', 'landtransaction', '', JSON.stringify({ ownerId: cccd }), cccd)
+            ]);
+
+            stats = {
+                landParcels: JSON.parse(landParcels.toString()).length,
+                certificates: JSON.parse(certificates.toString()).length,
+                transactions: JSON.parse(transactions.toString()).length,
+                documents: 0
+            };
+        } else {
+            // Org1 and Org2 see system-wide data
+            const [landParcels, certificates, transactions, documents] = await Promise.all([
+                contract.evaluateTransaction('QueryByKeyword', 'landparcel', '', '{}', cccd),
+                contract.evaluateTransaction('QueryByKeyword', 'landcertificate', '', '{}', cccd),
+                contract.evaluateTransaction('QueryByKeyword', 'landtransaction', '', '{}', cccd),
+                contract.evaluateTransaction('QueryByKeyword', 'document', '', '{}', cccd)
+            ]);
+
+            const transactionList = JSON.parse(transactions.toString());
+            const pendingTransactions = transactionList.filter(tx => tx.status === 'pending' || tx.status === 'submitted').length;
+            const completedTransactions = transactionList.filter(tx => tx.status === 'completed' || tx.status === 'approved').length;
+            const completionRate = transactionList.length > 0 ? Math.round((completedTransactions / transactionList.length) * 100) : 0;
+
+            stats = {
+                landParcels: JSON.parse(landParcels.toString()).length,
+                certificates: JSON.parse(certificates.toString()).length,
+                transactions: transactionList.length,
+                documents: JSON.parse(documents.toString()).length,
+                pendingTransactions,
+                completedTransactions,
+                completionRate,
+                averageProcessingTime: 7 // Default value, could be calculated from actual data
+            };
+        }
+
+        gateway.disconnect();
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: `Failed to get dashboard stats: ${error.message}` });
+    }
+});
+
+// User management endpoints (Admin only)
+app.get('/users', authenticateJWT, requireAdmin, async (req, res) => {
+    const { limit = 50, offset = 0, org: filterOrg, role } = req.query;
+
+    try {
+        let query = {};
+        if (filterOrg) query.org = filterOrg;
+        if (role) query.role = role;
+
+        const users = await User.find(query)
+            .select('-password -otp -otpExpires')
+            .limit(parseInt(limit))
+            .skip(parseInt(offset))
+            .sort({ createdAt: -1 });
+
+        const total = await User.countDocuments(query);
+
+        res.json({
+            users,
+            total,
+            limit: parseInt(limit),
+            offset: parseInt(offset)
+        });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to get users: ${error.message}` });
+    }
+});
+
+// Get user profile
+app.get('/profile', authenticateJWT, async (req, res) => {
+    try {
+        const user = await User.findOne({ cccd: req.user.cccd }).select('-password -otp -otpExpires');
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.json({ user });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to get profile: ${error.message}` });
+    }
+});
+
+// Update user profile
+app.put('/profile', authenticateJWT, async (req, res) => {
+    const { fullName, phone } = req.body;
+    const { cccd } = req.user;
+
+    try {
+        const updateData = {};
+        if (fullName) updateData.fullName = sanitizeInput(fullName);
+        if (phone) {
+            validatePhone(phone);
+            updateData.phone = phone;
+            updateData.isPhoneVerified = false; // Require re-verification if phone changes
+        }
+
+        const user = await User.findOneAndUpdate(
+            { cccd },
+            updateData,
+            { new: true }
+        ).select('-password -otp -otpExpires');
+
+        res.json({ message: 'Profile updated successfully', user });
+    } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({ error: 'Phone number already exists' });
+        }
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get user by CCCD (Admin only)
+app.get('/users/:cccd', authenticateJWT, requireAdmin, async (req, res) => {
+    const { cccd } = req.params;
+
+    try {
+        const user = await User.findOne({ cccd }).select('-password -otp -otpExpires');
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.json({ user });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to get user: ${error.message}` });
+    }
+});
+
+// Update user (Admin only)
+app.put('/users/:cccd', authenticateJWT, requireAdmin, async (req, res) => {
+    const { cccd } = req.params;
+    const { fullName, phone, role, org, isLocked } = req.body;
+
+    try {
+        const updateData = {};
+        if (fullName) updateData.fullName = sanitizeInput(fullName);
+        if (phone) {
+            validatePhone(phone);
+            updateData.phone = phone;
+        }
+        if (role) updateData.role = role;
+        if (org) {
+            validateOrg(org);
+            updateData.org = org;
+        }
+        if (typeof isLocked === 'boolean') updateData.isLocked = isLocked;
+
+        const user = await User.findOneAndUpdate(
+            { cccd },
+            updateData,
+            { new: true }
+        ).select('-password -otp -otpExpires');
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json({ message: 'User updated successfully', user });
+    } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({ error: 'Phone number already exists' });
+        }
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Delete land parcel (Org1 only)
+app.delete('/land-parcels/:id', authenticateJWT, checkOrg(['Org1']), async (req, res) => {
+    const { id } = req.params;
+    const { cccd, org } = req.user;
+
+    try {
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const statefulTxn = contract.createTransaction('DeleteLandParcel');
+        statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org2MSP');
+        await statefulTxn.submit(id);
+        gateway.disconnect();
+        res.json({ message: 'Land parcel deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to delete land parcel: ${error.message}` });
+    }
+});
+
+// Revoke certificate (Org1 only)
+app.post('/certificates/:certificateID/revoke', authenticateJWT, checkOrg(['Org1']), async (req, res) => {
+    const { certificateID } = req.params;
+    const { reason } = req.body;
+    const { cccd, org } = req.user;
+
+    try {
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const statefulTxn = contract.createTransaction('RevokeCertificate');
+        statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org2MSP');
+        await statefulTxn.submit(certificateID, reason || 'Administrative revocation');
+        const result = await contract.evaluateTransaction('QueryCertificateByID', certificateID, cccd);
+        gateway.disconnect();
+        res.json({ message: 'Certificate revoked successfully', certificate: JSON.parse(result.toString()) });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to revoke certificate: ${error.message}` });
+    }
+});
+
+// Reject document (Org2 only)
+app.post('/documents/:docID/reject', authenticateJWT, checkOrg(['Org2']), async (req, res) => {
+    const { docID } = req.params;
+    const { reason } = req.body;
+    const { cccd, org } = req.user;
+
+    try {
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const statefulTxn = contract.createTransaction('RejectDocument');
+        statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org2MSP');
+        await statefulTxn.submit(docID, reason || 'Document verification failed');
+        const result = await contract.evaluateTransaction('QueryDocumentByID', docID, cccd);
+        gateway.disconnect();
+        res.json({ message: 'Document rejected', document: JSON.parse(result.toString()) });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to reject document: ${error.message}` });
+    }
+});
+
+// Get transaction history for a land parcel (All orgs)
+app.get('/land-parcels/:id/history', authenticateJWT, checkOrg(['Org1', 'Org2', 'Org3']), async (req, res) => {
+    const { id } = req.params;
+    const { cccd, org } = req.user;
+
+    try {
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const result = await contract.evaluateTransaction('GetLandParcelHistory', id);
+        gateway.disconnect();
+        res.json({ history: JSON.parse(result.toString()) });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to get land parcel history: ${error.message}` });
+    }
+});
+
+// Get system reports (Org1, Org2 only)
+app.get('/reports/system', authenticateJWT, checkOrg(['Org1', 'Org2']), async (req, res) => {
+    const { startDate, endDate, type } = req.query;
+    const { cccd, org } = req.user;
+
+    try {
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+
+        const filters = {};
+        if (startDate) filters.startDate = startDate;
+        if (endDate) filters.endDate = endDate;
+        if (type) filters.type = type;
+
+        const [transactions, certificates, documents] = await Promise.all([
+            contract.evaluateTransaction('QueryByKeyword', 'landtransaction', '', JSON.stringify(filters), cccd),
+            contract.evaluateTransaction('QueryByKeyword', 'landcertificate', '', JSON.stringify(filters), cccd),
+            contract.evaluateTransaction('QueryByKeyword', 'document', '', JSON.stringify(filters), cccd)
+        ]);
+
+        const transactionData = JSON.parse(transactions.toString());
+        const certificateData = JSON.parse(certificates.toString());
+        const documentData = JSON.parse(documents.toString());
+
+        const report = {
+            summary: {
+                totalTransactions: transactionData.length,
+                totalCertificates: certificateData.length,
+                totalDocuments: documentData.length,
+                pendingTransactions: transactionData.filter(tx => tx.status === 'pending').length,
+                approvedTransactions: transactionData.filter(tx => tx.status === 'approved').length,
+                rejectedTransactions: transactionData.filter(tx => tx.status === 'rejected').length
+            },
+            transactions: transactionData,
+            certificates: certificateData,
+            documents: documentData
+        };
+
+        gateway.disconnect();
+        res.json({ report });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to generate system report: ${error.message}` });
+    }
+});
+
+// Get analytics data (Org1, Org2 only)
+app.get('/analytics', authenticateJWT, checkOrg(['Org1', 'Org2']), async (req, res) => {
+    const { period = '30d' } = req.query;
+    const { cccd, org } = req.user;
+
+    try {
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+
+        // Get all data for analytics
+        const [transactions, certificates, landParcels] = await Promise.all([
+            contract.evaluateTransaction('QueryByKeyword', 'landtransaction', '', '{}', cccd),
+            contract.evaluateTransaction('QueryByKeyword', 'landcertificate', '', '{}', cccd),
+            contract.evaluateTransaction('QueryByKeyword', 'landparcel', '', '{}', cccd)
+        ]);
+
+        const transactionData = JSON.parse(transactions.toString());
+        const certificateData = JSON.parse(certificates.toString());
+        const landParcelData = JSON.parse(landParcels.toString());
+
+        // Calculate analytics
+        const analytics = {
+            transactionTrends: calculateTrends(transactionData, period),
+            certificateIssuance: calculateCertificateStats(certificateData, period),
+            landParcelDistribution: calculateLandParcelStats(landParcelData),
+            processingTimes: calculateProcessingTimes(transactionData),
+            statusDistribution: calculateStatusDistribution(transactionData)
+        };
+
+        gateway.disconnect();
+        res.json({ analytics });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to get analytics: ${error.message}` });
+    }
+});
+
+// Bulk operations for land parcels (Org1 only)
+app.post('/land-parcels/bulk', authenticateJWT, checkOrg(['Org1']), async (req, res) => {
+    const { operation, landParcelIds, data } = req.body;
+    const { cccd, org } = req.user;
+
+    try {
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+        const results = [];
+
+        for (const id of landParcelIds) {
+            try {
+                let result;
+                const statefulTxn = contract.createTransaction(`Bulk${operation}`);
+                statefulTxn.setEndorsingOrganizations('Org1MSP', 'Org2MSP');
+
+                if (operation === 'Update') {
+                    await statefulTxn.submit(id, JSON.stringify(data));
+                } else if (operation === 'Delete') {
+                    await statefulTxn.submit(id);
+                }
+
+                result = await contract.evaluateTransaction('QueryLandParcelByID', id, cccd);
+                results.push({ id, success: true, data: JSON.parse(result.toString()) });
+            } catch (error) {
+                results.push({ id, success: false, error: error.message });
+            }
+        }
+
+        gateway.disconnect();
+        res.json({ message: `Bulk ${operation.toLowerCase()} completed`, results });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to perform bulk operation: ${error.message}` });
+    }
+});
+
+// Export data (Org1, Org2 only)
+app.get('/export/:dataType', authenticateJWT, checkOrg(['Org1', 'Org2']), async (req, res) => {
+    const { dataType } = req.params;
+    const { format = 'json', startDate, endDate } = req.query;
+    const { cccd, org } = req.user;
+
+    try {
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+
+        const filters = {};
+        if (startDate) filters.startDate = startDate;
+        if (endDate) filters.endDate = endDate;
+
+        let result;
+        switch (dataType) {
+            case 'land-parcels':
+                result = await contract.evaluateTransaction('QueryByKeyword', 'landparcel', '', JSON.stringify(filters), cccd);
+                break;
+            case 'certificates':
+                result = await contract.evaluateTransaction('QueryByKeyword', 'landcertificate', '', JSON.stringify(filters), cccd);
+                break;
+            case 'transactions':
+                result = await contract.evaluateTransaction('QueryByKeyword', 'landtransaction', '', JSON.stringify(filters), cccd);
+                break;
+            case 'documents':
+                result = await contract.evaluateTransaction('QueryByKeyword', 'document', '', JSON.stringify(filters), cccd);
+                break;
+            default:
+                return res.status(400).json({ error: 'Invalid data type' });
+        }
+
+        const data = JSON.parse(result.toString());
+
+        if (format === 'csv') {
+            // Convert to CSV format
+            const csv = convertToCSV(data);
+            res.setHeader('Content-Type', 'text/csv');
+            res.setHeader('Content-Disposition', `attachment; filename=${dataType}-export.csv`);
+            res.send(csv);
+        } else {
+            res.json({ data, exportedAt: new Date().toISOString(), count: data.length });
+        }
+
+        gateway.disconnect();
+    } catch (error) {
+        res.status(500).json({ error: `Failed to export data: ${error.message}` });
+    }
+});
+
+// Get system health status (Admin only)
+app.get('/system/health', authenticateJWT, requireAdmin, async (req, res) => {
+    try {
+        const { cccd, org } = req.user;
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+
+        // Test blockchain connectivity
+        await contract.evaluateTransaction('QueryByKeyword', 'landparcel', '', '{}', cccd);
+
+        // Test MongoDB connectivity
+        const userCount = await User.countDocuments();
+
+        const health = {
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            services: {
+                blockchain: 'connected',
+                database: 'connected',
+                userCount
+            }
+        };
+
+        gateway.disconnect();
+        res.json(health);
+    } catch (error) {
+        res.status(500).json({
+            status: 'unhealthy',
+            timestamp: new Date().toISOString(),
+            error: error.message
+        });
+    }
+});
+
+// Search across all data types (Org1, Org2 only)
+app.get('/search/global', authenticateJWT, checkOrg(['Org1', 'Org2']), async (req, res) => {
+    const { query, type } = req.query;
+    const { cccd, org } = req.user;
+
+    if (!query) {
+        return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    try {
+        const { gateway, contract } = await connectToNetwork(org, cccd);
+
+        const searchTypes = type ? [type] : ['landparcel', 'landcertificate', 'landtransaction', 'document'];
+        const results = {};
+
+        for (const searchType of searchTypes) {
+            try {
+                const result = await contract.evaluateTransaction('QueryByKeyword', searchType, query, '{}', cccd);
+                results[searchType] = JSON.parse(result.toString());
+            } catch (error) {
+                results[searchType] = [];
+            }
+        }
+
+        gateway.disconnect();
+        res.json({ query, results });
+    } catch (error) {
+        res.status(500).json({ error: `Failed to perform global search: ${error.message}` });
+    }
+});
+
+// ===== HELPER FUNCTIONS =====
+
+// Calculate trends for analytics
+function calculateTrends(data, period) {
+    const now = new Date();
+    const periodMs = period === '7d' ? 7 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+    const startDate = new Date(now.getTime() - periodMs);
+
+    const filteredData = data.filter(item => {
+        const itemDate = new Date(item.timestamp || item.createdAt || now);
+        return itemDate >= startDate;
+    });
+
+    return {
+        total: filteredData.length,
+        period,
+        trend: filteredData.length > 0 ? 'up' : 'neutral'
+    };
+}
+
+// Calculate certificate statistics
+function calculateCertificateStats(certificates, period) {
+    const now = new Date();
+    const periodMs = period === '7d' ? 7 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+    const startDate = new Date(now.getTime() - periodMs);
+
+    const recentCertificates = certificates.filter(cert => {
+        const certDate = new Date(cert.issuedDate || cert.timestamp || now);
+        return certDate >= startDate;
+    });
+
+    return {
+        total: certificates.length,
+        recent: recentCertificates.length,
+        active: certificates.filter(cert => cert.status === 'active').length,
+        revoked: certificates.filter(cert => cert.status === 'revoked').length
+    };
+}
+
+// Calculate land parcel statistics
+function calculateLandParcelStats(landParcels) {
+    const purposeDistribution = {};
+    const statusDistribution = {};
+
+    landParcels.forEach(parcel => {
+        const purpose = parcel.landUsePurpose || 'Unknown';
+        const status = parcel.legalStatus || 'Unknown';
+
+        purposeDistribution[purpose] = (purposeDistribution[purpose] || 0) + 1;
+        statusDistribution[status] = (statusDistribution[status] || 0) + 1;
+    });
+
+    return {
+        total: landParcels.length,
+        purposeDistribution,
+        statusDistribution
+    };
+}
+
+// Calculate processing times
+function calculateProcessingTimes(transactions) {
+    const completedTransactions = transactions.filter(tx =>
+        tx.status === 'completed' || tx.status === 'approved'
+    );
+
+    if (completedTransactions.length === 0) {
+        return { average: 0, median: 0, count: 0 };
+    }
+
+    const processingTimes = completedTransactions.map(tx => {
+        const start = new Date(tx.createdAt || tx.timestamp);
+        const end = new Date(tx.completedAt || tx.updatedAt || new Date());
+        return Math.ceil((end - start) / (1000 * 60 * 60 * 24)); // Days
+    });
+
+    const average = processingTimes.reduce((sum, time) => sum + time, 0) / processingTimes.length;
+    const sorted = processingTimes.sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+
+    return {
+        average: Math.round(average),
+        median,
+        count: completedTransactions.length
+    };
+}
+
+// Calculate status distribution
+function calculateStatusDistribution(transactions) {
+    const distribution = {};
+
+    transactions.forEach(tx => {
+        const status = tx.status || 'Unknown';
+        distribution[status] = (distribution[status] || 0) + 1;
+    });
+
+    return distribution;
+}
+
+// Convert data to CSV format
+function convertToCSV(data) {
+    if (!data || data.length === 0) {
+        return '';
+    }
+
+    const headers = Object.keys(data[0]);
+    const csvHeaders = headers.join(',');
+
+    const csvRows = data.map(row => {
+        return headers.map(header => {
+            const value = row[header];
+            // Escape commas and quotes in CSV
+            if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+                return `"${value.replace(/"/g, '""')}"`;
+            }
+            return value;
+        }).join(',');
+    });
+
+    return [csvHeaders, ...csvRows].join('\n');
+}
 
 // Khởi động server
 async function main() {

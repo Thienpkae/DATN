@@ -1,0 +1,334 @@
+/* Dashboard Color Override Styles */
+/* This file ensures all dashboard components have proper light backgrounds and good contrast */
+
+/* Force all dashboard cards to have light backgrounds */
+.ant-card,
+.enhanced-card,
+.stats-card,
+.professional-card {
+  background: #ffffff !important;
+  border: 1px solid #e8e8e8 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+  color: #1f1f1f !important;
+}
+
+/* Ensure card headers have proper styling */
+.ant-card-head,
+.enhanced-card__header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+  color: #1f1f1f !important;
+}
+
+.ant-card-head-title,
+.enhanced-card__title {
+  color: #1f1f1f !important;
+  font-weight: 600 !important;
+}
+
+/* Card body styling */
+.ant-card-body,
+.enhanced-card__body {
+  background: #ffffff !important;
+  color: #1f1f1f !important;
+}
+
+/* Statistics card specific styling */
+.stat-card-content {
+  background: #ffffff !important;
+  color: #1f1f1f !important;
+}
+
+.stat-card-value {
+  color: #1f1f1f !important;
+  font-weight: 700 !important;
+}
+
+.stat-card-title {
+  color: #666666 !important;
+}
+
+.stat-card-subtitle {
+  color: #666666 !important;
+}
+
+/* Text elements */
+.ant-typography,
+.ant-typography h1,
+.ant-typography h2,
+.ant-typography h3,
+.ant-typography h4,
+.ant-typography h5,
+.ant-typography h6 {
+  color: #1f1f1f !important;
+}
+
+.ant-typography.ant-typography-secondary {
+  color: #666666 !important;
+}
+
+/* Progress components */
+.ant-progress-text {
+  color: #1f1f1f !important;
+}
+
+/* Timeline components */
+.ant-timeline-item-content {
+  color: #1f1f1f !important;
+}
+
+/* List components */
+.ant-list-item {
+  background: #ffffff !important;
+  color: #1f1f1f !important;
+}
+
+.ant-list-item-meta-title {
+  color: #1f1f1f !important;
+}
+
+.ant-list-item-meta-description {
+  color: #666666 !important;
+}
+
+/* Button styling */
+.ant-btn-primary {
+  background: linear-gradient(135deg, #1890ff 0%, #0050b3 100%) !important;
+  border: none !important;
+  color: #ffffff !important;
+}
+
+.ant-btn-default {
+  background: #ffffff !important;
+  border: 1px solid #d9d9d9 !important;
+  color: #1f1f1f !important;
+}
+
+/* Badge styling */
+.ant-badge {
+  color: #1f1f1f !important;
+}
+
+/* Tag styling */
+.ant-tag {
+  background: #f0f0f0 !important;
+  border: 1px solid #d9d9d9 !important;
+  color: #1f1f1f !important;
+}
+
+/* Statistic component */
+.ant-statistic {
+  color: #1f1f1f !important;
+}
+
+.ant-statistic-title {
+  color: #666666 !important;
+}
+
+.ant-statistic-content {
+  color: #1f1f1f !important;
+}
+
+/* Empty state */
+.ant-empty {
+  color: #666666 !important;
+}
+
+.ant-empty-description {
+  color: #666666 !important;
+}
+
+/* Chart containers */
+.recharts-wrapper,
+.ant-chart-container {
+  background: #ffffff !important;
+  border-radius: 12px !important;
+}
+
+/* Override any dark mode or theme conflicts */
+[data-theme="dark"] .ant-card,
+[data-theme="dark"] .enhanced-card,
+.dark .ant-card,
+.dark .enhanced-card {
+  background: #ffffff !important;
+  color: #1f1f1f !important;
+}
+
+/* Ensure proper contrast for all text elements */
+* {
+  color: inherit !important;
+}
+
+/* Specific overrides for dashboard components */
+.dashboard-overview .ant-card,
+.dashboard-overview .enhanced-card {
+  background: #ffffff !important;
+  border: 1px solid #e8e8e8 !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+}
+
+/* Grid container styling */
+.grid-container {
+  background: transparent !important;
+}
+
+/* Flex container styling */
+.flex-container {
+  background: transparent !important;
+}
+
+/* Animation containers */
+.fade-in,
+.slide-in {
+  background: transparent !important;
+}
+
+/* Ensure all dashboard text is readable */
+.dashboard-overview * {
+  color: #1f1f1f !important;
+}
+
+.dashboard-overview .ant-typography-secondary,
+.dashboard-overview .ant-typography.ant-typography-secondary {
+  color: #666666 !important;
+}
+
+/* Icon styling */
+.anticon {
+  color: inherit !important;
+}
+
+/* Avatar styling in dashboard */
+.ant-avatar {
+  background: #1890ff !important;
+  color: #ffffff !important;
+}
+
+/* Progress circle text */
+.ant-progress-circle .ant-progress-text {
+  fill: #1f1f1f !important;
+}
+
+/* Dropdown and menu styling */
+.ant-dropdown,
+.ant-menu {
+  background: #ffffff !important;
+  color: #1f1f1f !important;
+}
+
+.ant-menu-item {
+  color: #1f1f1f !important;
+}
+
+.ant-menu-item:hover {
+  background: #f0f0f0 !important;
+  color: #1f1f1f !important;
+}
+
+/* Table styling */
+.ant-table {
+  background: #ffffff !important;
+  color: #1f1f1f !important;
+}
+
+.ant-table-thead > tr > th {
+  background: #fafafa !important;
+  color: #1f1f1f !important;
+}
+
+.ant-table-tbody > tr > td {
+  background: #ffffff !important;
+  color: #1f1f1f !important;
+}
+
+/* Form styling */
+.ant-form-item-label > label {
+  color: #1f1f1f !important;
+}
+
+.ant-input {
+  background: #ffffff !important;
+  border: 1px solid #d9d9d9 !important;
+  color: #1f1f1f !important;
+}
+
+/* Select styling */
+.ant-select-selector {
+  background: #ffffff !important;
+  border: 1px solid #d9d9d9 !important;
+  color: #1f1f1f !important;
+}
+
+/* Modal styling */
+.ant-modal-content {
+  background: #ffffff !important;
+  color: #1f1f1f !important;
+}
+
+.ant-modal-header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+}
+
+.ant-modal-title {
+  color: #1f1f1f !important;
+}
+
+/* Drawer styling */
+.ant-drawer-content {
+  background: #ffffff !important;
+  color: #1f1f1f !important;
+}
+
+.ant-drawer-header {
+  background: #ffffff !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+}
+
+.ant-drawer-title {
+  color: #1f1f1f !important;
+}
+
+/* Notification styling */
+.ant-notification {
+  background: #ffffff !important;
+  border: 1px solid #e8e8e8 !important;
+  color: #1f1f1f !important;
+}
+
+/* Message styling */
+.ant-message {
+  color: #1f1f1f !important;
+}
+
+/* Tooltip styling */
+.ant-tooltip-inner {
+  background: rgba(0, 0, 0, 0.85) !important;
+  color: #ffffff !important;
+}
+
+/* Popover styling */
+.ant-popover-inner {
+  background: #ffffff !important;
+  color: #1f1f1f !important;
+}
+
+/* Spin styling */
+.ant-spin {
+  color: #1890ff !important;
+}
+
+/* Result styling */
+.ant-result {
+  background: #ffffff !important;
+  color: #1f1f1f !important;
+}
+
+.ant-result-title {
+  color: #1f1f1f !important;
+}
+
+.ant-result-subtitle {
+  color: #666666 !important;
+}

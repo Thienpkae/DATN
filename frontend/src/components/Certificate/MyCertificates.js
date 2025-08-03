@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Typography, message, Button, Modal } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
-import { certificateAPI } from '../../services/api';
+import apiService from '../../services/api';
 
 const { Title } = Typography;
 
@@ -12,16 +12,19 @@ const MyCertificates = ({ user }) => {
   const [viewingCertificate, setViewingCertificate] = useState(null);
 
   const fetchMyCertificates = useCallback(async () => {
+    if (!user?.userId) return;
+
     setLoading(true);
     try {
-      const response = await certificateAPI.getByOwner(user.userId);
-      setCertificates(response.data || []);
+      const response = await apiService.getCertificatesByOwner(user.userId);
+      setCertificates(Array.isArray(response) ? response : []);
     } catch (error) {
-      message.error('Failed to fetch my certificates');
+      console.error('Fetch my certificates error:', error);
+      message.error(error.message || 'Failed to fetch my certificates');
     } finally {
       setLoading(false);
     }
-  }, [user.userId]);
+  }, [user?.userId]);
 
   useEffect(() => {
     fetchMyCertificates();

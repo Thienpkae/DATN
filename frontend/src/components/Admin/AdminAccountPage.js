@@ -37,7 +37,7 @@ import {
   UnlockOutlined
 } from '@ant-design/icons';
 import moment from 'moment';
-import { adminAPI } from '../../services/api';
+import apiService from '../../services/api';
 
 const { Option } = Select;
 const { Search } = Input;
@@ -64,17 +64,9 @@ const AdminAccountPage = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await adminAPI.getAllUsers();
-      if (Array.isArray(response.data)) {
-        setUsers(response.data);
-      } else if (response.data && Array.isArray(response.data.users)) {
-        setUsers(response.data.users);
-      } else if (response.data && Array.isArray(response.data.data)) {
-        setUsers(response.data.data);
-      } else {
-        console.error("Unexpected response format for getAllUsers:", response.data);
-        setUsers([]);
-      }
+      // Admin user management requires additional backend endpoints
+      setUsers([]);
+      message.info('Admin user management functionality requires additional backend endpoints');
     } catch (error) {
       message.error('Failed to fetch users');
     } finally {
@@ -84,8 +76,12 @@ const AdminAccountPage = () => {
 
   const fetchOrganizations = async () => {
     try {
-      const response = await adminAPI.getOrganizations();
-      setOrganizations(response.data);
+      // Organization management requires additional backend endpoints
+      setOrganizations([
+        { id: 'Org1', name: 'Land Registry Authority' },
+        { id: 'Org2', name: 'Government Office' },
+        { id: 'Org3', name: 'Citizens' }
+      ]);
     } catch (error) {
       message.error('Failed to fetch organizations');
     }
@@ -93,8 +89,13 @@ const AdminAccountPage = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await adminAPI.getSystemStats();
-      setStats(response.data);
+      // System stats would require additional backend endpoints
+      setStats({
+        totalUsers: 0,
+        activeUsers: 0,
+        totalOrganizations: 3,
+        systemHealth: 'Good'
+      });
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     }
@@ -121,7 +122,7 @@ const AdminAccountPage = () => {
 
   const handleDeleteUser = async (userId) => {
     try {
-      await adminAPI.deleteUser(userId);
+      await apiService.deleteAccount(userId);
       message.success('User deleted successfully');
       fetchUsers();
       fetchStats();
@@ -133,10 +134,10 @@ const AdminAccountPage = () => {
   const handleToggleUserStatus = async (userId, isActive) => {
     try {
       if (isActive) {
-        await adminAPI.deactivateUser(userId);
+        await apiService.lockUnlockAccount(userId, true);
         message.success('User deactivated successfully');
       } else {
-        await adminAPI.activateUser(userId);
+        await apiService.lockUnlockAccount(userId, false);
         message.success('User activated successfully');
       }
       fetchUsers();
@@ -157,10 +158,11 @@ const AdminAccountPage = () => {
       };
 
       if (editingUser) {
-        await adminAPI.updateUser(editingUser.id, userData);
-        message.success('User updated successfully');
+        // User update functionality requires additional backend endpoints
+        message.info('User update functionality requires additional backend endpoints');
       } else {
-        await adminAPI.createUser(userData);
+        // User creation uses the register endpoint
+        await apiService.register(userData);
         message.success('User created successfully');
       }
 
@@ -176,15 +178,8 @@ const AdminAccountPage = () => {
 
   const handleExportUsers = async () => {
     try {
-      const response = await adminAPI.exportUsers();
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'users_export.csv');
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      message.success('Users exported successfully');
+      // Export functionality requires additional backend endpoints
+      message.info('User export functionality requires additional backend endpoints');
     } catch (error) {
       message.error('Failed to export users');
     }
@@ -192,8 +187,8 @@ const AdminAccountPage = () => {
 
   const handleImportUsers = async (file) => {
     try {
-      await adminAPI.importUsers(file);
-      message.success('Users imported successfully');
+      // Import functionality requires additional backend endpoints
+      message.info('User import functionality requires additional backend endpoints');
       fetchUsers();
       fetchStats();
     } catch (error) {

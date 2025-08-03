@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Typography, message, Button, Tag } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
-import { transactionAPI } from '../../services/api';
+import apiService from '../../services/api';
 
 const { Title } = Typography;
 
@@ -10,16 +10,19 @@ const MyTransactions = ({ user }) => {
   const [loading, setLoading] = useState(false);
 
   const fetchMyTransactions = useCallback(async () => {
+    if (!user?.userId) return;
+
     setLoading(true);
     try {
-      const response = await transactionAPI.getByUser(user.userId);
-      setTransactions(response.data || []);
+      const response = await apiService.getTransactionsByOwner(user.userId);
+      setTransactions(Array.isArray(response) ? response : []);
     } catch (error) {
-      message.error('Failed to fetch my transactions');
+      console.error('Fetch my transactions error:', error);
+      message.error(error.message || 'Failed to fetch my transactions');
     } finally {
       setLoading(false);
     }
-  }, [user.userId]);
+  }, [user?.userId]);
 
   useEffect(() => {
     fetchMyTransactions();

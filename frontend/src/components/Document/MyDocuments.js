@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Button, message, Typography } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
-import { documentAPI } from '../../services/api';
+import apiService from '../../services/api';
 
 const { Title } = Typography;
 
@@ -10,21 +10,20 @@ const MyDocuments = ({ user }) => {
   const [loading, setLoading] = useState(false);
 
   const fetchMyDocuments = useCallback(async () => {
+    if (!user?.userId) return;
+
     setLoading(true);
     try {
-      const response = await documentAPI.getAll();
-      if (Array.isArray(response.data)) {
-        setDocuments(response.data.filter(doc => doc.uploadedBy === user.userId));
-      } else {
-        console.error("Unexpected response format for getAll documents in MyDocuments:", response.data);
-        setDocuments([]);
-      }
+      // Search documents for the current user
+      const response = await apiService.searchDocuments(user.userId, '');
+      setDocuments(Array.isArray(response) ? response : []);
     } catch (error) {
-      message.error('Failed to fetch your documents');
+      console.error('Fetch my documents error:', error);
+      message.error(error.message || 'Failed to fetch your documents');
     } finally {
       setLoading(false);
     }
-  }, [user.userId]);
+  }, [user?.userId]);
 
   useEffect(() => {
     fetchMyDocuments();

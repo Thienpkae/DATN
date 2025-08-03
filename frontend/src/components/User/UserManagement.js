@@ -8,7 +8,7 @@ import {
   Typography 
 } from 'antd';
 import { LockOutlined, UnlockOutlined } from '@ant-design/icons';
-import { adminAPI } from '../../services/api';
+import apiService from '../../services/api';
 
 const { Title } = Typography;
 
@@ -23,22 +23,26 @@ const UserManagement = ({ user }) => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // This would need a user management API
+      // For now, we'll show empty list since there's no user listing API
+      // In a real implementation, you'd need a backend endpoint to list users
       setUsers([]);
+      message.info('User listing functionality requires additional backend endpoints');
     } catch (error) {
-      message.error('Failed to fetch users');
+      console.error('Fetch users error:', error);
+      message.error(error.message || 'Failed to fetch users');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLockUnlock = async (userId, lock) => {
+  const handleLockUnlock = async (targetCccd, lock) => {
     try {
-      await adminAPI.lockUnlockAccount({ targetUserId: userId, lock });
+      await apiService.lockUnlockAccount(targetCccd, lock);
       message.success(`User ${lock ? 'locked' : 'unlocked'} successfully`);
       fetchUsers();
     } catch (error) {
-      message.error(error.response?.data?.error || 'Failed to update user status');
+      console.error('Lock/unlock user error:', error);
+      message.error(error.message || 'Failed to update user status');
     }
   };
 

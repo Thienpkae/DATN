@@ -11,7 +11,7 @@ import {
 import { 
   CheckOutlined
 } from '@ant-design/icons';
-import { transactionAPI } from '../../services/api';
+import apiService from '../../services/api';
 
 const { Title } = Typography;
 
@@ -22,14 +22,23 @@ const TransactionProcessing = ({ user }) => {
   const fetchPendingTransactions = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await transactionAPI.getPending();
-      setTransactions(response.data || []);
+      // For now, get all transactions and filter by status
+      if (user?.userId) {
+        const response = await apiService.getTransactionsByOwner(user.userId);
+        const pendingTransactions = Array.isArray(response)
+          ? response.filter(tx => tx.status === 'pending' || tx.status === 'processing')
+          : [];
+        setTransactions(pendingTransactions);
+      } else {
+        setTransactions([]);
+      }
     } catch (error) {
-      message.error('Failed to fetch pending transactions');
+      console.error('Fetch pending transactions error:', error);
+      message.error(error.message || 'Failed to fetch pending transactions');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.userId]);
 
   useEffect(() => {
     fetchPendingTransactions();
@@ -37,11 +46,12 @@ const TransactionProcessing = ({ user }) => {
 
   const handleProcessTransaction = async (txId) => {
     try {
-      await transactionAPI.process(txId);
+      await apiService.processTransaction(txId);
       message.success('Transaction processed and forwarded to authority');
       fetchPendingTransactions();
     } catch (error) {
-      message.error(error.response?.data?.error || 'Failed to process transaction');
+      console.error('Process transaction error:', error);
+      message.error(error.message || 'Failed to process transaction');
     }
   };
 

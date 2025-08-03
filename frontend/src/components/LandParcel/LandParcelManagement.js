@@ -20,7 +20,7 @@ import {
   EyeOutlined, 
   SearchOutlined 
 } from '@ant-design/icons';
-import { landParcelAPI } from '../../services/api';
+import apiService from '../../services/api';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -37,15 +37,21 @@ const LandParcelManagement = ({ user }) => {
 
   useEffect(() => {
     fetchLandParcels();
-  }, []);
+  }, [user?.userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchLandParcels = async () => {
     setLoading(true);
     try {
-      const response = await landParcelAPI.getAll();
-      setLandParcels(response.data || []);
+      // For now, we'll get land parcels by owner since there's no getAll endpoint
+      if (user?.userId) {
+        const response = await apiService.getLandParcelsByOwner(user.userId);
+        setLandParcels(response || []);
+      } else {
+        setLandParcels([]);
+      }
     } catch (error) {
-      message.error('Failed to fetch land parcels');
+      console.error('Fetch land parcels error:', error);
+      message.error(error.message || 'Failed to fetch land parcels');
     } finally {
       setLoading(false);
     }
@@ -53,60 +59,56 @@ const LandParcelManagement = ({ user }) => {
 
   const handleCreateParcel = async (values) => {
     try {
-      await landParcelAPI.create(values);
+      await apiService.createLandParcel(values);
       message.success('Land parcel created successfully');
       setModalVisible(false);
       form.resetFields();
       fetchLandParcels();
     } catch (error) {
-      message.error(error.response?.data?.error || 'Failed to create land parcel');
+      console.error('Create land parcel error:', error);
+      message.error(error.message || 'Failed to create land parcel');
     }
   };
 
   const handleUpdateParcel = async (values) => {
     try {
-      await landParcelAPI.update(editingParcel.id, values);
+      await apiService.updateLandParcel(editingParcel.id, values);
       message.success('Land parcel updated successfully');
       setModalVisible(false);
       setEditingParcel(null);
       form.resetFields();
       fetchLandParcels();
     } catch (error) {
-      message.error(error.response?.data?.error || 'Failed to update land parcel');
+      console.error('Update land parcel error:', error);
+      message.error(error.message || 'Failed to update land parcel');
     }
   };
 
   const handleViewParcel = async (parcelId) => {
     try {
-      const response = await landParcelAPI.getById(parcelId);
-      setViewingParcel(response.data);
+      const response = await apiService.getLandParcel(parcelId);
+      setViewingParcel(response);
       setViewModalVisible(true);
     } catch (error) {
-      message.error('Failed to fetch land parcel details');
+      console.error('View land parcel error:', error);
+      message.error(error.message || 'Failed to fetch land parcel details');
     }
   };
 
   const handleSearch = async (values) => {
     setLoading(true);
     try {
-      const allParcels = await landParcelAPI.getAll();
-      let filteredParcels = allParcels.data || [];
-
       if (values.searchValue) {
-        const searchTerm = values.searchValue.toLowerCase();
-        if (values.searchType === 'owner') {
-          filteredParcels = filteredParcels.filter(parcel => parcel.ownerID?.toLowerCase().includes(searchTerm));
-        } else if (values.searchType === 'location') {
-          filteredParcels = filteredParcels.filter(parcel => parcel.location?.toLowerCase().includes(searchTerm));
-        } else if (values.searchType === 'purpose') {
-          filteredParcels = filteredParcels.filter(parcel => parcel.landUsePurpose?.toLowerCase().includes(searchTerm));
-        } else if (values.searchType === 'legalStatus') {
-          filteredParcels = filteredParcels.filter(parcel => parcel.legalStatus?.toLowerCase().includes(searchTerm));
-        }
+        // Use the search API endpoint
+        const response = await apiService.searchLandParcels(values.searchValue);
+        setLandParcels(response || []);
+      } else {
+        // If no search value, fetch user's land parcels
+        fetchLandParcels();
       }
-      setLandParcels(filteredParcels);
     } catch (error) {
-      message.error('Search failed');
+      console.error('Search error:', error);
+      message.error(error.message || 'Search failed');
     } finally {
       setLoading(false);
     }

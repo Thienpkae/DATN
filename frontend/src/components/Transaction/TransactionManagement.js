@@ -16,7 +16,7 @@ import {
   CloseOutlined,
   SendOutlined
 } from '@ant-design/icons';
-import { transactionAPI } from '../../services/api';
+import apiService from '../../services/api';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -31,18 +31,24 @@ const TransactionManagement = ({ user }) => {
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await transactionAPI.getAll();
-      let filteredData = response.data || [];
-      if (statusFilter) {
-        filteredData = filteredData.filter(tx => tx.status === statusFilter);
+      // For now, get transactions by owner since there's no getAll endpoint
+      if (user?.userId) {
+        const response = await apiService.getTransactionsByOwner(user.userId);
+        let filteredData = Array.isArray(response) ? response : [];
+        if (statusFilter) {
+          filteredData = filteredData.filter(tx => tx.status === statusFilter);
+        }
+        setTransactions(filteredData);
+      } else {
+        setTransactions([]);
       }
-      setTransactions(filteredData);
     } catch (error) {
-      message.error('Failed to fetch transactions');
+      console.error('Fetch transactions error:', error);
+      message.error(error.message || 'Failed to fetch transactions');
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, user?.userId]);
 
   useEffect(() => {
     fetchTransactions();
@@ -50,31 +56,34 @@ const TransactionManagement = ({ user }) => {
 
   const handleProcessTransaction = async (txId) => {
     try {
-      await transactionAPI.process(txId);
+      await apiService.processTransaction(txId);
       message.success('Transaction processed successfully');
       fetchTransactions();
     } catch (error) {
-      message.error(error.response?.data?.error || 'Failed to process transaction');
+      console.error('Process transaction error:', error);
+      message.error(error.message || 'Failed to process transaction');
     }
   };
 
   const handleApproveTransaction = async (txId) => {
     try {
-      await transactionAPI.approve(txId, { approveDetails: 'Approved by authority' });
+      await apiService.approveTransaction(txId, 'Approved by authority');
       message.success('Transaction approved successfully');
       fetchTransactions();
     } catch (error) {
-      message.error(error.response?.data?.error || 'Failed to approve transaction');
+      console.error('Approve transaction error:', error);
+      message.error(error.message || 'Failed to approve transaction');
     }
   };
 
   const handleRejectTransaction = async (txId) => {
     try {
-      await transactionAPI.reject(txId, { rejectDetails: 'Rejected by authority' });
+      await apiService.rejectTransaction(txId, 'Rejected by authority');
       message.success('Transaction rejected');
       fetchTransactions();
     } catch (error) {
-      message.error(error.response?.data?.error || 'Failed to reject transaction');
+      console.error('Reject transaction error:', error);
+      message.error(error.message || 'Failed to reject transaction');
     }
   };
 

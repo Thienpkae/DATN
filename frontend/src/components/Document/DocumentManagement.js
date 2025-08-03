@@ -18,7 +18,7 @@ import {
   CheckCircleOutlined,
   UploadOutlined
 } from '@ant-design/icons';
-import { documentAPI } from '../../services/api';
+import apiService from '../../services/api';
 
 const { Title } = Typography;
 
@@ -31,20 +31,21 @@ const DocumentManagement = ({ user }) => {
 
   useEffect(() => {
     fetchDocuments();
-  }, []);
+  }, [user?.userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchDocuments = async () => {
     setLoading(true);
     try {
-      const response = await documentAPI.getAll();
-      if (Array.isArray(response.data)) {
-        setDocuments(response.data);
+      // For now, we'll search documents with empty keyword to get all
+      if (user?.userId) {
+        const response = await apiService.searchDocuments(user.userId, '');
+        setDocuments(Array.isArray(response) ? response : []);
       } else {
-        console.error("Unexpected response format for getAll documents:", response.data);
         setDocuments([]);
       }
     } catch (error) {
-      message.error('Failed to fetch documents');
+      console.error('Fetch documents error:', error);
+      message.error(error.message || 'Failed to fetch documents');
     } finally {
       setLoading(false);
     }
@@ -52,27 +53,31 @@ const DocumentManagement = ({ user }) => {
 
   const handleUploadDocument = async (values) => {
     try {
-      const file = values.file[0].originFileObj; // Extract the file object
-      const metadata = { ...values };
-      delete metadata.file; // Remove the file from metadata
+      const documentData = {
+        ...values,
+        // Add any additional metadata needed by the backend
+        uploadedBy: user?.userId
+      };
 
-      await documentAPI.upload(file, metadata);
+      await apiService.uploadDocument(documentData);
       message.success('Document uploaded successfully');
       setModalVisible(false);
       form.resetFields();
       fetchDocuments();
     } catch (error) {
-      message.error(error.response?.data?.error || 'Failed to upload document');
+      console.error('Upload document error:', error);
+      message.error(error.message || 'Failed to upload document');
     }
   };
 
   const handleVerifyDocument = async (docId) => {
     try {
-      await documentAPI.verify(docId);
+      await apiService.verifyDocument(docId);
       message.success('Document verified successfully');
       fetchDocuments();
     } catch (error) {
-      message.error(error.response?.data?.error || 'Failed to verify document');
+      console.error('Verify document error:', error);
+      message.error(error.message || 'Failed to verify document');
     }
   };
 
