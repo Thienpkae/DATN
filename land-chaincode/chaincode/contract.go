@@ -37,17 +37,16 @@ func (s *LandRegistryChaincode) CreateLandParcel(ctx contractapi.TransactionCont
 	}
 
 	land := Land{
-		ID:                id,
-		OwnerID:           ownerID,
-		Area:              areaFloat,
-		Location:          location,
-		LandUsePurpose:    landUsePurpose,
-		LegalStatus:       legalStatus,
-		CertificateID:     certificateID,
-		DocumentsVerified: false,
-		DocumentIDs:       []string{},
-		CreatedAt:         txTime,
-		UpdatedAt:         txTime,
+		ID:             id,
+		OwnerID:        ownerID,
+		Area:           areaFloat,
+		Location:       location,
+		LandUsePurpose: landUsePurpose,
+		LegalStatus:    legalStatus,
+		CertificateID:  certificateID,
+		DocumentIDs:    []string{},
+		CreatedAt:      txTime,
+		UpdatedAt:      txTime,
 	}
 
 	// Set IssueDate and LegalInfo only if CertificateID is provided
@@ -99,18 +98,15 @@ func (s *LandRegistryChaincode) UpdateLandParcel(ctx contractapi.TransactionCont
 	}
 
 	updatedLand := Land{
-		ID:                id,
-		OwnerID:           existingLand.OwnerID,
-		Area:              areaFloat,
-		Location:          location,
-		LandUsePurpose:    landUsePurpose,
-		LegalStatus:       legalStatus,
-		DocumentIDs:       existingLand.DocumentIDs,
-		DocumentsVerified: existingLand.DocumentsVerified,
-		VerifiedBy:        existingLand.VerifiedBy,
-		VerifiedAt:        existingLand.VerifiedAt,
-		CreatedAt:         existingLand.CreatedAt,
-		UpdatedAt:         txTime,
+		ID:             id,
+		OwnerID:        existingLand.OwnerID,
+		Area:           areaFloat,
+		Location:       location,
+		LandUsePurpose: landUsePurpose,
+		LegalStatus:    legalStatus,
+		DocumentIDs:    existingLand.DocumentIDs,
+		CreatedAt:      existingLand.CreatedAt,
+		UpdatedAt:      txTime,
 	}
 
 	// Handle certificate information updates
@@ -888,16 +884,8 @@ func (s *LandRegistryChaincode) ProcessTransaction(ctx contractapi.TransactionCo
 		return fmt.Errorf("giao dịch %s không ở trạng thái PENDING", txID)
 	}
 
-	// Check if related land documents are verified
-	if tx.LandParcelID != "" {
-		land, err := s.QueryLandByID(ctx, tx.LandParcelID, userID)
-		if err != nil {
-			return fmt.Errorf("lỗi khi truy vấn thửa đất %s: %v", tx.LandParcelID, err)
-		}
-		if !land.DocumentsVerified {
-			return fmt.Errorf("tài liệu thửa đất %s chưa được chứng thực", tx.LandParcelID)
-		}
-	}
+	// Documents are now verified when linked to land parcel
+	// DocumentIDs only contains verified documents
 
 	missingDocs, err := CheckRequiredDocuments(ctx, txID, tx.Type)
 	if err != nil {

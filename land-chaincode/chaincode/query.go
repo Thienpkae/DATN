@@ -470,9 +470,6 @@ func (s *LandRegistryChaincode) QueryDocumentHistory(ctx contractapi.Transaction
 					"ownerID":      land.OwnerID,
 					"ipfsHash":     ipfsHash,
 					"type":         "land",
-					"verified":     land.DocumentsVerified,
-					"verifiedBy":   land.VerifiedBy,
-					"verifiedAt":   land.VerifiedAt,
 					"location":     land.Location,
 					"area":         land.Area,
 				})

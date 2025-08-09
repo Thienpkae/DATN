@@ -4,21 +4,18 @@ import "time"
 
 // Land định nghĩa thông tin thửa đất và giấy chứng nhận
 type Land struct {
-	ID                string    `json:"id"`                   // Mã thửa đất
-	OwnerID           string    `json:"ownerId"`              // CCCD của chủ sở hữu
-	Area              float64   `json:"area"`                 // Diện tích (m²)
-	Location          string    `json:"location"`             // Vị trí
-	LandUsePurpose    string    `json:"landUsePurpose"`       // Mục đích sử dụng
-	LegalStatus       string    `json:"legalStatus"`          // Trạng thái pháp lý
-	CertificateID     string    `json:"certificateId"`        // Mã giấy chứng nhận
-	IssueDate         time.Time `json:"issueDate,omitempty"`  // Ngày cấp giấy chứng nhận
-	LegalInfo         string    `json:"legalInfo"`            // Thông tin pháp lý
-	DocumentIDs       []string  `json:"documentIds"`          // Danh sách ID tài liệu liên quan
-	DocumentsVerified bool      `json:"documentsVerified"`    // Trạng thái chứng thực tài liệu
-	VerifiedBy        string    `json:"verifiedBy"`           // Người chứng thực
-	VerifiedAt        time.Time `json:"verifiedAt,omitempty"` // Thời gian chứng thực
-	CreatedAt         time.Time `json:"createdAt"`            // Thời gian tạo
-	UpdatedAt         time.Time `json:"updatedAt"`            // Thời gian cập nhật
+	ID             string    `json:"id"`                  // Mã thửa đất
+	OwnerID        string    `json:"ownerId"`             // CCCD của chủ sở hữu
+	Area           float64   `json:"area"`                // Diện tích (m²)
+	Location       string    `json:"location"`            // Vị trí
+	LandUsePurpose string    `json:"landUsePurpose"`      // Mục đích sử dụng
+	LegalStatus    string    `json:"legalStatus"`         // Trạng thái pháp lý
+	CertificateID  string    `json:"certificateId"`       // Mã giấy chứng nhận
+	IssueDate      time.Time `json:"issueDate,omitempty"` // Ngày cấp giấy chứng nhận
+	LegalInfo      string    `json:"legalInfo"`           // Thông tin pháp lý
+	DocumentIDs    []string  `json:"documentIds"`         // Danh sách ID tài liệu liên quan (chỉ verified documents)
+	CreatedAt      time.Time `json:"createdAt"`           // Thời gian tạo
+	UpdatedAt      time.Time `json:"updatedAt"`           // Thời gian cập nhật
 }
 
 // Document định nghĩa tài liệu độc lập

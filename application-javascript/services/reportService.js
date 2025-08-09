@@ -34,7 +34,7 @@ const reportService = {
                     totalLands: lands.length,
                     totalTransactions: transactions.length,
                     landsWithCertificates: lands.filter(land => land.certificateId && land.certificateId !== '').length,
-                    verifiedDocuments: lands.filter(land => land.documentsVerified).length,
+                    verifiedDocuments: lands.filter(land => land.documentIds && land.documentIds.length > 0).length,
                     pendingTransactions: transactions.filter(tx => tx.status === 'PENDING').length,
                     approvedTransactions: transactions.filter(tx => tx.status === 'APPROVED').length,
                     totalArea: lands.reduce((sum, land) => sum + (land.area || 0), 0)
@@ -87,7 +87,7 @@ const reportService = {
                 totalLands: lands.length,
                 totalTransactions: transactions.length,
                 landsWithCertificates: lands.filter(land => land.certificateId && land.certificateId !== '').length,
-                verifiedDocuments: lands.filter(land => land.documentsVerified).length,
+                verifiedDocuments: lands.filter(land => land.documentIds && land.documentIds.length > 0).length,
                 totalArea: lands.reduce((sum, land) => sum + (land.area || 0), 0),
                 transactionStatus: transactions.reduce((acc, tx) => {
                     const status = tx.status || 'Không xác định';
