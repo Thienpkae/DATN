@@ -93,17 +93,21 @@ const CertificateManagementPage = ({ user }) => {
   };
 
   const handleRevokeCertificate = async (certificateID, reason = 'Administrative revocation') => {
-    try {
-      setLoading(true);
-      await apiService.revokeCertificate(certificateID, reason);
-      message.success('Certificate revoked successfully');
-      fetchCertificates();
-    } catch (error) {
-      console.error('Revoke certificate error:', error);
-      message.error('Failed to revoke certificate');
-    } finally {
-      setLoading(false);
-    }
+    // DISABLED: RevokeCertificate function not implemented in chaincode
+    message.warning('Certificate revocation is currently not available. This feature is not implemented in the chaincode.');
+    return;
+
+    // try {
+    //   setLoading(true);
+    //   await apiService.revokeCertificate(certificateID, reason);
+    //   message.success('Certificate revoked successfully');
+    //   fetchCertificates();
+    // } catch (error) {
+    //   console.error('Revoke certificate error:', error);
+    //   message.error('Failed to revoke certificate');
+    // } finally {
+    //   setLoading(false);
+    // }
   };
 
   const getFilteredCertificates = () => {

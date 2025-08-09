@@ -170,6 +170,7 @@ class ApiService {
   }
 
   async updateLandParcel(landParcelID, updateData) {
+    // Updated to match chaincode parameters: area, location, landUsePurpose, legalStatus
     return this.put(`/land-parcels/${landParcelID}`, updateData);
   }
 
@@ -263,11 +264,20 @@ class ApiService {
   }
 
   async updateDocument(documentID, updateData) {
+    // Updated to match chaincode parameters: ipfsHash, description (not metadata)
     return this.put(`/documents/${documentID}`, updateData);
   }
 
-  async verifyDocument(docID) {
-    return this.post(`/documents/${docID}/verify`);
+  async verifyDocument(docID, verificationData = {}) {
+    return this.post(`/documents/${docID}/verify`, { verificationData });
+  }
+
+  async analyzeDocument(ipfsHash, expectedCCCD = null, expectedLandParcelID = null) {
+    const params = {};
+    if (expectedCCCD) params.expectedCCCD = expectedCCCD;
+    if (expectedLandParcelID) params.expectedLandParcelID = expectedLandParcelID;
+    
+    return this.get(`/documents/analyze/${ipfsHash}`, params);
   }
 
   async getDocument(docID) {
@@ -410,9 +420,10 @@ class ApiService {
     });
   }
 
-  async performBulkOperation(operationData) {
-    return this.post('/land-parcels/bulk', operationData);
-  }
+  // Bulk Operations API - DISABLED: Function not implemented in chaincode
+  // async performBulkOperation(operationData) {
+  //   return this.post('/land-parcels/bulk', operationData);
+  // }
 
   async exportData(params) {
     return this.get('/export/land-parcels', params, { responseType: 'blob' });
@@ -463,15 +474,15 @@ class ApiService {
     });
   }
 
-  // Certificate Revocation API (Org1)
-  async revokeCertificate(certificateID, revocationData) {
-    return this.post(`/certificates/${certificateID}/revoke`, revocationData);
-  }
+  // Certificate Revocation API (Org1) - DISABLED: Function not implemented in chaincode
+  // async revokeCertificate(certificateID, revocationData) {
+  //   return this.post(`/certificates/${certificateID}/revoke`, revocationData);
+  // }
 
-  // Document Rejection API (Org2)
-  async rejectDocument(docID, rejectionData) {
-    return this.post(`/documents/${docID}/reject`, rejectionData);
-  }
+  // Document Rejection API (Org2) - DISABLED: Function not implemented in chaincode
+  // async rejectDocument(docID, rejectionData) {
+  //   return this.post(`/documents/${docID}/reject`, rejectionData);
+  // }
 
   // Pending Documents API (Org2)
   async getPendingDocuments() {
@@ -497,9 +508,10 @@ class ApiService {
     return this.get('/land-parcels', params);
   }
 
-  async deleteLandParcel(id) {
-    return this.delete(`/land-parcels/${id}`);
-  }
+  // Delete Land Parcel API - DISABLED: Function not implemented in chaincode
+  // async deleteLandParcel(id) {
+  //   return this.delete(`/land-parcels/${id}`);
+  // }
 
   // Additional Backend-Matched API Methods (non-duplicates only)
 
@@ -513,10 +525,10 @@ class ApiService {
     return this.get('/analytics', { period });
   }
 
-  // Bulk Operations API (enhanced)
-  async bulkLandParcelOperation(operation, landParcelIds, data = {}) {
-    return this.post('/land-parcels/bulk', { operation, landParcelIds, data });
-  }
+  // Bulk Operations API - DISABLED: BulkUpdate/BulkDelete functions not implemented in chaincode
+  // async bulkLandParcelOperation(operation, landParcelIds, data = {}) {
+  //   return this.post('/land-parcels/bulk', { operation, landParcelIds, data });
+  // }
 
   // ===== ADDITIONAL MAIN FUNCTIONS (Non-duplicates only) =====
 
@@ -535,6 +547,45 @@ class ApiService {
 
   // Note: updateDocument, lockUnlockAccount, deleteAccount, and updateUser
   // are already defined earlier in this file
+
+  // ==========================================
+  // SYSTEM CONFIGURATION ENDPOINTS (UC-67)
+  // ==========================================
+
+  // Get all system configurations
+  async getSystemConfigs(params = {}) {
+    return this.get('/system/configs', params);
+  }
+
+  // Get system configuration categories
+  async getSystemConfigCategories() {
+    return this.get('/system/configs/categories');
+  }
+
+  // Get system configuration by key
+  async getSystemConfig(key) {
+    return this.get(`/system/configs/${key}`);
+  }
+
+  // Update system configuration
+  async updateSystemConfig(key, configData) {
+    return this.put(`/system/configs/${key}`, configData);
+  }
+
+  // Delete system configuration
+  async deleteSystemConfig(key) {
+    return this.delete(`/system/configs/${key}`);
+  }
+
+  // Reset configuration to default
+  async resetSystemConfig(key) {
+    return this.post(`/system/configs/${key}/reset`);
+  }
+
+  // Initialize default configurations
+  async initializeSystemConfigs() {
+    return this.post('/system/configs/initialize');
+  }
 }
 
 // Create singleton instance

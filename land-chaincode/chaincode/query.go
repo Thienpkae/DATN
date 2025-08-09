@@ -3,253 +3,216 @@ package chaincode
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
+	"log"
+	"strconv"
 
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
-// QueryByKeyword thực hiện truy vấn theo từ khóa trên các thực thể với bộ lọc và phân quyền
-func (s *LandRegistryChaincode) QueryByKeyword(ctx contractapi.TransactionContextInterface, entityType, keyword string, filters map[string]string, userID string) (interface{}, error) {
-	// Xác định tổ chức của người gọi
+// ========================================
+// LAND QUERY FUNCTIONS
+// ========================================
+
+// QueryLandByID - Truy vấn thửa đất theo ID với kiểm tra quyền truy cập
+func (s *LandRegistryChaincode) QueryLandByID(ctx contractapi.TransactionContextInterface, landID, userID string) (*Land, error) {
+	data, err := ctx.GetStub().GetState(landID)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi truy vấn thửa đất %s: %v", landID, err)
+	}
+	if data == nil {
+		return nil, fmt.Errorf("thửa đất %s không tồn tại", landID)
+	}
+
+	var land Land
+	if err := json.Unmarshal(data, &land); err != nil {
+		return nil, fmt.Errorf("lỗi khi giải mã thửa đất: %v", err)
+	}
+
+	// Kiểm tra quyền truy cập cho Org3MSP (công dân)
+	mspID, err := GetCallerOrgMSP(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if mspID == "Org3MSP" && land.OwnerID != userID {
+		return nil, fmt.Errorf("người dùng %s không có quyền truy cập thửa đất %s", userID, landID)
+	}
+
+	return &land, nil
+}
+
+// GetLand - Lấy thông tin thửa đất theo ID (wrapper function)
+func (s *LandRegistryChaincode) GetLand(ctx contractapi.TransactionContextInterface, landID string) (*Land, error) {
+	userID, err := GetCallerID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.QueryLandByID(ctx, landID, userID)
+}
+
+// QueryLandsByOwner - Truy vấn tất cả thửa đất của một chủ sở hữu
+func (s *LandRegistryChaincode) QueryLandsByOwner(ctx contractapi.TransactionContextInterface, ownerID, userID string) ([]*Land, error) {
 	mspID, err := GetCallerOrgMSP(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Chuẩn hóa entityType
-	entityType = strings.ToLower(entityType)
-	var allowedEntities []string
-	var allowedOrgs []string
+	// Org3MSP chỉ có thể truy vấn thửa đất của chính họ
+	if mspID == "Org3MSP" && ownerID != userID {
+		return nil, fmt.Errorf("người dùng %s không có quyền truy vấn thửa đất của %s", userID, ownerID)
+	}
 
-	// Phân quyền theo tổ chức và thực thể
-	switch mspID {
-	case "Org1MSP", "Org2MSP":
-		allowedEntities = []string{"landparcel", "landcertificate", "landtransaction", "document", "transactionlog"}
-		allowedOrgs = []string{"Org1MSP", "Org2MSP"}
-	case "Org3MSP":
-		allowedEntities = []string{"landparcel", "landcertificate", "landtransaction", "document"}
-		allowedOrgs = []string{"Org3MSP"}
-	default:
+	// Tạo truy vấn tìm kiếm theo ownerId
+	queryString := fmt.Sprintf(`{"selector":{"ownerId":"%s","id":{"$exists":true},"landUsePurpose":{"$exists":true}}}`, ownerID)
+
+	lands, err := s.getQueryResultForLands(ctx, queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	logDetails := fmt.Sprintf("Truy vấn thửa đất theo chủ sở hữu %s", ownerID)
+	if err := RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_LANDS_BY_OWNER", userID, logDetails); err != nil {
+		fmt.Printf("Lỗi khi ghi log giao dịch: %v\n", err)
+	}
+
+	return lands, nil
+}
+
+// QueryLandsByKeyword - Truy vấn thửa đất theo từ khóa với bộ lọc
+func (s *LandRegistryChaincode) QueryLandsByKeyword(ctx contractapi.TransactionContextInterface, keyword string, filtersJSON string, userID string) ([]*Land, error) {
+	mspID, err := GetCallerOrgMSP(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Kiểm tra quyền truy cập tổ chức
+	allowedOrgs := []string{"Org1MSP", "Org2MSP", "Org3MSP"}
+	isAllowed := false
+	for _, org := range allowedOrgs {
+		if mspID == org {
+			isAllowed = true
+			break
+		}
+	}
+	if !isAllowed {
 		return nil, fmt.Errorf("tổ chức %s không được phép truy vấn", mspID)
 	}
 
-	// Kiểm tra entityType hợp lệ
-	if !contains(allowedEntities, entityType) {
-		return nil, fmt.Errorf("thực thể %s không được phép truy vấn bởi tổ chức %s", entityType, mspID)
+	// Parse filters từ JSON
+	filters := make(map[string]string)
+	if filtersJSON != "" {
+		if err := json.Unmarshal([]byte(filtersJSON), &filters); err != nil {
+			return nil, fmt.Errorf("lỗi khi parse filters: %v", err)
+		}
 	}
 
-	// Kiểm tra quyền tổ chức
-	if err := CheckOrganization(ctx, allowedOrgs); err != nil {
-		return nil, err
-	}
-
-	// Xây dựng query string
-	queryString, err := buildQueryString(entityType, keyword, filters, userID, mspID)
-	if err != nil {
-		return nil, err
-	}
+	// Tạo truy vấn Mango
+	queryString := buildQueryStringForLands(keyword, filters, userID, mspID)
+	log.Printf("Land Query String: %s", queryString)
 
 	// Thực hiện truy vấn
-	resultsIterator, err := ctx.GetStub().GetQueryResult(queryString)
+	lands, err := s.getQueryResultForLands(ctx, queryString)
 	if err != nil {
-		return nil, fmt.Errorf("lỗi khi truy vấn %s: %v", entityType, err)
+		return nil, err
+	}
+
+	// Kiểm tra quyền truy cập cho Org3MSP
+	if mspID == "Org3MSP" {
+		filteredLands := []*Land{}
+		for _, land := range lands {
+			if land.OwnerID == userID {
+				filteredLands = append(filteredLands, land)
+			}
+		}
+		return filteredLands, nil
+	}
+
+	return lands, nil
+}
+
+// QueryAllLands - Truy vấn tất cả thửa đất (chỉ cho admin)
+func (s *LandRegistryChaincode) QueryAllLands(ctx contractapi.TransactionContextInterface, userID string) ([]*Land, error) {
+	// Chỉ Org1MSP và Org2MSP mới có thể truy vấn tất cả
+	if err := CheckOrganization(ctx, []string{"Org1MSP", "Org2MSP"}); err != nil {
+		return nil, err
+	}
+
+	queryString := `{"selector":{"id":{"$exists":true},"landUsePurpose":{"$exists":true}}}`
+	lands, err := s.getQueryResultForLands(ctx, queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	return lands, nil
+}
+
+// GetLandHistory - Trả về lịch sử thay đổi của một thửa đất
+func (s *LandRegistryChaincode) GetLandHistory(ctx contractapi.TransactionContextInterface, landID, userID string) ([]map[string]interface{}, error) {
+	mspID, err := GetCallerOrgMSP(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Kiểm tra quyền truy cập cho Org3MSP
+	if mspID == "Org3MSP" {
+		land, err := s.QueryLandByID(ctx, landID, userID)
+		if err != nil {
+			return nil, fmt.Errorf("lỗi khi kiểm tra quyền sở hữu thửa đất %s: %v", landID, err)
+		}
+		if land.OwnerID != userID {
+			return nil, fmt.Errorf("người dùng %s không có quyền truy cập lịch sử thửa đất %s", userID, landID)
+		}
+	}
+
+	resultsIterator, err := ctx.GetStub().GetHistoryForKey(landID)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi truy vấn lịch sử thửa đất %s: %v", landID, err)
 	}
 	defer resultsIterator.Close()
 
-	// Xử lý kết quả theo entityType
-	switch entityType {
-	case "landparcel":
-		var parcels []*LandParcel
-		for resultsIterator.HasNext() {
-			queryResponse, err := resultsIterator.Next()
-			if err != nil {
-				return nil, fmt.Errorf("lỗi khi duyệt kết quả: %v", err)
-			}
-			var parcel LandParcel
-			if err := json.Unmarshal(queryResponse.Value, &parcel); err != nil {
-				return nil, fmt.Errorf("lỗi khi giải mã thửa đất: %v", err)
-			}
-			// Kiểm tra quyền Org3
-			if mspID == "Org3MSP" && parcel.OwnerID != userID {
-				continue
-			}
-			parcels = append(parcels, &parcel)
+	// Initialize empty slice to ensure proper JSON array even when no results
+	history := make([]map[string]interface{}, 0)
+	for resultsIterator.HasNext() {
+		response, err := resultsIterator.Next()
+		if err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc kết quả lịch sử: %v", err)
 		}
-		return parcels, RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_BY_KEYWORD", userID, fmt.Sprintf("Truy vấn thửa đất với từ khóa %s", keyword))
 
-	case "landcertificate":
-		var certificates []*LandCertificate
-		for resultsIterator.HasNext() {
-			queryResponse, err := resultsIterator.Next()
-			if err != nil {
-				return nil, fmt.Errorf("lỗi khi duyệt kết quả: %v", err)
+		var land Land
+		if len(response.Value) > 0 {
+			if err := json.Unmarshal(response.Value, &land); err != nil {
+				return nil, fmt.Errorf("lỗi khi giải mã dữ liệu thửa đất: %v", err)
 			}
-			var cert LandCertificate
-			if err := json.Unmarshal(queryResponse.Value, &cert); err != nil {
-				return nil, fmt.Errorf("lỗi khi giải mã GCN: %v", err)
-			}
-			// Kiểm tra quyền Org3
-			if mspID == "Org3MSP" && cert.OwnerID != userID {
-				continue
-			}
-			certificates = append(certificates, &cert)
+		} else {
+			land = Land{ID: landID}
 		}
-		return certificates, RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_BY_KEYWORD", userID, fmt.Sprintf("Truy vấn GCN với từ khóa %s", keyword))
 
-	case "landtransaction":
-		var transactions []*LandTransaction
-		for resultsIterator.HasNext() {
-			queryResponse, err := resultsIterator.Next()
-			if err != nil {
-				return nil, fmt.Errorf("lỗi khi duyệt kết quả: %v", err)
-			}
-			var tx LandTransaction
-			if err := json.Unmarshal(queryResponse.Value, &tx); err != nil {
-				return nil, fmt.Errorf("lỗi khi giải mã giao dịch: %v", err)
-			}
-			// Kiểm tra quyền Org3
-			if mspID == "Org3MSP" && tx.FromOwnerID != userID && tx.ToOwnerID != userID {
-				continue
-			}
-			transactions = append(transactions, &tx)
+		historyEntry := map[string]interface{}{
+			"txId":      response.TxId,
+			"timestamp": response.Timestamp,
+			"isDelete":  response.IsDelete,
+			"land":      land,
 		}
-		return transactions, RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_BY_KEYWORD", userID, fmt.Sprintf("Truy vấn giao dịch với từ khóa %s", keyword))
-
-	case "document":
-		var documents []*Document
-		for resultsIterator.HasNext() {
-			queryResponse, err := resultsIterator.Next()
-			if err != nil {
-				return nil, fmt.Errorf("lỗi khi duyệt kết quả: %v", err)
-			}
-			var doc Document
-			if err := json.Unmarshal(queryResponse.Value, &doc); err != nil {
-				return nil, fmt.Errorf("lỗi khi giải mã tài liệu: %v", err)
-			}
-			// Kiểm tra quyền Org3
-			if mspID == "Org3MSP" {
-				parcelData, err := ctx.GetStub().GetState(doc.LandParcelID)
-				if err != nil || parcelData == nil {
-					continue
-				}
-				var parcel LandParcel
-				if err := json.Unmarshal(parcelData, &parcel); err != nil {
-					continue
-				}
-				if parcel.OwnerID != userID {
-					continue
-				}
-			}
-			documents = append(documents, &doc)
-		}
-		return documents, RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_BY_KEYWORD", userID, fmt.Sprintf("Truy vấn tài liệu với từ khóa %s", keyword))
-
-	case "transactionlog":
-		var logs []*TransactionLog
-		for resultsIterator.HasNext() {
-			queryResponse, err := resultsIterator.Next()
-			if err != nil {
-				return nil, fmt.Errorf("lỗi khi duyệt kết quả: %v", err)
-			}
-			var log TransactionLog
-			if err := json.Unmarshal(queryResponse.Value, &log); err != nil {
-				return nil, fmt.Errorf("lỗi khi giải mã nhật ký: %v", err)
-			}
-			logs = append(logs, &log)
-		}
-		return logs, RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_BY_KEYWORD", userID, fmt.Sprintf("Truy vấn nhật ký với từ khóa %s", keyword))
+		history = append(history, historyEntry)
 	}
 
-	return nil, fmt.Errorf("thực thể %s không được hỗ trợ", entityType)
+	if len(history) == 0 {
+		return nil, fmt.Errorf("không tìm thấy lịch sử cho thửa đất %s", landID)
+	}
+
+	logDetails := fmt.Sprintf("Truy vấn lịch sử thửa đất %s", landID)
+	if err := RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "GET_LAND_HISTORY", userID, logDetails); err != nil {
+		fmt.Printf("Lỗi khi ghi log giao dịch: %v\n", err)
+	}
+
+	return history, nil
 }
 
-// QueryLandParcelByID truy vấn theo ID khóa chính (Org1, Org2, Org3)
-func (s *LandRegistryChaincode) QueryLandParcelByID(ctx contractapi.TransactionContextInterface, id, userID string) (*LandParcel, error) {
-	if err := CheckOrganization(ctx, []string{"Org1MSP", "Org2MSP", "Org3MSP"}); err != nil {
-		return nil, err
-	}
+// ========================================
+// DOCUMENT QUERY FUNCTIONS
+// ========================================
 
-	data, err := ctx.GetStub().GetState(id)
-	if err != nil {
-		return nil, fmt.Errorf("lỗi khi truy vấn thửa đất %s: %v", id, err)
-	}
-	if data == nil {
-		return nil, fmt.Errorf("thửa đất %s không tồn tại", id)
-	}
-
-	var parcel LandParcel
-	if err := json.Unmarshal(data, &parcel); err != nil {
-		return nil, fmt.Errorf("lỗi khi giải mã thửa đất: %v", err)
-	}
-
-	// Kiểm tra quyền Org3
-	if mspID, _ := GetCallerOrgMSP(ctx); mspID == "Org3MSP" && parcel.OwnerID != userID {
-		return nil, fmt.Errorf("người dùng %s không có quyền truy vấn thửa đất %s", userID, id)
-	}
-
-	return &parcel, RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_LAND_PARCEL", userID, fmt.Sprintf("Truy vấn thửa đất %s", id))
-}
-
-// QueryCertificateByID truy vấn GCN theo ID khóa chính (Org1, Org2, Org3)
-func (s *LandRegistryChaincode) QueryCertificateByID(ctx contractapi.TransactionContextInterface, certificateID, userID string) (*LandCertificate, error) {
-	if err := CheckOrganization(ctx, []string{"Org1MSP", "Org2MSP", "Org3MSP"}); err != nil {
-		return nil, err
-	}
-
-	data, err := ctx.GetStub().GetState(certificateID)
-	if err != nil {
-		return nil, fmt.Errorf("lỗi khi truy vấn GCN %s: %v", certificateID, err)
-	}
-	if data == nil {
-		return nil, fmt.Errorf("GCN %s không tồn tại", certificateID)
-	}
-
-	var cert LandCertificate
-	if err := json.Unmarshal(data, &cert); err != nil {
-		return nil, fmt.Errorf("lỗi khi giải mã GCN: %v", err)
-	}
-
-	// Kiểm tra quyền Org3
-	if mspID, _ := GetCallerOrgMSP(ctx); mspID == "Org3MSP" && cert.OwnerID != userID {
-		return nil, fmt.Errorf("người dùng %s không có quyền truy vấn GCN %s", userID, certificateID)
-	}
-
-	return &cert, RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_CERTIFICATE", userID, fmt.Sprintf("Truy vấn GCN %s", certificateID))
-}
-
-// QueryTransactionByID truy vấn giao dịch theo ID khóa chính (Org1, Org2, Org3)
-func (s *LandRegistryChaincode) QueryTransactionByID(ctx contractapi.TransactionContextInterface, txID, userID string) (*LandTransaction, error) {
-	if err := CheckOrganization(ctx, []string{"Org1MSP", "Org2MSP", "Org3MSP"}); err != nil {
-		return nil, err
-	}
-
-	data, err := ctx.GetStub().GetState(txID)
-	if err != nil {
-		return nil, fmt.Errorf("lỗi khi truy vấn giao dịch %s: %v", txID, err)
-	}
-	if data == nil {
-		return nil, fmt.Errorf("giao dịch %s không tồn tại", txID)
-	}
-
-	var tx LandTransaction
-	if err := json.Unmarshal(data, &tx); err != nil {
-		return nil, fmt.Errorf("lỗi khi giải mã giao dịch: %v", err)
-	}
-
-	// Kiểm tra quyền Org3
-	if mspID, _ := GetCallerOrgMSP(ctx); mspID == "Org3MSP" && tx.FromOwnerID != userID && tx.ToOwnerID != userID {
-		return nil, fmt.Errorf("người dùng %s không có quyền truy vấn giao dịch %s", userID, txID)
-	}
-
-	return &tx, RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_TRANSACTION", userID, fmt.Sprintf("Truy vấn giao dịch %s", txID))
-}
-
-// QueryDocumentByID truy vấn tài liệu theo ID khóa chính (Org1, Org2, Org3)
-func (s *LandRegistryChaincode) QueryDocumentByID(ctx contractapi.TransactionContextInterface, docID, userID string) (*Document, error) {
-	if err := CheckOrganization(ctx, []string{"Org1MSP", "Org2MSP", "Org3MSP"}); err != nil {
-		return nil, err
-	}
-
+// GetDocument - Lấy thông tin tài liệu theo ID
+func (s *LandRegistryChaincode) GetDocument(ctx contractapi.TransactionContextInterface, docID string) (*Document, error) {
 	data, err := ctx.GetStub().GetState(docID)
 	if err != nil {
 		return nil, fmt.Errorf("lỗi khi truy vấn tài liệu %s: %v", docID, err)
@@ -263,134 +226,770 @@ func (s *LandRegistryChaincode) QueryDocumentByID(ctx contractapi.TransactionCon
 		return nil, fmt.Errorf("lỗi khi giải mã tài liệu: %v", err)
 	}
 
-	// Kiểm tra quyền Org3
-	if mspID, _ := GetCallerOrgMSP(ctx); mspID == "Org3MSP" {
-		parcelData, err := ctx.GetStub().GetState(doc.LandParcelID)
+	// Kiểm tra quyền truy cập cho Org3
+	mspID, err := GetCallerOrgMSP(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if mspID == "Org3MSP" {
+		userID, err := GetCallerID(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("lỗi khi kiểm tra thửa đất %s: %v", doc.LandParcelID, err)
+			return nil, err
 		}
-		if parcelData == nil {
-			return nil, fmt.Errorf("thửa đất %s không tồn tại", doc.LandParcelID)
-		}
-		var parcel LandParcel
-		if err := json.Unmarshal(parcelData, &parcel); err != nil {
-			return nil, fmt.Errorf("lỗi khi giải mã thửa đất: %v", err)
-		}
-		if parcel.OwnerID != userID {
-			return nil, fmt.Errorf("người dùng %s không có quyền truy vấn tài liệu %s", userID, docID)
+		if doc.UploadedBy != userID {
+			return nil, fmt.Errorf("người dùng %s không có quyền truy cập tài liệu %s", userID, docID)
 		}
 	}
 
-	return &doc, RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_DOCUMENT", userID, fmt.Sprintf("Truy vấn tài liệu %s", docID))
+	return &doc, nil
 }
 
-// buildQueryString xây dựng CouchDB query string dựa trên entityType, keyword và filters
-func buildQueryString(entityType, keyword string, filters map[string]string, userID, mspID string) (string, error) {
-	selector := map[string]interface{}{}
+// QueryDocuments - Truy vấn tài liệu theo thửa đất hoặc giao dịch
+func (s *LandRegistryChaincode) QueryDocuments(ctx contractapi.TransactionContextInterface, entityType, entityID, userID string) ([]string, error) {
+	switch entityType {
+	case "land":
+		land, err := s.QueryLandByID(ctx, entityID, userID)
+		if err != nil {
+			return nil, err
+		}
+		return land.DocumentIDs, nil
+	case "transaction":
+		tx, err := s.QueryTransactionByID(ctx, entityID, userID)
+		if err != nil {
+			return nil, err
+		}
+		return tx.DocumentIDs, nil
+	default:
+		return nil, fmt.Errorf("loại thực thể %s không được hỗ trợ", entityType)
+	}
+}
 
-	// Thêm từ khóa tìm kiếm
-	if keyword != "" {
-		keyword = strings.ReplaceAll(keyword, `"`, `\"`) // Sanitize
-		regexKeyword := fmt.Sprintf(".*%s.*", keyword)
-		switch entityType {
-		case "landparcel":
-			selector["$or"] = []map[string]interface{}{
-				{"location": map[string]string{"$regex": regexKeyword}},
-				{"landUsePurpose": map[string]string{"$regex": regexKeyword}},
-				{"legalStatus": map[string]string{"$regex": regexKeyword}},
+// QueryDocumentsByLandParcel - Truy vấn tài liệu theo thửa đất
+func (s *LandRegistryChaincode) QueryDocumentsByLandParcel(ctx contractapi.TransactionContextInterface, landParcelID, userID string) ([]*Document, error) {
+	land, err := s.QueryLandByID(ctx, landParcelID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var documents []*Document
+	for _, docID := range land.DocumentIDs {
+		doc, err := s.GetDocument(ctx, docID)
+		if err == nil {
+			documents = append(documents, doc)
+		}
+	}
+
+	return documents, nil
+}
+
+// QueryDocumentsByTransaction - Truy vấn tài liệu theo giao dịch
+func (s *LandRegistryChaincode) QueryDocumentsByTransaction(ctx contractapi.TransactionContextInterface, txID, userID string) ([]*Document, error) {
+	tx, err := s.QueryTransactionByID(ctx, txID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var documents []*Document
+	for _, docID := range tx.DocumentIDs {
+		doc, err := s.GetDocument(ctx, docID)
+		if err == nil {
+			documents = append(documents, doc)
+		}
+	}
+
+	return documents, nil
+}
+
+// QueryDocumentsByStatus - Truy vấn tài liệu theo trạng thái (pending/verified)
+func (s *LandRegistryChaincode) QueryDocumentsByStatus(ctx contractapi.TransactionContextInterface, status, userID string) ([]*Document, error) {
+	switch status {
+	case "pending":
+		// Chỉ Org2 mới được truy vấn tài liệu chờ chứng thực
+		if err := CheckOrganization(ctx, []string{"Org2MSP"}); err != nil {
+			return nil, err
+		}
+	case "verified":
+		// Tất cả các org đều có thể xem verified documents - không cần check
+	default:
+		return nil, fmt.Errorf("trạng thái %s không được hỗ trợ", status)
+	}
+
+	// Truy vấn tất cả tài liệu theo trạng thái
+	var verifiedValue string
+	if status == "verified" {
+		verifiedValue = "true"
+	} else {
+		verifiedValue = "false"
+	}
+	queryString := fmt.Sprintf(`{"selector":{"verified":%s}}`, verifiedValue)
+
+	documents, err := s.getQueryResultForDocuments(ctx, queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	// Lọc theo quyền truy cập cho Org3
+	mspID, err := GetCallerOrgMSP(ctx)
+	if err == nil && mspID == "Org3MSP" {
+		var filteredDocs []*Document
+		for _, doc := range documents {
+			if doc.UploadedBy == userID {
+				filteredDocs = append(filteredDocs, doc)
 			}
-		case "landcertificate":
-			selector["legalInfo"] = map[string]string{"$regex": regexKeyword}
-		case "landtransaction":
-			selector["$or"] = []map[string]interface{}{
-				{"details": map[string]string{"$regex": regexKeyword}},
-				{"type": map[string]string{"$regex": regexKeyword}},
-				{"status": map[string]string{"$regex": regexKeyword}},
+		}
+		return filteredDocs, nil
+	}
+
+	return documents, nil
+}
+
+// QueryDocumentsByType - Truy vấn tài liệu theo loại
+func (s *LandRegistryChaincode) QueryDocumentsByType(ctx contractapi.TransactionContextInterface, docType, userID string) ([]*Document, error) {
+	queryString := fmt.Sprintf(`{"selector":{"type":"%s"}}`, docType)
+
+	documents, err := s.getQueryResultForDocuments(ctx, queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	// Lọc theo quyền truy cập cho Org3
+	mspID, err := GetCallerOrgMSP(ctx)
+	if err == nil && mspID == "Org3MSP" {
+		var filteredDocs []*Document
+		for _, doc := range documents {
+			if doc.UploadedBy == userID {
+				filteredDocs = append(filteredDocs, doc)
 			}
-		case "document":
-			selector["$or"] = []map[string]interface{}{
-				{"description": map[string]string{"$regex": regexKeyword}},
-				{"ipfsHash": map[string]string{"$regex": regexKeyword}},
+		}
+		return filteredDocs, nil
+	}
+
+	return documents, nil
+}
+
+// QueryDocumentsByUploader - Truy vấn tài liệu theo người upload
+func (s *LandRegistryChaincode) QueryDocumentsByUploader(ctx contractapi.TransactionContextInterface, uploaderID, userID string) ([]*Document, error) {
+	queryString := fmt.Sprintf(`{"selector":{"uploadedBy":"%s"}}`, uploaderID)
+
+	documents, err := s.getQueryResultForDocuments(ctx, queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	// Kiểm tra quyền truy cập cho Org3
+	mspID, err := GetCallerOrgMSP(ctx)
+	if err == nil && mspID == "Org3MSP" && uploaderID != userID {
+		// Chỉ cho phép xem tài liệu của chính mình
+		return nil, fmt.Errorf("người dùng %s không có quyền xem tài liệu của %s", userID, uploaderID)
+	}
+
+	return documents, nil
+}
+
+// QueryDocumentsByKeyword - Truy vấn tài liệu theo từ khóa
+func (s *LandRegistryChaincode) QueryDocumentsByKeyword(ctx contractapi.TransactionContextInterface, keyword string, filtersJSON string, userID string) ([]*Document, error) {
+	mspID, err := GetCallerOrgMSP(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse filters từ JSON
+	filters := make(map[string]string)
+	if filtersJSON != "" {
+		if err := json.Unmarshal([]byte(filtersJSON), &filters); err != nil {
+			return nil, fmt.Errorf("lỗi khi parse filters: %v", err)
+		}
+	}
+
+	// Tạo query cho tài liệu
+	queryString := buildQueryStringForDocuments(keyword, filters, userID, mspID)
+	log.Printf("Document Query String: %s", queryString)
+
+	documents, err := s.getQueryResultForDocuments(ctx, queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	return documents, nil
+}
+
+// QueryAllDocuments - Truy vấn tất cả tài liệu (chỉ cho admin)
+func (s *LandRegistryChaincode) QueryAllDocuments(ctx contractapi.TransactionContextInterface, userID string) ([]*Document, error) {
+	// Chỉ Org1MSP và Org2MSP mới có thể truy vấn tất cả
+	if err := CheckOrganization(ctx, []string{"Org1MSP", "Org2MSP"}); err != nil {
+		return nil, err
+	}
+
+	queryString := `{"selector":{"id":{"$exists":true},"type":{"$exists":true}}}`
+	documents, err := s.getQueryResultForDocuments(ctx, queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	return documents, nil
+}
+
+// QueryPendingDocuments - Truy vấn tài liệu chờ chứng thực (backward compatibility)
+func (s *LandRegistryChaincode) QueryPendingDocuments(ctx contractapi.TransactionContextInterface, userID string) ([]*Document, error) {
+	return s.QueryDocumentsByStatus(ctx, "pending", userID)
+}
+
+// QueryVerifiedDocuments - Truy vấn tài liệu đã chứng thực (backward compatibility)
+func (s *LandRegistryChaincode) QueryVerifiedDocuments(ctx contractapi.TransactionContextInterface, userID string) ([]*Document, error) {
+	return s.QueryDocumentsByStatus(ctx, "verified", userID)
+}
+
+// QueryDocumentHistory - Truy vấn lịch sử tài liệu
+func (s *LandRegistryChaincode) QueryDocumentHistory(ctx contractapi.TransactionContextInterface, ipfsHash, userID string) ([]map[string]interface{}, error) {
+	// Truy vấn lịch sử của tài liệu trong các thửa đất
+	// Sử dụng query để tìm thửa đất có document chứa IPFS hash
+	queryString := fmt.Sprintf(`{"selector":{"documentIds":{"$elemMatch":{"$eq":"%s"}}}}`, ipfsHash)
+
+	lands, err := s.getQueryResultForLands(ctx, queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	var history []map[string]interface{}
+	for _, land := range lands {
+		// Kiểm tra quyền truy cập cho Org3
+		mspID, err := GetCallerOrgMSP(ctx)
+		if err == nil && mspID == "Org3MSP" && land.OwnerID != userID {
+			continue // Bỏ qua nếu không phải chủ sở hữu
+		}
+
+		// Kiểm tra xem document có chứa IPFS hash không
+		for _, docID := range land.DocumentIDs {
+			doc, err := GetDocument(ctx, docID)
+			if err != nil {
+				continue
 			}
-		case "transactionlog":
-			selector["$or"] = []map[string]interface{}{
-				{"details": map[string]string{"$regex": regexKeyword}},
-				{"action": map[string]string{"$regex": regexKeyword}},
+			if doc.IPFSHash == ipfsHash {
+				history = append(history, map[string]interface{}{
+					"landParcelID": land.ID,
+					"ownerID":      land.OwnerID,
+					"ipfsHash":     ipfsHash,
+					"type":         "land",
+					"verified":     land.DocumentsVerified,
+					"verifiedBy":   land.VerifiedBy,
+					"verifiedAt":   land.VerifiedAt,
+					"location":     land.Location,
+					"area":         land.Area,
+				})
+				break
 			}
 		}
 	}
 
-	// Thêm bộ lọc
+	// Truy vấn lịch sử trong các giao dịch
+	queryString = fmt.Sprintf(`{"selector":{"documentIds":{"$elemMatch":{"$eq":"%s"}}}}`, ipfsHash)
+
+	transactions, err := s.getQueryResultForTransactions(ctx, queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, tx := range transactions {
+		// Kiểm tra quyền truy cập cho Org3
+		mspID, err := GetCallerOrgMSP(ctx)
+		if err == nil && mspID == "Org3MSP" && tx.FromOwnerID != userID && tx.ToOwnerID != userID {
+			continue // Bỏ qua nếu không liên quan
+		}
+
+		// Kiểm tra xem document có chứa IPFS hash không
+		for _, docID := range tx.DocumentIDs {
+			doc, err := GetDocument(ctx, docID)
+			if err != nil {
+				continue
+			}
+			if doc.IPFSHash == ipfsHash {
+				history = append(history, map[string]interface{}{
+					"txID":        tx.TxID,
+					"type":        "transaction",
+					"txType":      tx.Type,
+					"fromOwnerID": tx.FromOwnerID,
+					"toOwnerID":   tx.ToOwnerID,
+					"ipfsHash":    ipfsHash,
+					"status":      tx.Status,
+					"lastUpdated": tx.UpdatedAt,
+				})
+				break
+			}
+		}
+	}
+
+	return history, nil
+}
+
+// ========================================
+// TRANSACTION QUERY FUNCTIONS
+// ========================================
+
+// QueryTransactionByID - Truy vấn giao dịch theo ID với kiểm tra quyền truy cập
+func (s *LandRegistryChaincode) QueryTransactionByID(ctx contractapi.TransactionContextInterface, txID, userID string) (*Transaction, error) {
+	tx, err := GetTransaction(ctx, txID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Kiểm tra quyền truy cập cho Org3MSP
+	mspID, err := GetCallerOrgMSP(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if mspID == "Org3MSP" && tx.FromOwnerID != userID && tx.ToOwnerID != userID {
+		return nil, fmt.Errorf("người dùng %s không có quyền truy cập giao dịch %s", userID, txID)
+	}
+
+	return tx, nil
+}
+
+// GetTransaction - Lấy thông tin giao dịch theo ID (wrapper function)
+func (s *LandRegistryChaincode) GetTransaction(ctx contractapi.TransactionContextInterface, txID string) (*Transaction, error) {
+	userID, err := GetCallerID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.QueryTransactionByID(ctx, txID, userID)
+}
+
+// QueryTransactionsByOwner - Truy vấn tất cả giao dịch của một chủ sở hữu
+func (s *LandRegistryChaincode) QueryTransactionsByOwner(ctx contractapi.TransactionContextInterface, ownerID, userID string) ([]*Transaction, error) {
+	mspID, err := GetCallerOrgMSP(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Org3MSP chỉ có thể truy vấn giao dịch của chính họ
+	if mspID == "Org3MSP" && ownerID != userID {
+		return nil, fmt.Errorf("người dùng %s không có quyền truy vấn giao dịch của %s", userID, ownerID)
+	}
+
+	// Tạo truy vấn tìm kiếm giao dịch mà user tham gia
+	queryString := fmt.Sprintf(`{"selector":{"$or":[{"fromOwnerId":"%s"},{"toOwnerId":"%s"}],"txId":{"$exists":true},"type":{"$exists":true}}}`, ownerID, ownerID)
+
+	transactions, err := s.getQueryResultForTransactions(ctx, queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	logDetails := fmt.Sprintf("Truy vấn giao dịch theo chủ sở hữu %s", ownerID)
+	if err := RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_TRANSACTIONS_BY_OWNER", userID, logDetails); err != nil {
+		fmt.Printf("Lỗi khi ghi log giao dịch: %v\n", err)
+	}
+
+	return transactions, nil
+}
+
+// QueryTransactionsByStatus - Truy vấn giao dịch theo trạng thái
+func (s *LandRegistryChaincode) QueryTransactionsByStatus(ctx contractapi.TransactionContextInterface, status, userID string) ([]*Transaction, error) {
+	// Chỉ có Org1MSP và Org2MSP mới có thể truy vấn theo trạng thái
+	if err := CheckOrganization(ctx, []string{"Org1MSP", "Org2MSP"}); err != nil {
+		return nil, err
+	}
+
+	// Tạo truy vấn tìm kiếm theo trạng thái
+	queryString := fmt.Sprintf(`{"selector":{"status":"%s","txId":{"$exists":true},"type":{"$exists":true}}}`, status)
+
+	transactions, err := s.getQueryResultForTransactions(ctx, queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	logDetails := fmt.Sprintf("Truy vấn giao dịch theo trạng thái %s", status)
+	if err := RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_TRANSACTIONS_BY_STATUS", userID, logDetails); err != nil {
+		fmt.Printf("Lỗi khi ghi log giao dịch: %v\n", err)
+	}
+
+	return transactions, nil
+}
+
+// QueryTransactionsByKeyword - Truy vấn giao dịch theo từ khóa với bộ lọc
+func (s *LandRegistryChaincode) QueryTransactionsByKeyword(ctx contractapi.TransactionContextInterface, keyword string, filtersJSON string, userID string) ([]*Transaction, error) {
+	mspID, err := GetCallerOrgMSP(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Kiểm tra quyền truy cập tổ chức
+	allowedOrgs := []string{"Org1MSP", "Org2MSP", "Org3MSP"}
+	isAllowed := false
+	for _, org := range allowedOrgs {
+		if mspID == org {
+			isAllowed = true
+			break
+		}
+	}
+	if !isAllowed {
+		return nil, fmt.Errorf("tổ chức %s không được phép truy vấn", mspID)
+	}
+
+	// Parse filters từ JSON
+	filters := make(map[string]string)
+	if filtersJSON != "" {
+		if err := json.Unmarshal([]byte(filtersJSON), &filters); err != nil {
+			return nil, fmt.Errorf("lỗi khi parse filters: %v", err)
+		}
+	}
+
+	// Tạo truy vấn Mango
+	queryString := buildQueryStringForTransactions(keyword, filters, userID, mspID)
+	log.Printf("Transaction Query String: %s", queryString)
+
+	// Thực hiện truy vấn
+	txs, err := s.getQueryResultForTransactions(ctx, queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	// Kiểm tra quyền truy cập cho Org3MSP
 	if mspID == "Org3MSP" {
-		switch entityType {
-		case "landparcel", "landcertificate":
-			selector["ownerId"] = userID
-		case "landtransaction":
+		filteredTxs := []*Transaction{}
+		for _, tx := range txs {
+			if tx.FromOwnerID == userID || tx.ToOwnerID == userID {
+				filteredTxs = append(filteredTxs, tx)
+			}
+		}
+		return filteredTxs, nil
+	}
+
+	return txs, nil
+}
+
+// QueryAllTransactions - Truy vấn tất cả giao dịch (chỉ cho admin)
+func (s *LandRegistryChaincode) QueryAllTransactions(ctx contractapi.TransactionContextInterface, userID string) ([]*Transaction, error) {
+	// Chỉ Org1MSP và Org2MSP mới có thể truy vấn tất cả
+	if err := CheckOrganization(ctx, []string{"Org1MSP", "Org2MSP"}); err != nil {
+		return nil, err
+	}
+
+	queryString := `{"selector":{"txId":{"$exists":true},"type":{"$exists":true}}}`
+	transactions, err := s.getQueryResultForTransactions(ctx, queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	return transactions, nil
+}
+
+// GetTransactionHistory - Trả về lịch sử thay đổi của một giao dịch
+func (s *LandRegistryChaincode) GetTransactionHistory(ctx contractapi.TransactionContextInterface, txID, userID string) ([]map[string]interface{}, error) {
+	mspID, err := GetCallerOrgMSP(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Kiểm tra quyền truy cập cho Org3MSP
+	if mspID == "Org3MSP" {
+		tx, err := s.QueryTransactionByID(ctx, txID, userID)
+		if err != nil {
+			return nil, fmt.Errorf("lỗi khi kiểm tra quyền truy cập giao dịch %s: %v", txID, err)
+		}
+		if tx.FromOwnerID != userID && tx.ToOwnerID != userID {
+			return nil, fmt.Errorf("người dùng %s không có quyền truy cập lịch sử giao dịch %s", userID, txID)
+		}
+	}
+
+	resultsIterator, err := ctx.GetStub().GetHistoryForKey(txID)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi truy vấn lịch sử giao dịch %s: %v", txID, err)
+	}
+	defer resultsIterator.Close()
+
+	// Initialize empty slice to ensure proper JSON array even when no results
+	history := make([]map[string]interface{}, 0)
+	for resultsIterator.HasNext() {
+		response, err := resultsIterator.Next()
+		if err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc kết quả lịch sử: %v", err)
+		}
+
+		var tx Transaction
+		if len(response.Value) > 0 {
+			if err := json.Unmarshal(response.Value, &tx); err != nil {
+				return nil, fmt.Errorf("lỗi khi giải mã dữ liệu giao dịch: %v", err)
+			}
+		} else {
+			tx = Transaction{TxID: txID}
+		}
+
+		historyEntry := map[string]interface{}{
+			"txId":        response.TxId,
+			"timestamp":   response.Timestamp,
+			"isDelete":    response.IsDelete,
+			"transaction": tx,
+		}
+		history = append(history, historyEntry)
+	}
+
+	if len(history) == 0 {
+		return nil, fmt.Errorf("không tìm thấy lịch sử cho giao dịch %s", txID)
+	}
+
+	logDetails := fmt.Sprintf("Truy vấn lịch sử giao dịch %s", txID)
+	if err := RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "GET_TRANSACTION_HISTORY", userID, logDetails); err != nil {
+		fmt.Printf("Lỗi khi ghi log giao dịch: %v\n", err)
+	}
+
+	return history, nil
+}
+
+// ========================================
+// GENERAL QUERY FUNCTIONS
+// ========================================
+
+// QueryByKeyword - wrapper function for backward compatibility (returns []byte)
+func (s *LandRegistryChaincode) QueryByKeyword(ctx contractapi.TransactionContextInterface, entityType, keyword string, filtersJSON string, userID string) ([]byte, error) {
+	switch entityType {
+	case "land":
+		lands, err := s.QueryLandsByKeyword(ctx, keyword, filtersJSON, userID)
+		if err != nil {
+			return nil, err
+		}
+		resultBytes, err := json.Marshal(lands)
+		if err != nil {
+			return nil, fmt.Errorf("lỗi khi tuần tự hóa kết quả land: %v", err)
+		}
+		return resultBytes, nil
+
+	case "transaction":
+		txs, err := s.QueryTransactionsByKeyword(ctx, keyword, filtersJSON, userID)
+		if err != nil {
+			return nil, err
+		}
+		resultBytes, err := json.Marshal(txs)
+		if err != nil {
+			return nil, fmt.Errorf("lỗi khi tuần tự hóa kết quả transaction: %v", err)
+		}
+		return resultBytes, nil
+
+	case "document":
+		// Truy vấn tài liệu theo từ khóa
+		documents, err := s.QueryDocumentsByKeyword(ctx, keyword, filtersJSON, userID)
+		if err != nil {
+			return nil, err
+		}
+		resultBytes, err := json.Marshal(documents)
+		if err != nil {
+			return nil, fmt.Errorf("lỗi khi tuần tự hóa kết quả document: %v", err)
+		}
+		return resultBytes, nil
+
+	default:
+		return nil, fmt.Errorf("loại thực thể %s không được hỗ trợ", entityType)
+	}
+}
+
+// QueryForKeyword - wrapper function for backward compatibility
+func (s *LandRegistryChaincode) QueryForKeyword(ctx contractapi.TransactionContextInterface, entityType, keyword, filtersJSON, userID string) ([]byte, error) {
+	return s.QueryByKeyword(ctx, entityType, keyword, filtersJSON, userID)
+}
+
+// ========================================
+// HELPER QUERY FUNCTIONS
+// ========================================
+
+// buildQueryStringForLands - Tạo chuỗi truy vấn Mango cho thửa đất
+func buildQueryStringForLands(keyword string, filters map[string]string, userID, mspID string) string {
+	selector := map[string]interface{}{}
+
+	// Thửa đất có các trường id, ownerId, landUsePurpose
+	selector["id"] = map[string]interface{}{"$exists": true}
+	selector["ownerId"] = map[string]interface{}{"$exists": true}
+	selector["landUsePurpose"] = map[string]interface{}{"$exists": true}
+
+	if keyword != "" {
+		// For numeric searches, try to parse as number for area field
+		var areaConditions []map[string]interface{}
+		if areaValue, err := strconv.ParseFloat(keyword, 64); err == nil {
+			areaConditions = append(areaConditions, map[string]interface{}{"area": areaValue})
+		}
+
+		// Create search conditions - CouchDB regex is case-sensitive by default
+		searchConditions := []map[string]interface{}{
+			{"id": map[string]interface{}{"$regex": keyword}},
+			{"location": map[string]interface{}{"$regex": keyword}},
+			{"landUsePurpose": map[string]interface{}{"$regex": keyword}},
+			{"ownerId": map[string]interface{}{"$regex": keyword}},
+		}
+
+		// Add area conditions if keyword is numeric
+		searchConditions = append(searchConditions, areaConditions...)
+
+		selector["$or"] = searchConditions
+	}
+
+	// Áp dụng các bộ lọc bổ sung
+	for key, value := range filters {
+		selector[key] = value
+	}
+
+	// Áp dụng kiểm soát truy cập theo tổ chức
+	if mspID == "Org3MSP" {
+		selector["ownerId"] = userID
+	}
+
+	queryBytes, _ := json.Marshal(map[string]interface{}{
+		"selector": selector,
+	})
+	return string(queryBytes)
+}
+
+// buildQueryStringForTransactions - Tạo chuỗi truy vấn Mango cho giao dịch
+func buildQueryStringForTransactions(keyword string, filters map[string]string, userID, mspID string) string {
+	selector := map[string]interface{}{}
+
+	// Giao dịch có các trường txId, type
+	selector["txId"] = map[string]interface{}{"$exists": true}
+	selector["type"] = map[string]interface{}{"$exists": true}
+
+	if keyword != "" {
+		// Create search conditions - CouchDB regex is case-sensitive by default
+		selector["$or"] = []map[string]interface{}{
+			{"txId": map[string]interface{}{"$regex": keyword}},
+			{"type": map[string]interface{}{"$regex": keyword}},
+			{"status": map[string]interface{}{"$regex": keyword}},
+			{"details": map[string]interface{}{"$regex": keyword}},
+		}
+	}
+
+	// Áp dụng các bộ lọc bổ sung
+	for key, value := range filters {
+		selector[key] = value
+	}
+
+	// Áp dụng kiểm soát truy cập theo tổ chức
+	if mspID == "Org3MSP" {
+		if existingOr, hasOr := selector["$or"]; hasOr {
+			// Nếu đã có mệnh đề $or (từ tìm kiếm keyword), kết hợp với kiểm soát truy cập
+			selector["$and"] = []map[string]interface{}{
+				{"$or": existingOr},
+				{"$or": []map[string]interface{}{
+					{"fromOwnerId": userID},
+					{"toOwnerId": userID},
+				}},
+			}
+			delete(selector, "$or")
+		} else {
 			selector["$or"] = []map[string]interface{}{
 				{"fromOwnerId": userID},
 				{"toOwnerId": userID},
 			}
-		case "document":
-			// Lọc tài liệu theo landParcelID của người dùng sẽ được xử lý sau khi truy vấn
 		}
 	}
 
-	if filters != nil {
-		switch entityType {
-		case "landcertificate":
-			if startDate, ok := filters["startDate"]; ok && startDate != "" {
-				if _, ok := selector["issueDate"]; !ok {
-					selector["issueDate"] = map[string]string{}
-				}
-				selector["issueDate"].(map[string]string)["$gte"] = startDate
-			}
-			if endDate, ok := filters["endDate"]; ok && endDate != "" {
-				if _, ok := selector["issueDate"]; !ok {
-					selector["issueDate"] = map[string]string{}
-				}
-				selector["issueDate"].(map[string]string)["$lte"] = endDate
-			}
-		case "landtransaction":
-			if status, ok := filters["status"]; ok && status != "" {
-				selector["status"] = status
-			}
-			if txType, ok := filters["type"]; ok && txType != "" {
-				selector["type"] = txType
-			}
-			if startTime, ok := filters["startTime"]; ok && startTime != "" {
-				if _, ok := selector["createdAt"]; !ok {
-					selector["createdAt"] = map[string]string{}
-				}
-				selector["createdAt"].(map[string]string)["$gte"] = startTime
-			}
-			if endTime, ok := filters["endTime"]; ok && endTime != "" {
-				if _, ok := selector["createdAt"]; !ok {
-					selector["createdAt"] = map[string]string{}
-				}
-				selector["createdAt"].(map[string]string)["$lte"] = endTime
-			}
-		}
-	}
-
-	// Đảm bảo selector không rỗng
-	if len(selector) == 0 {
-		selector["$and"] = []map[string]interface{}{}
-	}
-
-	queryBytes, err := json.Marshal(map[string]interface{}{"selector": selector})
-	if err != nil {
-		return "", fmt.Errorf("lỗi khi mã hóa query: %v", err)
-	}
-
-	return string(queryBytes), nil
+	queryBytes, _ := json.Marshal(map[string]interface{}{
+		"selector": selector,
+	})
+	return string(queryBytes)
 }
 
-// contains kiểm tra phần tử có trong slice
-func contains(slice []string, elem string) bool {
-	for _, s := range slice {
-		if s == elem {
-			return true
+// buildQueryStringForDocuments - Tạo query string cho tài liệu
+func buildQueryStringForDocuments(keyword string, filters map[string]string, userID, mspID string) string {
+	selector := map[string]interface{}{}
+
+	if keyword != "" {
+		// Tìm kiếm theo từ khóa trong các trường liên quan
+		searchConditions := []map[string]interface{}{
+			{"id": map[string]interface{}{"$regex": keyword}},
+			{"title": map[string]interface{}{"$regex": keyword}},
+			{"description": map[string]interface{}{"$regex": keyword}},
 		}
+		selector["$or"] = searchConditions
 	}
-	return false
+
+	// Áp dụng các bộ lọc bổ sung
+	for key, value := range filters {
+		selector[key] = value
+	}
+
+	// Áp dụng kiểm soát truy cập theo tổ chức
+	if mspID == "Org3MSP" {
+		selector["uploadedBy"] = userID
+	}
+
+	queryBytes, _ := json.Marshal(map[string]interface{}{
+		"selector": selector,
+	})
+	return string(queryBytes)
+}
+
+// getQueryResultForLands - Executes the passed in query string and returns land results
+func (s *LandRegistryChaincode) getQueryResultForLands(ctx contractapi.TransactionContextInterface, queryString string) ([]*Land, error) {
+	resultsIterator, err := ctx.GetStub().GetQueryResult(queryString)
+	if err != nil {
+		return nil, err
+	}
+	defer resultsIterator.Close()
+
+	results := []*Land{}
+
+	for resultsIterator.HasNext() {
+		response, err := resultsIterator.Next()
+		if err != nil {
+			return nil, err
+		}
+		var land *Land
+
+		err = json.Unmarshal(response.Value, &land)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal land JSON: %v", err)
+		}
+
+		results = append(results, land)
+	}
+	return results, nil
+}
+
+// getQueryResultForTransactions - Executes the passed in query string and returns transaction results
+func (s *LandRegistryChaincode) getQueryResultForTransactions(ctx contractapi.TransactionContextInterface, queryString string) ([]*Transaction, error) {
+	resultsIterator, err := ctx.GetStub().GetQueryResult(queryString)
+	if err != nil {
+		return nil, err
+	}
+	defer resultsIterator.Close()
+
+	results := []*Transaction{}
+
+	for resultsIterator.HasNext() {
+		response, err := resultsIterator.Next()
+		if err != nil {
+			return nil, err
+		}
+		var tx *Transaction
+
+		err = json.Unmarshal(response.Value, &tx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal transaction JSON: %v", err)
+		}
+
+		results = append(results, tx)
+	}
+	return results, nil
+}
+
+// getQueryResultForDocuments - Helper function để truy vấn tài liệu
+func (s *LandRegistryChaincode) getQueryResultForDocuments(ctx contractapi.TransactionContextInterface, queryString string) ([]*Document, error) {
+	resultsIterator, err := ctx.GetStub().GetQueryResult(queryString)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi truy vấn tài liệu: %v", err)
+	}
+	defer resultsIterator.Close()
+
+	var documents []*Document
+	for resultsIterator.HasNext() {
+		queryResult, err := resultsIterator.Next()
+		if err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc kết quả truy vấn: %v", err)
+		}
+
+		var doc Document
+		if err := json.Unmarshal(queryResult.Value, &doc); err != nil {
+			log.Printf("Lỗi khi giải mã tài liệu: %v", err)
+			continue
+		}
+		documents = append(documents, &doc)
+	}
+
+	return documents, nil
 }

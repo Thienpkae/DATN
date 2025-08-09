@@ -1,0 +1,14 @@
+{
+  "index": {
+    "fields": [
+      "hash",
+      "txId",
+      "type",
+      "name",
+      "description"
+    ]
+  },
+  "ddoc": "indexDocumentDoc",
+  "name": "indexDocument",
+  "type": "json"
+}

@@ -1,0 +1,2611 @@
+{
+  "info": {
+    "name": "Land Management System Test - Complete",
+    "description": "Complete test suite for Land Management System APIs with comprehensive coverage including all endpoints, error scenarios, validation tests, and performance tests. Tests users from Org1, Org2, and Org3, covering registration, authentication, account management, document management, transaction processing, reporting, and system administration with organization-based authorization, robust error handling, and Vietnam time zone (+07:00).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Initial Admin Login",
+      "description": "Login tests for pre-created admin accounts for each organization.",
+      "item": [
+        {
+          "name": "Login Org1 Admin",
+          "description": "Login with Org1 admin account (CCCD: 000000000001).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cccd\":\"000000000001\",\"password\":\"Admin123!\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Org1 Admin Login Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.token).to.exist;",
+                  "    pm.collectionVariables.set('org1_admin_token', jsonData.token);",
+                  "    console.log('Org1 Admin Token:', jsonData.token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Org2 Admin",
+          "description": "Login with Org2 admin account (CCCD: 000000000002).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cccd\":\"000000000002\",\"password\":\"Admin123!\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Org2 Admin Login Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.token).to.exist;",
+                  "    pm.collectionVariables.set('org2_admin_token', jsonData.token);",
+                  "    console.log('Org2 Admin Token:', jsonData.token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Org3 Admin",
+          "description": "Login with Org3 admin account (CCCD: 000000000003).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cccd\":\"000000000003\",\"password\":\"Admin123!\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Org3 Admin Login Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.token).to.exist;",
+                  "    pm.collectionVariables.set('org3_admin_token', jsonData.token);",
+                  "    console.log('Org3 Admin Token:', jsonData.token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Test Admin Authentication",
+          "description": "Test that admin tokens work for authenticated endpoints.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_admin_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/profile"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Admin Authentication Works', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.user).to.exist;",
+                  "    pm.expect(jsonData.user.role).to.equal('admin');",
+                  "    pm.expect(jsonData.user.org).to.equal('Org1');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login with Phone (Org1 Admin)",
+          "description": "Test login using phone number instead of CCCD.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"phone\":\"0900000001\",\"password\":\"Admin123!\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Phone Login Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.equal('Login successful');",
+                  "    pm.expect(jsonData.token).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User Registration",
+      "description": "Register users across Org1, Org2, and Org3 with OTP flow.",
+      "item": [
+        {
+          "name": "Register UserOrg1_1 (Org1, Admin)",
+          "description": "Register an admin user in Org1 with OTP sent. Requires admin authentication.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"org\":\"Org1\",\"cccd\":\"123456789012\",\"phone\":\"0987654321\",\"fullName\":\"Nguyen Van A\",\"password\":\"Password123!\",\"role\":\"admin\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Register UserOrg1_1 Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.include('OTP sent to phone');",
+                  "    pm.expect(jsonData.cccd).to.equal('123456789012');",
+                  "    pm.expect(jsonData.phone).to.equal('0987654321');",
+                  "    pm.environment.set('org1_user_cccd', jsonData.cccd);",
+                  "});",
+                  "pm.test('Register UserOrg1_1 Duplicate CCCD', function () {",
+                  "    pm.sendRequest({",
+                  "        url: '{{baseUrl}}/register',",
+                  "        method: 'POST',",
+                  "        header: {",
+                  "            'Content-Type': 'application/json',",
+                  "            'Authorization': 'Bearer {{org1_admin_token}}'",
+                  "        },",
+                  "        body: {",
+                  "            mode: 'raw',",
+                  "            raw: JSON.stringify({\"org\":\"Org1\",\"cccd\":\"123456789012\",\"phone\":\"0987654321\",\"fullName\":\"Nguyen Van A\",\"password\":\"Password123!\",\"role\":\"admin\"})",
+                  "        }",
+                  "    }, function (err, res) {",
+                  "        pm.expect(res).to.have.status(400);",
+                  "        pm.expect(res.json().error).to.include('already exists');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register UserOrg2_1 (Org2, User)",
+          "description": "Register a user in Org2 with OTP sent. Requires admin authentication.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org2_admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"org\":\"Org2\",\"cccd\":\"987654321012\",\"phone\":\"0987654322\",\"fullName\":\"Tran Thi B\",\"password\":\"Password123!\",\"role\":\"user\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Register UserOrg2_1 Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.include('OTP sent to phone');",
+                  "    pm.expect(jsonData.cccd).to.equal('987654321012');",
+                  "    pm.expect(jsonData.phone).to.equal('0987654322');",
+                  "    pm.environment.set('org2_user_cccd', jsonData.cccd);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register UserOrg3_1 (Org3, Citizen)",
+          "description": "Register a citizen in Org3 without authentication (self-registration).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"org\":\"Org3\",\"cccd\":\"456789123456\",\"phone\":\"0987654323\",\"fullName\":\"Le Van C\",\"password\":\"Password123!\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Register UserOrg3_1 Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.include('OTP sent to phone');",
+                  "    pm.expect(jsonData.cccd).to.equal('456789123456');",
+                  "    pm.expect(jsonData.phone).to.equal('0987654323');",
+                  "    pm.environment.set('org3_user_cccd', jsonData.cccd);",
+                  "});",
+                  "pm.test('Register UserOrg3_1 Invalid Org', function () {",
+                  "    pm.sendRequest({",
+                  "        url: '{{baseUrl}}/register',",
+                  "        method: 'POST',",
+                  "        header: {'Content-Type': 'application/json'},",
+                  "        body: {",
+                  "            mode: 'raw',",
+                  "            raw: JSON.stringify({\"org\":\"Org1\",\"cccd\":\"456789123456\",\"phone\":\"0987654323\",\"fullName\":\"Le Van C\",\"password\":\"Password123!\"})",
+                  "        }",
+                  "    }, function (err, res) {",
+                  "        pm.expect(res).to.have.status(403);",
+                  "        pm.expect(res.json().error).to.equal('Citizens can only register for Org3');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Verify OTP",
+      "description": "Verify OTP for registered users to complete registration.",
+      "item": [
+        {
+          "name": "Verify OTP UserOrg1_1",
+          "description": "Verify OTP for userOrg1_1 to complete registration.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cccd\":\"{{org1_user_cccd}}\",\"otp\":\"123456\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/verify-otp"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Verify OTP UserOrg1_1 Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().message).to.equal('User registered successfully');",
+                  "});",
+                  "pm.test('Verify OTP UserOrg1_1 Invalid OTP', function () {",
+                  "    pm.sendRequest({",
+                  "        url: '{{baseUrl}}/verify-otp',",
+                  "        method: 'POST',",
+                  "        header: {'Content-Type': 'application/json'},",
+                  "        body: {",
+                  "            mode: 'raw',",
+                  "            raw: JSON.stringify({\"cccd\": \"{{org1_user_cccd}}\",\"otp\":\"999999\"})",
+                  "        }",
+                  "    }, function (err, res) {",
+                  "        pm.expect(res).to.have.status(400);",
+                  "        pm.expect(res.json().error).to.equal('Invalid OTP');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify OTP UserOrg2_1",
+          "description": "Verify OTP for userOrg2_1 to complete registration.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cccd\":\"{{org2_user_cccd}}\",\"otp\":\"123456\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/verify-otp"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Verify OTP UserOrg2_1 Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().message).to.equal('User registered successfully');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify OTP UserOrg3_1",
+          "description": "Verify OTP for userOrg3_1 to complete registration.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cccd\":\"{{org3_user_cccd}}\",\"otp\":\"123456\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/verify-otp"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Verify OTP UserOrg3_1 Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().message).to.equal('User registered successfully');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resend OTP",
+          "description": "Resend OTP for user verification.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cccd\":\"{{org3_user_cccd}}\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/resend-otp"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Resend OTP Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().message).to.include('OTP sent');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Login Users",
+      "description": "Login users to obtain JWT tokens.",
+      "item": [
+        {
+          "name": "Login UserOrg1_1",
+          "description": "Login userOrg1_1 to obtain JWT token.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cccd\":\"{{org1_user_cccd}}\",\"password\":\"Password123!\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login UserOrg1_1 Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.equal('Login successful');",
+                  "    pm.expect(jsonData.token).to.exist;",
+                  "    pm.environment.set('org1_user_token', jsonData.token);",
+                  "});",
+                  "pm.test('Login UserOrg1_1 Invalid Password', function () {",
+                  "    pm.sendRequest({",
+                  "        url: '{{baseUrl}}/login',",
+                  "        method: 'POST',",
+                  "        header: {'Content-Type': 'application/json'},",
+                  "        body: {",
+                  "            mode: 'raw',",
+                  "            raw: JSON.stringify({\"cccd\":\"{{org1_user_cccd}}\",\"password\":\"WrongPassword!\"})",
+                  "        }",
+                  "    }, function (err, res) {",
+                  "        pm.expect(res).to.have.status(401);",
+                  "        pm.expect(res.json().error).to.equal('Invalid credentials');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login UserOrg2_1",
+          "description": "Login userOrg2_1 to obtain JWT token.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cccd\":\"{{org2_user_cccd}}\",\"password\":\"Password123!\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login UserOrg2_1 Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.equal('Login successful');",
+                  "    pm.expect(jsonData.token).to.exist;",
+                  "    pm.environment.set('org2_user_token', jsonData.token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login UserOrg3_1",
+          "description": "Login userOrg3_1 to obtain JWT token.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cccd\":\"{{org3_user_cccd}}\",\"password\":\"Password123!\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login UserOrg3_1 Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.equal('Login successful');",
+                  "    pm.expect(jsonData.token).to.exist;",
+                  "    pm.environment.set('org3_user_token', jsonData.token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Account Management",
+      "description": "Test account management operations (logout, change password, forgot password, reset password).",
+      "item": [
+        {
+          "name": "Logout User",
+          "description": "Logout authenticated user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{baseUrl}}/api/auth/logout"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Logout Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().success).to.be.true;",
+                  "    pm.expect(pm.response.json().message).to.equal('Logout successful');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change Password",
+          "description": "Change user password.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"oldPassword\":\"Admin123!\",\"newPassword\":\"NewPassword123!\",\"confirmPassword\":\"NewPassword123!\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/change-password"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Change Password Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().success).to.be.true;",
+                  "    pm.expect(pm.response.json().message).to.include('Password changed successfully');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Forgot Password",
+          "description": "Request password reset OTP.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cccd\":\"000000000001\",\"phone\":\"0900000001\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/forgot-password"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Forgot Password Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().success).to.be.true;",
+                  "    pm.expect(pm.response.json().message).to.include('OTP sent');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset Password",
+          "description": "Reset password with OTP.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cccd\":\"000000000001\",\"otp\":\"123456\",\"newPassword\":\"ResetPassword123!\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/reset-password"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Reset Password Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().success).to.be.true;",
+                  "    pm.expect(pm.response.json().message).to.include('Password reset successfully');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Land Parcels",
+      "description": "Test land parcel operations (create, update, query).",
+      "item": [
+        {
+          "name": "Create Land Parcel (Org1)",
+          "description": "Create a new land parcel by Org1 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"LAND001\",\n  \"ownerId\": \"456789123456\",\n  \"location\": \"123 Nguyen Trai, Hanoi\",\n  \"landUsePurpose\": \"Đất ở\",\n  \"legalStatus\": \"Có giấy chứng nhận\",\n  \"area\": \"100\",\n  \"certificateId\": \"\",\n  \"legalInfo\": \"\"\n}"
+            },
+            "url": "{{baseUrl}}/api/land-parcels"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create Land Parcel Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.include('created');",
+                  "    pm.collectionVariables.set('land_parcel_id', 'LAND001');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Land Parcel (Org1)",
+          "description": "Update an existing land parcel by Org1 user.",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"area\": \"120\",\n  \"location\": \"123 Nguyen Trai, Hanoi - Updated\",\n  \"landUsePurpose\": \"Đất ở\",\n  \"legalStatus\": \"Có giấy chứng nhận\",\n  \"certificateId\": \"\",\n  \"legalInfo\": \"Updated legal information\"\n}"
+            },
+            "url": "{{baseUrl}}/api/land-parcels/{{land_parcel_id}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Update Land Parcel Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.include('updated');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Query Land Parcel by ID",
+          "description": "Query a land parcel by ID for Org1, Org2, and Org3 (with ownership check).",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/land-parcels/{{land_parcel_id}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Query Land Parcel Success (Org1)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.landParcel.ID).to.equal('LP001');",
+                  "    pm.expect(jsonData.landParcel.CreatedAt).to.match(/\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\+07:00/);",
+                  "});",
+                  "pm.test('Query Land Parcel Unauthorized Owner (Org3)', function () {",
+                  "    pm.sendRequest({",
+                  "        url: '{{baseUrl}}/land-parcels/{{land_parcel_id}}',",
+                  "        method: 'GET',",
+                  "        header: {",
+                  "            'Authorization': 'Bearer {{org3_user_token}}'",
+                  "        }",
+                  "    }, function (err, res) {",
+                  "        pm.expect(res).to.have.status(500);",
+                  "        pm.expect(res.json().error).to.include('Access denied');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get All Land Parcels (Org1)",
+          "description": "Get all land parcels for management (Org1, Org2 only).",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/land-parcels"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get All Land Parcels Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search Land Parcels (All Orgs)",
+          "description": "Search land parcels by keyword (now available for all organizations).",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org3_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/land-parcels/search?keyword=Hanoi"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Search Land Parcels Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Land Parcels by Owner",
+          "description": "Get land parcels by owner ID.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org3_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/land-parcels/owner/456789123456"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get Land Parcels by Owner Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.landParcels).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Land Parcel History",
+          "description": "Get transaction history for a land parcel.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/land-parcels/{{land_parcel_id}}/history"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get Land Parcel History Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.history).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "description": "Test document operations (upload, verify, query, analyze).",
+      "item": [
+        {
+          "name": "Create Document (Org3)",
+          "description": "Create a document by Org3 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org3_admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"docID\":\"DOC001\",\"docType\":\"certificate\",\"title\":\"Land Certificate\",\"description\":\"Giấy chứng nhận quyền sử dụng đất\",\"ipfsHash\":\"QmTestHash\",\"fileType\":\"pdf\",\"fileSize\":1024}"
+            },
+            "url": "{{baseUrl}}/api/documents"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create Document Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Tài liệu đã được tạo thành công');",
+                  "    pm.expect(jsonData.data).to.exist;",
+                  "    pm.environment.set('document_id', 'DOC001');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Document by ID",
+          "description": "Get document details by ID.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/documents/{{document_id}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get Document by ID Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Document (Org2)",
+          "description": "Verify a document by Org2 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org2_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"verificationNotes\":\"Document verified successfully\"}"
+            },
+            "url": "{{baseUrl}}/api/documents/{{land_document_id}}/verify"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Verify Document Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Tài liệu đã được xác minh thành công');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Link Document to Land (Org3)",
+          "description": "Link existing verified document to land parcel.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org3_admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"docID\": \"DOC002\",\n  \"landParcelId\": \"LAND001\"\n}"
+            },
+            "url": "{{baseUrl}}/api/documents/land"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Link Document to Land Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.include('liên kết');",
+                  "    pm.expect(jsonData.data.docID).to.equal('DOC002');",
+                  "    pm.expect(jsonData.data.landParcelId).to.equal('LAND001');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Link Document to Transaction (Org3)",
+          "description": "Link existing verified document to transaction.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org3_admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"docID\": \"DOC003\",\n  \"transactionId\": \"TX001\"\n}"
+            },
+            "url": "{{baseUrl}}/api/documents/transaction"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Link Document to Transaction Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.include('liên kết');",
+                  "    pm.expect(jsonData.data.docID).to.equal('DOC003');",
+                  "    pm.expect(jsonData.data.transactionId).to.equal('TX001');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Document (Org1)",
+          "description": "Update a document by Org1 user.",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\":\"Updated Document Title\",\"description\":\"Updated document description\",\"ipfsHash\":\"QmUpdatedHash\"}"
+            },
+            "url": "{{baseUrl}}/api/documents/{{document_id}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Update Document Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Tài liệu đã được cập nhật thành công');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Document (Org1)",
+          "description": "Delete a document by Org1 user.",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/documents/{{document_id}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Delete Document Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Tài liệu đã được xóa thành công');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject Document (Org2)",
+          "description": "Reject a document by Org2 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org2_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"rejectionReason\":\"Document does not meet requirements\"}"
+            },
+            "url": "{{baseUrl}}/api/documents/DOC004/reject"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Reject Document Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Tài liệu đã bị từ chối');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Documents by Land Parcel",
+          "description": "Get documents associated with a land parcel.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/documents/land-parcel/{{land_parcel_id}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get Documents by Land Parcel Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Documents by Transaction",
+          "description": "Get documents associated with a transaction.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/documents/transaction/{{transaction_id}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get Documents by Transaction Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Documents by Status",
+          "description": "Get documents by verification status.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org2_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/documents/status/pending"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get Documents by Status Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Documents by Type",
+          "description": "Get documents by document type.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/documents/type/certificate"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get Documents by Type Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Documents by Uploader",
+          "description": "Get documents by uploader ID.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/documents/uploader/{{org3_user_cccd}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get Documents by Uploader Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search Documents",
+          "description": "Search documents by keyword.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/documents/search?keyword=certificate&docType=certificate"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Search Documents Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Analyze Document (Org1)",
+          "description": "Analyze document content using AI (Org1, Org2 only).",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/documents/{{land_document_id}}/analyze"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Analyze Document Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "description": "Test transaction operations (transfer, process, approve).",
+      "item": [
+        {
+          "name": "Create Transfer Request (Org3)",
+          "description": "Create a transfer request by Org3 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org3_admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"txID\":\"TX001\",\"landParcelId\":\"{{land_parcel_id}}\",\"fromOwnerId\":\"456789123456\",\"toOwnerId\":\"987654321012\"}"
+            },
+            "url": "{{baseUrl}}/api/transactions/transfer"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create Transfer Request Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Yêu cầu chuyển nhượng đã được tạo thành công');",
+                  "    pm.expect(jsonData.data).to.exist;",
+                  "    pm.environment.set('transaction_id', 'TX001');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Split Request (Org3)",
+          "description": "Create a split request by Org3 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org3_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"txID\":\"TX003\",\"landParcelId\":\"{{land_parcel_id}}\",\"ownerId\":\"456789123456\",\"newParcels\":[{\"id\":\"LP003\",\"area\":50},{\"id\":\"LP004\",\"area\":50}]}"
+            },
+            "url": "{{baseUrl}}/api/transactions/split"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create Split Request Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Yêu cầu tách thửa đã được tạo thành công');",
+                  "    pm.environment.set('split_transaction_id', 'TX003');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Merge Request (Org3)",
+          "description": "Create a merge request by Org3 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org3_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"txID\":\"TX004\",\"ownerId\":\"456789123456\",\"parcelIds\":[\"LP003\",\"LP004\"],\"newParcel\":{\"id\":\"LP005\",\"area\":100}}"
+            },
+            "url": "{{baseUrl}}/api/transactions/merge"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create Merge Request Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Yêu cầu hợp thửa đã được tạo thành công');",
+                  "    pm.environment.set('merge_transaction_id', 'TX004');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Change Purpose Request (Org3)",
+          "description": "Create a change purpose request by Org3 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org3_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"txID\":\"TX005\",\"landParcelId\":\"{{land_parcel_id}}\",\"ownerId\":\"456789123456\",\"newPurpose\":\"Đất thương mại\",\"details\":\"Change from residential to commercial use\"}"
+            },
+            "url": "{{baseUrl}}/api/transactions/change-purpose"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create Change Purpose Request Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Yêu cầu thay đổi mục đích sử dụng đã được tạo thành công');",
+                  "    pm.environment.set('change_purpose_transaction_id', 'TX005');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Reissue Request (Org3)",
+          "description": "Create a reissue request by Org3 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org3_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"txID\":\"TX006\",\"landParcelId\":\"{{land_parcel_id}}\",\"ownerId\":\"456789123456\",\"details\":\"Certificate lost, need reissue\"}"
+            },
+            "url": "{{baseUrl}}/api/transactions/reissue"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create Reissue Request Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Yêu cầu cấp lại giấy chứng nhận đã được tạo thành công');",
+                  "    pm.environment.set('reissue_transaction_id', 'TX006');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Process Transaction (Org2)",
+          "description": "Process a transaction by Org2 user, checking required documents.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org2_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{baseUrl}}/transactions/{{transaction_id}}/process"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Process Transaction Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.equal('Transaction processed');",
+                  "    pm.expect(jsonData.transaction.Status).to.equal('PROCESSING');",
+                  "});",
+                  "pm.test('Process Transaction Missing Documents', function () {",
+                  "    pm.sendRequest({",
+                  "        url: '{{baseUrl}}/transactions/TX002/process',",
+                  "        method: 'POST',",
+                  "        header: {",
+                  "            'Content-Type': 'application/json',",
+                  "            'Authorization': 'Bearer {{org2_user_token}}'",
+                  "        },",
+                  "        body: {",
+                  "            mode: 'raw',",
+                  "            raw: '{}'",
+                  "        }",
+                  "    }, function (err, res) {",
+                  "        pm.expect(res).to.have.status(500);",
+                  "        pm.expect(res.json().error).to.include('Missing required documents');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Forward Transaction (Org2)",
+          "description": "Forward a transaction by Org2 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org2_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"forwardDetails\":\"Forwarded to authority for approval\"}"
+            },
+            "url": "{{baseUrl}}/api/transactions/{{transaction_id}}/forward"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Forward Transaction Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Giao dịch đã được chuyển tiếp thành công');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm Transfer (Org3)",
+          "description": "Confirm a transfer by Org3 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org3_admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"txID\":\"TX001\",\"landParcelId\":\"{{land_parcel_id}}\",\"toOwnerId\":\"987654321012\"}"
+            },
+            "url": "{{baseUrl}}/api/transactions/TX001/confirm"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Confirm Transfer Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Chuyển nhượng đã được xác nhận thành công');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve Transfer Transaction (Org1)",
+          "description": "Approve a transfer transaction by Org1 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"approveDetails\":\"Transfer approved by authority\"}"
+            },
+            "url": "{{baseUrl}}/api/transactions/{{transaction_id}}/approve/transfer"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Approve Transfer Transaction Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Giao dịch chuyển nhượng đã được phê duyệt thành công');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve Split Transaction (Org1)",
+          "description": "Approve a split transaction by Org1 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"approveDetails\":\"Split approved by authority\"}"
+            },
+            "url": "{{baseUrl}}/api/transactions/{{split_transaction_id}}/approve/split"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Approve Split Transaction Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Giao dịch tách thửa đã được phê duyệt thành công');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve Merge Transaction (Org1)",
+          "description": "Approve a merge transaction by Org1 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"approveDetails\":\"Merge approved by authority\"}"
+            },
+            "url": "{{baseUrl}}/api/transactions/{{merge_transaction_id}}/approve/merge"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Approve Merge Transaction Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Giao dịch hợp thửa đã được phê duyệt thành công');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve Change Purpose Transaction (Org1)",
+          "description": "Approve a change purpose transaction by Org1 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"approveDetails\":\"Change purpose approved by authority\"}"
+            },
+            "url": "{{baseUrl}}/api/transactions/{{change_purpose_transaction_id}}/approve/change-purpose"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Approve Change Purpose Transaction Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Giao dịch thay đổi mục đích sử dụng đã được phê duyệt thành công');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve Reissue Transaction (Org1)",
+          "description": "Approve a reissue transaction by Org1 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"approveDetails\":\"Reissue approved by authority\"}"
+            },
+            "url": "{{baseUrl}}/api/transactions/{{reissue_transaction_id}}/approve/reissue"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Approve Reissue Transaction Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.equal('Giao dịch cấp lại giấy chứng nhận đã được phê duyệt thành công');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject Transaction (Org1)",
+          "description": "Reject a transaction by Org1 user.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"rejectDetails\":\"Missing required documentation\"}"
+            },
+            "url": "{{baseUrl}}/transactions/TX002/reject"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Reject Transaction Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().message).to.equal('Transaction rejected');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Transaction by ID",
+          "description": "Get transaction details by ID.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions/{{transaction_id}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get Transaction by ID Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get All Transactions (Org1)",
+          "description": "Get all transactions for management (Org1, Org2 only).",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get All Transactions Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search Transactions",
+          "description": "Search transactions by keyword and filters.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions/search?keyword=transfer"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Search Transactions Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Transactions by Land Parcel",
+          "description": "Get transactions associated with a land parcel.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions/land-parcel/{{land_parcel_id}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get Transactions by Land Parcel Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Transactions by Owner",
+          "description": "Get transactions by owner ID.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org3_user_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/transactions/owner/456789123456"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get Transactions by Owner Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User Management",
+      "description": "Test user management operations (admin only).",
+      "item": [
+        {
+          "name": "Get All Users (Admin)",
+          "description": "Get all users (admin only).",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_admin_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users?limit=10&offset=0&org=Org1"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get All Users Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get User by CCCD (Admin)",
+          "description": "Get user details by CCCD (admin only).",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_admin_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/{{org1_user_cccd}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get User by CCCD Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.user.cccd).to.equal('{{org1_user_cccd}}');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update User (Admin)",
+          "description": "Update user details (admin only).",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"fullName\":\"Nguyen Van A Updated\",\"phone\":\"0987654321\",\"role\":\"admin\",\"org\":\"Org1\",\"isLocked\":false}"
+            },
+            "url": "{{baseUrl}}/api/users/{{org1_user_cccd}}"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Update User Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().message).to.equal('Cập nhật người dùng thành công');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lock/Unlock Account (Admin)",
+          "description": "Lock or unlock user account (admin only).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org1_admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"targetCccd\":\"000000000002\",\"lock\":true}"
+            },
+            "url": "{{baseUrl}}/api/auth/lock-unlock"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Lock Account Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().success).to.be.true;",
+                  "    pm.expect(pm.response.json().message).to.include('Account locked successfully');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Profile",
+          "description": "Get user profile (authenticated user).",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org3_admin_token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/profile"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Get Profile Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.cccd).to.exist;",
+                  "    pm.expect(jsonData.data.fullName).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Profile",
+          "description": "Update user profile (authenticated user).",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{org3_user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"fullName\":\"Le Van C Updated\",\"phone\":\"0987654323\"}"
+            },
+            "url": "{{baseUrl}}/api/users/profile"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Update Profile Success', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().message).to.equal('Profile updated successfully');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "org1_admin_token",
+      "value": ""
+    },
+    {
+      "key": "org2_admin_token",
+      "value": ""
+    },
+    {
+      "key": "org3_admin_token",
+      "value": ""
+    },
+    {
+      "key": "org1_admin_cccd",
+      "value": "000000000001"
+    },
+    {
+      "key": "org2_admin_cccd",
+      "value": "000000000002"
+    },
+    {
+      "key": "org3_admin_cccd",
+      "value": "000000000003"
+    },
+    {
+      "key": "org1_admin_phone",
+      "value": "0900000001"
+    },
+    {
+      "key": "org2_admin_phone",
+      "value": "0900000002"
+    },
+    {
+      "key": "org3_admin_phone",
+      "value": "0900000003"
+    },
+    {
+      "key": "admin_password",
+      "value": "Admin123!"
+    },
+    {
+      "key": "org1_user_cccd",
+      "value": "123456789012"
+    },
+    {
+      "key": "org2_user_cccd",
+      "value": "987654321012"
+    },
+    {
+      "key": "org3_user_cccd",
+      "value": "456789123456"
+    },
+    {
+      "key": "org1_user_token",
+      "value": ""
+    },
+    {
+      "key": "org2_user_token",
+      "value": ""
+    },
+    {
+      "key": "org3_user_token",
+      "value": ""
+    },
+    {
+      "key": "land_parcel_id",
+      "value": ""
+    },
+    {
+      "key": "document_id",
+      "value": ""
+    },
+    {
+      "key": "transaction_id",
+      "value": ""
+    },
+    {
+      "key": "certificate_id",
+      "value": ""
+    },
+    {
+      "key": "admin_land_parcel_id",
+      "value": ""
+    },
+    {
+      "key": "admin_certificate_id",
+      "value": ""
+    },
+    {
+      "key": "split_transaction_id",
+      "value": ""
+    },
+    {
+      "key": "merge_transaction_id",
+      "value": ""
+    },
+    {
+      "key": "change_purpose_transaction_id",
+      "value": ""
+    },
+    {
+      "key": "reissue_transaction_id",
+      "value": ""
+    },
+    {
+      "key": "land_document_id",
+      "value": ""
+    },
+    {
+      "key": "transaction_document_id",
+      "value": ""
+    }
+  ]
+}

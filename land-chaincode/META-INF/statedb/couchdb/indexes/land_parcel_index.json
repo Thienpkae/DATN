@@ -1,8 +1,0 @@
-{
-  "index": {
-    "fields": ["id", "ownerId", "location", "landUsePurpose", "legalStatus", "createdAt"]
-  },
-  "ddoc": "land_parcel_doc",
-  "name": "land_parcel_index",
-  "type": "json"
-}

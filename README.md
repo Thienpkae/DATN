@@ -62,6 +62,7 @@ npm start
 ```
 
 The frontend will run on http://localhost:5000
+
 The backend API runs on http://localhost:3000
 
 ## Default Admin Accounts
@@ -70,9 +71,9 @@ When the server starts for the first time, it automatically creates admin accoun
 
 | Organization | User ID | Password | CCCD | Phone | Role |
 |-------------|---------|----------|------|-------|------|
-| Org1 (Land Authority) | admin-org1 | Admin123! | 000000000001 | +84900000001 | Authority Admin |
-| Org2 (Government Office) | admin-org2 | Admin123! | 000000000002 | +84900000002 | Officer Admin |  
-| Org3 (Citizens) | admin-org3 | Admin123! | 000000000003 | +84900000003 | Citizen Admin |
+| Org1 (Land Authority) | admin-org1 | Admin123! | 000000000001 | 0900000001 | Authority Admin |
+| Org2 (Government Office) | admin-org2 | Admin123! | 000000000002 | 0900000002 | Officer Admin |  
+| Org3 (Citizens) | admin-org3 | Admin123! | 000000000003 | 0900000003 | Citizen Admin |
 
 **Note:** Change these default passwords after first login for security.
 

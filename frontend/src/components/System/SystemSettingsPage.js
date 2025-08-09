@@ -1,390 +1,657 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Card,
-  Row,
-  Col,
-  Button,
-  Input,
-  Switch,
-  Select,
-  Space,
-  Typography,
-  message,
-  Tabs,
-  Alert,
-  Statistic,
-  Progress,
-  Tag
-} from 'antd';
+    Card,
+    CardContent,
+    CardHeader,
+    Typography,
+    Grid,
+    TextField,
+    Button,
+    Switch,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Alert,
+    Box,
+    Tabs,
+    Tab,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Chip,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Paper,
+    IconButton,
+    Tooltip
+} from '@mui/material';
 import {
-  SettingOutlined,
-  DatabaseOutlined,
-  CloudOutlined,
-  LockOutlined,
-  SaveOutlined,
-  ReloadOutlined,
-  CheckCircleOutlined
-} from '@ant-design/icons';
+    Settings as SettingsIcon,
+    Security as SecurityIcon,
+    Speed as SpeedIcon,
+    Palette as PaletteIcon,
+    Notifications as NotificationsIcon,
+    AccountTree as BlockchainIcon,
+    Public as GeneralIcon,
+    Save as SaveIcon,
+    Restore as RestoreIcon,
+    Delete as DeleteIcon,
+    Add as AddIcon,
+    Edit as EditIcon,
+    History as HistoryIcon
+} from '@mui/icons-material';
+import api from '../../services/api';
 
-const { Title, Text } = Typography;
-const { Option } = Select;
+function TabPanel({ children, value, index, ...other }) {
+    return (
+        <div
+            role="tabpanel"
+            hidden={value !== index}
+            id={`system-tabpanel-${index}`}
+            aria-labelledby={`system-tab-${index}`}
+            {...other}
+        >
+            {value === index && (
+                <Box sx={{ p: 3 }}>
+                    {children}
+                </Box>
+            )}
+        </div>
+    );
+}
 
-const SystemSettingsPage = ({ user }) => {
-  const [loading, setLoading] = useState(false);
-  const [systemInfo, setSystemInfo] = useState({});
-  const [settings, setSettings] = useState({
-    notifications: true,
-    autoBackup: true,
-    maintenanceMode: false,
-    maxFileSize: 10,
-    sessionTimeout: 30,
-    passwordPolicy: 'strong',
-    twoFactorAuth: false,
-    auditLogging: true
-  });
+const SystemSettingsPage = () => {
+    const [tabValue, setTabValue] = useState(0);
+    const [configs, setConfigs] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState({ type: '', content: '' });
+    const [editDialog, setEditDialog] = useState({ open: false, config: null, isNew: false });
+    const [deleteDialog, setDeleteDialog] = useState({ open: false, config: null });
 
-  useEffect(() => {
-    fetchSystemInfo();
-    loadSettings();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const fetchSystemInfo = async () => {
-    // Simulate system information
-    setSystemInfo({
-      version: '1.0.0',
-      uptime: '15 days, 3 hours',
-      totalUsers: 1,
-      totalTransactions: 0,
-      storageUsed: 45,
-      memoryUsage: 68,
-      cpuUsage: 23,
-      networkStatus: 'Connected',
-      blockchainStatus: 'Synced',
-      databaseStatus: 'Healthy'
-    });
-  };
-
-  const loadSettings = () => {
-    // Load settings from localStorage or API
-    const savedSettings = localStorage.getItem('systemSettings');
-    if (savedSettings) {
-      setSettings({ ...settings, ...JSON.parse(savedSettings) });
-    }
-  };
-
-  const saveSettings = async () => {
-    setLoading(true);
-    try {
-      // Save settings to localStorage (in production, this would be an API call)
-      localStorage.setItem('systemSettings', JSON.stringify(settings));
-      message.success('Settings saved successfully');
-    } catch (error) {
-      message.error('Failed to save settings');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resetSettings = () => {
-    setSettings({
-      notifications: true,
-      autoBackup: true,
-      maintenanceMode: false,
-      maxFileSize: 10,
-      sessionTimeout: 30,
-      passwordPolicy: 'strong',
-      twoFactorAuth: false,
-      auditLogging: true
-    });
-    message.info('Settings reset to defaults');
-  };
-
-  const handleSettingChange = (key, value) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-  };
-
-  const getStatusColor = (status) => {
-    const colors = {
-      'Connected': 'green',
-      'Synced': 'green',
-      'Healthy': 'green',
-      'Disconnected': 'red',
-      'Error': 'red',
-      'Warning': 'orange'
+    // Category icons mapping
+    const categoryIcons = {
+        security: <SecurityIcon />,
+        performance: <SpeedIcon />,
+        ui: <PaletteIcon />,
+        notification: <NotificationsIcon />,
+        blockchain: <BlockchainIcon />,
+        general: <GeneralIcon />
     };
-    return colors[status] || 'default';
-  };
 
-  const systemOverview = (
-    <div>
-      <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="System Version"
-              value={systemInfo.version}
-              prefix={<SettingOutlined />}
+    useEffect(() => {
+        loadCategories();
+        loadConfigs();
+    }, []);
+
+    const loadCategories = async () => {
+        try {
+            const response = await api.get('/system/configs/categories');
+            if (response.data.success) {
+                setCategories(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error loading categories:', error);
+        }
+    };
+
+    const loadConfigs = async (category = null) => {
+        try {
+            setLoading(true);
+            const params = category ? { category } : {};
+            const response = await api.get('/system/configs', { params });
+            if (response.data.success) {
+                setConfigs(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error loading configs:', error);
+            setMessage({ type: 'error', content: 'Lỗi khi tải cấu hình hệ thống' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleTabChange = (event, newValue) => {
+        setTabValue(newValue);
+        if (newValue === 0) {
+            loadConfigs(); // Load all configs
+        } else {
+            const category = categories[newValue - 1]?.key;
+            loadConfigs(category);
+        }
+    };
+
+    const handleSaveConfig = async (configData) => {
+        try {
+            setLoading(true);
+            const response = await api.put(`/system/configs/${configData.key}`, configData);
+            if (response.data.success) {
+                setMessage({ type: 'success', content: response.data.message });
+                loadConfigs();
+                setEditDialog({ open: false, config: null, isNew: false });
+            }
+        } catch (error) {
+            console.error('Error saving config:', error);
+            setMessage({ type: 'error', content: error.response?.data?.message || 'Lỗi khi lưu cấu hình' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteConfig = async (key) => {
+        try {
+            setLoading(true);
+            const response = await api.delete(`/system/configs/${key}`);
+            if (response.data.success) {
+                setMessage({ type: 'success', content: response.data.message });
+                loadConfigs();
+                setDeleteDialog({ open: false, config: null });
+            }
+        } catch (error) {
+            console.error('Error deleting config:', error);
+            setMessage({ type: 'error', content: error.response?.data?.message || 'Lỗi khi xóa cấu hình' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResetConfig = async (key) => {
+        try {
+            setLoading(true);
+            const response = await api.post(`/system/configs/${key}/reset`);
+            if (response.data.success) {
+                setMessage({ type: 'success', content: response.data.message });
+                loadConfigs();
+            }
+        } catch (error) {
+            console.error('Error resetting config:', error);
+            setMessage({ type: 'error', content: error.response?.data?.message || 'Lỗi khi reset cấu hình' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleInitializeConfigs = async () => {
+        try {
+            setLoading(true);
+            const response = await api.post('/system/configs/initialize');
+            if (response.data.success) {
+                setMessage({ type: 'success', content: response.data.message });
+                loadConfigs();
+            }
+        } catch (error) {
+            console.error('Error initializing configs:', error);
+            setMessage({ type: 'error', content: error.response?.data?.message || 'Lỗi khi khởi tạo cấu hình' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const renderConfigValue = (config) => {
+        const { value, dataType } = config;
+        
+        switch (dataType) {
+            case 'boolean':
+                return (
+                    <Chip
+                        label={value ? 'Bật' : 'Tắt'}
+                        color={value ? 'success' : 'default'}
+                        size="small"
+                    />
+                );
+            case 'number':
+                return <Typography variant="body2">{value.toLocaleString()}</Typography>;
+            case 'object':
+            case 'array':
+                return <Typography variant="body2">{JSON.stringify(value)}</Typography>;
+            default:
+                return <Typography variant="body2">{value}</Typography>;
+        }
+    };
+
+    const renderConfigsTable = () => (
+        <TableContainer component={Paper}>
+            <Table>
+                <TableHead>
+                    <TableRow>
+                        <TableCell>Khóa cấu hình</TableCell>
+                        <TableCell>Mô tả</TableCell>
+                        <TableCell>Giá trị</TableCell>
+                        <TableCell>Loại</TableCell>
+                        <TableCell>Danh mục</TableCell>
+                        <TableCell>Công khai</TableCell>
+                        <TableCell>Thao tác</TableCell>
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                    {configs.map((config) => (
+                        <TableRow key={config.key}>
+                            <TableCell>
+                                <Typography variant="body2" fontWeight="bold">
+                                    {config.key}
+                                </Typography>
+                            </TableCell>
+                            <TableCell>
+                                <Typography variant="body2">
+                                    {config.description}
+                                </Typography>
+                            </TableCell>
+                            <TableCell>
+                                {renderConfigValue(config)}
+                            </TableCell>
+                            <TableCell>
+                                <Chip label={config.dataType} size="small" variant="outlined" />
+                            </TableCell>
+                            <TableCell>
+                                <Box display="flex" alignItems="center" gap={1}>
+                                    {categoryIcons[config.category]}
+                                    <Typography variant="body2">
+                                        {categories.find(c => c.key === config.category)?.name || config.category}
+                                    </Typography>
+                                </Box>
+                            </TableCell>
+                            <TableCell>
+                                <Chip
+                                    label={config.isPublic ? 'Có' : 'Không'}
+                                    color={config.isPublic ? 'primary' : 'default'}
+                                    size="small"
+                                />
+                            </TableCell>
+                            <TableCell>
+                                <Box display="flex" gap={1}>
+                                    <Tooltip title="Chỉnh sửa">
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => setEditDialog({ open: true, config, isNew: false })}
+                                        >
+                                            <EditIcon />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Reset về mặc định">
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => handleResetConfig(config.key)}
+                                        >
+                                            <RestoreIcon />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Xóa">
+                                        <IconButton
+                                            size="small"
+                                            color="error"
+                                            onClick={() => setDeleteDialog({ open: true, config })}
+                                        >
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </Tooltip>
+                                </Box>
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </TableContainer>
+    );
+
+    return (
+        <Box sx={{ p: 3 }}>
+            <Typography variant="h4" gutterBottom display="flex" alignItems="center" gap={2}>
+                <SettingsIcon />
+                Cài đặt hệ thống
+            </Typography>
+
+            {message.content && (
+                <Alert severity={message.type} sx={{ mb: 2 }} onClose={() => setMessage({ type: '', content: '' })}>
+                    {message.content}
+                </Alert>
+            )}
+
+            <Card>
+                <CardHeader
+                    title="Quản lý cấu hình hệ thống"
+                    subheader="UC-67: Cài đặt hệ thống - Quản lý cấu hình và tùy chỉnh hoạt động"
+                    action={
+                        <Box display="flex" gap={1}>
+                            <Button
+                                variant="contained"
+                                startIcon={<AddIcon />}
+                                onClick={() => setEditDialog({ open: true, config: null, isNew: true })}
+                            >
+                                Thêm cấu hình
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                startIcon={<SettingsIcon />}
+                                onClick={handleInitializeConfigs}
+                                disabled={loading}
+                            >
+                                Khởi tạo mặc định
+                            </Button>
+                        </Box>
+                    }
+                />
+                <CardContent>
+                    <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                        <Tabs value={tabValue} onChange={handleTabChange}>
+                            <Tab label="Tất cả" />
+                            {categories.map((category, index) => (
+                                <Tab
+                                    key={category.key}
+                                    label={category.name}
+                                    icon={categoryIcons[category.key]}
+                                    iconPosition="start"
+                                />
+                            ))}
+                        </Tabs>
+                    </Box>
+
+                    <TabPanel value={tabValue} index={0}>
+                        {renderConfigsTable()}
+                    </TabPanel>
+
+                    {categories.map((category, index) => (
+                        <TabPanel key={category.key} value={tabValue} index={index + 1}>
+                            <Typography variant="h6" gutterBottom>
+                                {category.description}
+                            </Typography>
+                            {renderConfigsTable()}
+                        </TabPanel>
+                    ))}
+                </CardContent>
+            </Card>
+
+            {/* Edit Config Dialog */}
+            <ConfigEditDialog
+                open={editDialog.open}
+                config={editDialog.config}
+                isNew={editDialog.isNew}
+                categories={categories}
+                onClose={() => setEditDialog({ open: false, config: null, isNew: false })}
+                onSave={handleSaveConfig}
             />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="Uptime"
-              value={systemInfo.uptime}
-              prefix={<CheckCircleOutlined />}
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="Total Users"
-              value={systemInfo.totalUsers}
-              prefix={<DatabaseOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="Transactions"
-              value={systemInfo.totalTransactions}
-              prefix={<CloudOutlined />}
-            />
-          </Card>
-        </Col>
-      </Row>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-        <Col xs={24} md={12}>
-          <Card title="System Performance">
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <div>
-                <Text>Storage Usage</Text>
-                <Progress percent={systemInfo.storageUsed} status="active" />
-              </div>
-              <div>
-                <Text>Memory Usage</Text>
-                <Progress percent={systemInfo.memoryUsage} status="active" />
-              </div>
-              <div>
-                <Text>CPU Usage</Text>
-                <Progress percent={systemInfo.cpuUsage} status="active" />
-              </div>
-            </Space>
-          </Card>
-        </Col>
-        <Col xs={24} md={12}>
-          <Card title="System Status">
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Text>Network Status:</Text>
-                <Tag color={getStatusColor(systemInfo.networkStatus)}>
-                  {systemInfo.networkStatus}
-                </Tag>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Text>Blockchain Status:</Text>
-                <Tag color={getStatusColor(systemInfo.blockchainStatus)}>
-                  {systemInfo.blockchainStatus}
-                </Tag>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Text>Database Status:</Text>
-                <Tag color={getStatusColor(systemInfo.databaseStatus)}>
-                  {systemInfo.databaseStatus}
-                </Tag>
-              </div>
-            </Space>
-          </Card>
-        </Col>
-      </Row>
-    </div>
-  );
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, config: null })}>
+                <DialogTitle>Xác nhận xóa cấu hình</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Bạn có chắc chắn muốn xóa cấu hình "{deleteDialog.config?.key}"?
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Hành động này không thể hoàn tác.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteDialog({ open: false, config: null })}>
+                        Hủy
+                    </Button>
+                    <Button
+                        color="error"
+                        variant="contained"
+                        onClick={() => handleDeleteConfig(deleteDialog.config?.key)}
+                    >
+                        Xóa
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        </Box>
+    );
+};
 
-  const generalSettings = (
-    <div>
-      <Card title="General Settings" style={{ marginBottom: '16px' }}>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div>
-                <Text strong>Enable Notifications</Text>
-                <br />
-                <Text type="secondary">Receive system notifications</Text>
-              </div>
-              <Switch
-                checked={settings.notifications}
-                onChange={(checked) => handleSettingChange('notifications', checked)}
-              />
-            </div>
-          </Col>
-          <Col xs={24} sm={12}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div>
-                <Text strong>Auto Backup</Text>
-                <br />
-                <Text type="secondary">Automatic daily backups</Text>
-              </div>
-              <Switch
-                checked={settings.autoBackup}
-                onChange={(checked) => handleSettingChange('autoBackup', checked)}
-              />
-            </div>
-          </Col>
-          <Col xs={24} sm={12}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div>
-                <Text strong>Maintenance Mode</Text>
-                <br />
-                <Text type="secondary">Enable maintenance mode</Text>
-              </div>
-              <Switch
-                checked={settings.maintenanceMode}
-                onChange={(checked) => handleSettingChange('maintenanceMode', checked)}
-              />
-            </div>
-          </Col>
-          <Col xs={24} sm={12}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div>
-                <Text strong>Audit Logging</Text>
-                <br />
-                <Text type="secondary">Log all system activities</Text>
-              </div>
-              <Switch
-                checked={settings.auditLogging}
-                onChange={(checked) => handleSettingChange('auditLogging', checked)}
-              />
-            </div>
-          </Col>
-        </Row>
-      </Card>
+// Config Edit Dialog Component
+const ConfigEditDialog = ({ open, config, isNew, categories, onClose, onSave }) => {
+    const [formData, setFormData] = useState({
+        key: '',
+        value: '',
+        category: 'general',
+        description: '',
+        dataType: 'string',
+        isPublic: false
+    });
 
-      <Card title="File & Session Settings">
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12}>
-            <Text strong>Max File Size (MB)</Text>
-            <Input
-              type="number"
-              value={settings.maxFileSize}
-              onChange={(e) => handleSettingChange('maxFileSize', parseInt(e.target.value))}
-              style={{ marginTop: '8px' }}
-            />
-          </Col>
-          <Col xs={24} sm={12}>
-            <Text strong>Session Timeout (minutes)</Text>
-            <Input
-              type="number"
-              value={settings.sessionTimeout}
-              onChange={(e) => handleSettingChange('sessionTimeout', parseInt(e.target.value))}
-              style={{ marginTop: '8px' }}
-            />
-          </Col>
-        </Row>
-      </Card>
-    </div>
-  );
+    const [errors, setErrors] = useState({});
 
-  const securitySettings = (
-    <div>
-      <Alert
-        message="Security Settings"
-        description="Configure security policies and authentication settings for the system."
-        type="info"
-        showIcon
-        style={{ marginBottom: '16px' }}
-      />
+    useEffect(() => {
+        if (open) {
+            if (isNew) {
+                setFormData({
+                    key: '',
+                    value: '',
+                    category: 'general',
+                    description: '',
+                    dataType: 'string',
+                    isPublic: false
+                });
+            } else if (config) {
+                setFormData({
+                    key: config.key,
+                    value: config.value,
+                    category: config.category,
+                    description: config.description,
+                    dataType: config.dataType,
+                    isPublic: config.isPublic
+                });
+            }
+            setErrors({});
+        }
+    }, [open, config, isNew]);
 
-      <Card title="Authentication & Security">
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12}>
-            <Text strong>Password Policy</Text>
-            <Select
-              style={{ width: '100%', marginTop: '8px' }}
-              value={settings.passwordPolicy}
-              onChange={(value) => handleSettingChange('passwordPolicy', value)}
-            >
-              <Option value="weak">Weak (6+ characters)</Option>
-              <Option value="medium">Medium (8+ characters, mixed case)</Option>
-              <Option value="strong">Strong (8+ characters, mixed case, numbers, symbols)</Option>
-            </Select>
-          </Col>
-          <Col xs={24} sm={12}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px' }}>
-              <div>
-                <Text strong>Two-Factor Authentication</Text>
-                <br />
-                <Text type="secondary">Require 2FA for all users</Text>
-              </div>
-              <Switch
-                checked={settings.twoFactorAuth}
-                onChange={(checked) => handleSettingChange('twoFactorAuth', checked)}
-              />
-            </div>
-          </Col>
-        </Row>
-      </Card>
-    </div>
-  );
+    const handleChange = (field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+        if (errors[field]) {
+            setErrors(prev => ({ ...prev, [field]: '' }));
+        }
+    };
 
-  const items = [
-    {
-      key: '1',
-      label: 'System Overview',
-      children: systemOverview,
-      icon: <DatabaseOutlined />
-    },
-    {
-      key: '2',
-      label: 'General Settings',
-      children: generalSettings,
-      icon: <SettingOutlined />
-    },
-    {
-      key: '3',
-      label: 'Security',
-      children: securitySettings,
-      icon: <LockOutlined />
-    }
-  ];
+    const validateForm = () => {
+        const newErrors = {};
 
-  return (
-    <div style={{ padding: '24px' }}>
-      <div style={{ marginBottom: '24px' }}>
-        <Title level={2}>
-          <SettingOutlined style={{ marginRight: '8px' }} />
-          System Settings
-        </Title>
-        <Text type="secondary">
-          Configure system settings, monitor performance, and manage security
-        </Text>
-      </div>
+        if (!formData.key.trim()) {
+            newErrors.key = 'Khóa cấu hình là bắt buộc';
+        }
 
-      <div style={{ marginBottom: '16px' }}>
-        <Space>
-          <Button
-            type="primary"
-            icon={<SaveOutlined />}
-            onClick={saveSettings}
-            loading={loading}
-          >
-            Save Settings
-          </Button>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={resetSettings}
-          >
-            Reset to Defaults
-          </Button>
-        </Space>
-      </div>
+        if (!formData.description.trim()) {
+            newErrors.description = 'Mô tả là bắt buộc';
+        }
 
-      <Tabs items={items} />
-    </div>
-  );
+        if (formData.value === '' || formData.value === null || formData.value === undefined) {
+            newErrors.value = 'Giá trị là bắt buộc';
+        }
+
+        // Validate value based on data type
+        if (formData.dataType === 'number' && isNaN(Number(formData.value))) {
+            newErrors.value = 'Giá trị phải là số';
+        }
+
+        if (formData.dataType === 'boolean' && typeof formData.value !== 'boolean') {
+            newErrors.value = 'Giá trị phải là true/false';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const handleSubmit = () => {
+        if (validateForm()) {
+            let processedValue = formData.value;
+
+            // Process value based on data type
+            if (formData.dataType === 'number') {
+                processedValue = Number(formData.value);
+            } else if (formData.dataType === 'boolean') {
+                processedValue = Boolean(formData.value);
+            } else if (formData.dataType === 'object' || formData.dataType === 'array') {
+                try {
+                    processedValue = JSON.parse(formData.value);
+                } catch (error) {
+                    setErrors({ value: 'Giá trị JSON không hợp lệ' });
+                    return;
+                }
+            }
+
+            onSave({
+                ...formData,
+                value: processedValue
+            });
+        }
+    };
+
+    const renderValueInput = () => {
+        switch (formData.dataType) {
+            case 'boolean':
+                return (
+                    <FormControl fullWidth margin="normal">
+                        <Box display="flex" alignItems="center" gap={2}>
+                            <Typography>Giá trị:</Typography>
+                            <Switch
+                                checked={Boolean(formData.value)}
+                                onChange={(e) => handleChange('value', e.target.checked)}
+                            />
+                            <Typography>{formData.value ? 'Bật' : 'Tắt'}</Typography>
+                        </Box>
+                    </FormControl>
+                );
+            case 'number':
+                return (
+                    <TextField
+                        fullWidth
+                        margin="normal"
+                        label="Giá trị"
+                        type="number"
+                        value={formData.value}
+                        onChange={(e) => handleChange('value', e.target.value)}
+                        error={!!errors.value}
+                        helperText={errors.value}
+                        required
+                    />
+                );
+            case 'object':
+            case 'array':
+                return (
+                    <TextField
+                        fullWidth
+                        margin="normal"
+                        label="Giá trị (JSON)"
+                        multiline
+                        rows={4}
+                        value={typeof formData.value === 'object' ? JSON.stringify(formData.value, null, 2) : formData.value}
+                        onChange={(e) => handleChange('value', e.target.value)}
+                        error={!!errors.value}
+                        helperText={errors.value || 'Nhập giá trị dưới dạng JSON'}
+                        required
+                    />
+                );
+            default:
+                return (
+                    <TextField
+                        fullWidth
+                        margin="normal"
+                        label="Giá trị"
+                        value={formData.value}
+                        onChange={(e) => handleChange('value', e.target.value)}
+                        error={!!errors.value}
+                        helperText={errors.value}
+                        required
+                    />
+                );
+        }
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+            <DialogTitle>
+                {isNew ? 'Thêm cấu hình mới' : 'Chỉnh sửa cấu hình'}
+            </DialogTitle>
+            <DialogContent>
+                <TextField
+                    fullWidth
+                    margin="normal"
+                    label="Khóa cấu hình"
+                    value={formData.key}
+                    onChange={(e) => handleChange('key', e.target.value)}
+                    error={!!errors.key}
+                    helperText={errors.key}
+                    disabled={!isNew}
+                    required
+                />
+
+                <TextField
+                    fullWidth
+                    margin="normal"
+                    label="Mô tả"
+                    multiline
+                    rows={2}
+                    value={formData.description}
+                    onChange={(e) => handleChange('description', e.target.value)}
+                    error={!!errors.description}
+                    helperText={errors.description}
+                    required
+                />
+
+                <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                        <FormControl fullWidth margin="normal">
+                            <InputLabel>Danh mục</InputLabel>
+                            <Select
+                                value={formData.category}
+                                onChange={(e) => handleChange('category', e.target.value)}
+                                label="Danh mục"
+                            >
+                                {categories.map((category) => (
+                                    <MenuItem key={category.key} value={category.key}>
+                                        {category.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={6}>
+                        <FormControl fullWidth margin="normal">
+                            <InputLabel>Kiểu dữ liệu</InputLabel>
+                            <Select
+                                value={formData.dataType}
+                                onChange={(e) => handleChange('dataType', e.target.value)}
+                                label="Kiểu dữ liệu"
+                            >
+                                <MenuItem value="string">Chuỗi</MenuItem>
+                                <MenuItem value="number">Số</MenuItem>
+                                <MenuItem value="boolean">Logic</MenuItem>
+                                <MenuItem value="object">Đối tượng</MenuItem>
+                                <MenuItem value="array">Mảng</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                </Grid>
+
+                {renderValueInput()}
+
+                <FormControl fullWidth margin="normal">
+                    <Box display="flex" alignItems="center" gap={2}>
+                        <Typography>Công khai:</Typography>
+                        <Switch
+                            checked={formData.isPublic}
+                            onChange={(e) => handleChange('isPublic', e.target.checked)}
+                        />
+                        <Typography variant="body2" color="text.secondary">
+                            {formData.isPublic ? 'Người dùng thường có thể xem' : 'Chỉ admin có thể xem'}
+                        </Typography>
+                    </Box>
+                </FormControl>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Hủy</Button>
+                <Button variant="contained" onClick={handleSubmit} startIcon={<SaveIcon />}>
+                    {isNew ? 'Tạo' : 'Lưu'}
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
 };
 
 export default SystemSettingsPage;

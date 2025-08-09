@@ -1,0 +1,12 @@
+{
+  "index": {
+    "fields": [
+      "ownerId",
+      "legalStatus",
+      "area"
+    ]
+  },
+  "ddoc": "indexOwnerLandDoc",
+  "name": "indexOwnerLand",
+  "type": "json"
+}

@@ -70,17 +70,22 @@ const LandManagementModule = ({ user }) => {
   };
 
   const handleDeleteParcel = async (parcelId) => {
-    try {
-      setLoading(true);
-      await apiService.deleteLandParcel(parcelId);
-      message.success('Land parcel deleted successfully');
-      fetchLandParcels();
-    } catch (error) {
-      console.error('Delete parcel error:', error);
-      message.error('Failed to delete land parcel');
-    } finally {
-      setLoading(false);
-    }
+    // DISABLED: DeleteLandParcel function not implemented in chaincode
+    console.log('Delete requested for parcel:', parcelId); // Acknowledge parameter
+    message.warning('Land parcel deletion is currently not available. This feature is not implemented in the chaincode.');
+    return;
+
+    // try {
+    //   setLoading(true);
+    //   await apiService.deleteLandParcel(parcelId);
+    //   message.success('Land parcel deleted successfully');
+    //   fetchLandParcels();
+    // } catch (error) {
+    //   console.error('Delete parcel error:', error);
+    //   message.error('Failed to delete land parcel');
+    // } finally {
+    //   setLoading(false);
+    // }
   };
 
   const handleModalOk = async () => {

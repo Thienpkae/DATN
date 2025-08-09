@@ -1,8 +1,0 @@
-{
-  "index": {
-    "fields": ["txId", "type", "landParcelId", "fromOwnerId", "toOwnerId", "status", "details", "createdAt"]
-  },
-  "ddoc": "transaction_doc",
-  "name": "transaction_index",
-  "type": "json"
-}

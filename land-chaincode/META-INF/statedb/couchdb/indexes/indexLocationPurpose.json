@@ -1,0 +1,12 @@
+{
+  "index": {
+    "fields": [
+      "location",
+      "landUsePurpose",
+      "legalStatus"
+    ]
+  },
+  "ddoc": "indexLocationPurposeDoc",
+  "name": "indexLocationPurpose",
+  "type": "json"
+}

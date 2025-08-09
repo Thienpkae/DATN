@@ -1,8 +1,0 @@
-{
-  "index": {
-    "fields": ["docId", "landParcelId", "txId", "ipfsHash", "description", "createdAt"]
-  },
-  "ddoc": "document_doc",
-  "name": "document_index",
-  "type": "json"
-}

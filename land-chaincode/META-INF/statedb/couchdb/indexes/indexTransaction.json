@@ -1,0 +1,14 @@
+{
+  "index": {
+    "fields": [
+      "txId",
+      "type",
+      "status",
+      "fromOwnerId",
+      "toOwnerId"
+    ]
+  },
+  "ddoc": "indexTransactionDoc",
+  "name": "indexTransaction",
+  "type": "json"
+}
