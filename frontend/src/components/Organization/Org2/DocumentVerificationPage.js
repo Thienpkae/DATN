@@ -1,434 +1,557 @@
 import React, { useState, useEffect } from 'react';
 import {
   Card,
-  Row,
-  Col,
-  Button,
   Table,
+  Button,
+  Space,
+  Tag,
   Modal,
   Form,
   Input,
-  Select,
-  Space,
-  Typography,
-  Tag,
   message,
+  Typography,
+  Row,
+  Col,
   Statistic,
-  Steps,
   Descriptions,
-  Alert
+  Select,
+  DatePicker,
+  Tooltip,
+  Alert,
+  Divider
 } from 'antd';
 import {
-  SafetyOutlined,
+  FileTextOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  ClockCircleOutlined,
   EyeOutlined,
   SearchOutlined,
   FilterOutlined,
-  FileTextOutlined,
-  AuditOutlined
+  ReloadOutlined,
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
-import apiService from '../../../services/api';
+import documentService from '../../../services/documentService';
 
 const { Title, Text } = Typography;
+const { TextArea } = Input;
 const { Option } = Select;
-const { Step } = Steps;
 
+/**
+ * Document Verification Page for Org2 (Commune Administrative Unit)
+ * Verifies documents submitted by citizens
+ */
 const DocumentVerificationPage = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [documents, setDocuments] = useState([]);
-  const [modalVisible, setModalVisible] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
-  const [searchText, setSearchText] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [form] = Form.useForm();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [verificationModalVisible, setVerificationModalVisible] = useState(false);
+  const [verifyingDocument, setVerifyingDocument] = useState(null);
+  const [searchForm] = Form.useForm();
+  const [verificationForm] = Form.useForm();
+  const [stats, setStats] = useState({
+    total: 0,
+    verified: 0,
+    pending: 0,
+    rejected: 0
+  });
+  const [filters, setFilters] = useState({});
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   useEffect(() => {
     fetchDocuments();
+    fetchStats();
   }, []);
 
   const fetchDocuments = async () => {
-    setLoading(true);
     try {
-      // Fetch pending documents for verification
-      const response = await apiService.getPendingDocuments();
-      setDocuments(response || []);
+      setLoading(true);
+      const response = await documentService.getAllDocuments();
+      setDocuments(response.documents || response || []);
     } catch (error) {
-      console.error('Fetch documents error:', error);
-      message.error('Failed to fetch documents');
-      setDocuments([]);
+      console.error('Lỗi khi lấy danh sách tài liệu:', error);
+      message.error('Không thể lấy danh sách tài liệu');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerifyDocument = async (documentId, status, comments) => {
+  const fetchStats = async () => {
     try {
-      setLoading(true);
-      await apiService.verifyDocument(documentId, {
-        status,
-        comments,
-        verifiedBy: user.userId,
-        verificationDate: new Date().toISOString()
-      });
+      const allDocs = await documentService.getAllDocuments();
+      const docs = allDocs.documents || allDocs || [];
       
-      message.success(`Document ${status === 'approved' ? 'approved' : 'rejected'} successfully`);
-      setModalVisible(false);
-      fetchDocuments();
+      setStats({
+        total: docs.length,
+        verified: docs.filter(doc => doc.verified).length,
+        pending: docs.filter(doc => !doc.verified && !doc.rejected).length,
+        rejected: docs.filter(doc => doc.rejected).length
+      });
     } catch (error) {
-      console.error('Verify document error:', error);
-      message.error(error.message || 'Failed to verify document');
-    } finally {
-      setLoading(false);
+      console.error('Lỗi khi lấy thống kê:', error);
     }
   };
 
   const handleViewDocument = (document) => {
     setSelectedDocument(document);
-    form.setFieldsValue({
-      status: '',
-      comments: ''
-    });
     setModalVisible(true);
   };
 
-  const getFilteredDocuments = () => {
-    let filtered = documents;
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(doc => doc.status === statusFilter);
+  const handleVerifyDocument = async (values) => {
+    try {
+      setLoading(true);
+      const { action, comments } = values;
+      
+      if (action === 'VERIFIED') {
+        await documentService.verifyDocument(verifyingDocument.docID, {
+          status: 'VERIFIED',
+          verifierComments: comments,
+          verifiedBy: user.cccd,
+          verifiedAt: new Date().toISOString()
+        });
+        message.success('Tài liệu đã được xác thực thành công');
+      } else if (action === 'REJECTED') {
+        await documentService.rejectDocument(verifyingDocument.docID, {
+          status: 'REJECTED',
+          rejectionComments: comments,
+          rejectedBy: user.cccd,
+          rejectedAt: new Date().toISOString()
+        });
+        message.success('Tài liệu đã bị từ chối');
+      }
+      
+      fetchDocuments();
+      fetchStats();
+      setVerificationModalVisible(false);
+      setVerifyingDocument(null);
+      verificationForm.resetFields();
+    } catch (error) {
+      console.error('Lỗi khi xác thực tài liệu:', error);
+      message.error(error.message || 'Lỗi khi xác thực tài liệu');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    if (searchText) {
-      filtered = filtered.filter(doc =>
-        doc.id?.toLowerCase().includes(searchText.toLowerCase()) ||
-        doc.type?.toLowerCase().includes(searchText.toLowerCase()) ||
-        doc.submittedBy?.toLowerCase().includes(searchText.toLowerCase())
-      );
+  const openVerificationModal = (document) => {
+    setVerifyingDocument(document);
+    setVerificationModalVisible(true);
+  };
+
+  const handleSearch = async (values) => {
+    try {
+      setLoading(true);
+      if (values.keyword) {
+        const response = await documentService.searchDocuments({
+          keyword: values.keyword,
+          filters: JSON.stringify(filters)
+        });
+        setDocuments(response.documents || response || []);
+      } else {
+        fetchDocuments();
+      }
+    } catch (error) {
+      console.error('Lỗi khi tìm kiếm:', error);
+      message.error('Lỗi khi tìm kiếm tài liệu');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    return filtered;
+  const handleAdvancedSearch = async (values) => {
+    try {
+      setLoading(true);
+      const response = await documentService.advancedSearch(values);
+      setDocuments(response.documents || response || []);
+    } catch (error) {
+      console.error('Lỗi khi tìm kiếm nâng cao:', error);
+      message.error('Lỗi khi tìm kiếm nâng cao');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetFilters = () => {
+    searchForm.resetFields();
+    setFilters({});
+    fetchDocuments();
+  };
+
+  const getStatusColor = (status) => {
+    const statusColors = {
+      'PENDING': 'orange',
+      'VERIFIED': 'green',
+      'REJECTED': 'red',
+      'EXPIRED': 'default',
+      'ARCHIVED': 'blue'
+    };
+    return statusColors[status] || 'default';
+  };
+
+  const getStatusText = (status) => {
+    const statusTexts = {
+      'PENDING': 'Chờ xử lý',
+      'VERIFIED': 'Đã xác thực',
+      'REJECTED': 'Bị từ chối',
+      'EXPIRED': 'Hết hạn',
+      'ARCHIVED': 'Đã lưu trữ'
+    };
+    return statusTexts[status] || status;
+  };
+
+  const getDocumentTypeText = (docType) => {
+    const typeTexts = {
+      'CERTIFICATE': 'Giấy chứng nhận',
+      'CONTRACT': 'Hợp đồng',
+      'MAP': 'Bản đồ',
+      'IDENTITY': 'Giấy tờ tùy thân',
+      'APPLICATION': 'Đơn từ',
+      'OTHER': 'Khác'
+    };
+    return typeTexts[docType] || docType;
   };
 
   const columns = [
     {
-      title: 'Document ID',
-      dataIndex: 'id',
-      key: 'id',
-      render: (id) => <Text strong>{id}</Text>
+      title: 'Mã tài liệu',
+      dataIndex: 'docID',
+      key: 'docID',
+      width: 120,
+      render: (text) => <Text code>{text}</Text>
     },
     {
-      title: 'Document Type',
-      dataIndex: 'type',
-      key: 'type',
-      render: (type) => (
-        <Space>
-          <FileTextOutlined />
-          <Text>{type}</Text>
-        </Space>
+      title: 'Loại tài liệu',
+      dataIndex: 'docType',
+      key: 'docType',
+      width: 120,
+      render: (docType) => <Tag color="blue">{getDocumentTypeText(docType)}</Tag>
+    },
+    {
+      title: 'Tiêu đề',
+      dataIndex: 'title',
+      key: 'title',
+      ellipsis: true,
+      render: (text) => (
+        <Tooltip title={text}>
+          <Text ellipsis style={{ maxWidth: 200 }}>{text}</Text>
+        </Tooltip>
       )
     },
     {
-      title: 'Submitted By',
-      dataIndex: 'submittedBy',
-      key: 'submittedBy'
+      title: 'Người upload',
+      dataIndex: 'uploadedBy',
+      key: 'uploadedBy',
+      width: 120,
+      render: (text) => <Text code>{text}</Text>
     },
     {
-      title: 'Submission Date',
-      dataIndex: 'submissionDate',
-      key: 'submissionDate',
-      render: (date) => date ? new Date(date).toLocaleDateString() : 'N/A'
-    },
-    {
-      title: 'Priority',
-      dataIndex: 'priority',
-      key: 'priority',
-      render: (priority) => {
-        const colors = {
-          'high': 'red',
-          'medium': 'orange',
-          'low': 'green'
-        };
-        return <Tag color={colors[priority] || 'default'}>{priority}</Tag>;
+      title: 'Trạng thái',
+      dataIndex: 'verified',
+      key: 'verified',
+      width: 120,
+      render: (verified, record) => {
+        if (record.rejected) {
+          return <Tag color="red">Bị từ chối</Tag>;
+        }
+        return verified ? 
+          <Tag color="green" icon={<CheckCircleOutlined />}>Đã xác thực</Tag> : 
+          <Tag color="orange">Chờ xử lý</Tag>;
       }
     },
     {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => {
-        const colors = {
-          'pending': 'orange',
-          'approved': 'green',
-          'rejected': 'red',
-          'under_review': 'blue'
-        };
-        const icons = {
-          'pending': <ClockCircleOutlined />,
-          'approved': <CheckCircleOutlined />,
-          'rejected': <CloseCircleOutlined />,
-          'under_review': <AuditOutlined />
-        };
-        return (
-          <Tag color={colors[status] || 'default'} icon={icons[status]}>
-            {status?.replace('_', ' ')}
-          </Tag>
-        );
-      }
+      title: 'Ngày tạo',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 120,
+      render: (date) => date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'
     },
     {
-      title: 'Actions',
+      title: 'Thao tác',
       key: 'actions',
+      width: 200,
       render: (_, record) => (
         <Space>
-          <Button
-            type="link"
-            icon={<EyeOutlined />}
-            onClick={() => handleViewDocument(record)}
-          >
-            Review
-          </Button>
+          <Tooltip title="Xem chi tiết">
+            <Button 
+              icon={<EyeOutlined />} 
+              size="small"
+              onClick={() => handleViewDocument(record)}
+            />
+          </Tooltip>
+          {!record.verified && !record.rejected && (
+            <Tooltip title="Xác thực">
+              <Button 
+                icon={<CheckCircleOutlined />} 
+                size="small"
+                type="primary"
+                onClick={() => openVerificationModal(record)}
+              >
+                Xác thực
+              </Button>
+            </Tooltip>
+          )}
         </Space>
-      )
-    }
+      ),
+    },
   ];
 
-  const stats = {
-    total: documents.length,
-    pending: documents.filter(d => d.status === 'pending').length,
-    approved: documents.filter(d => d.status === 'approved').length,
-    rejected: documents.filter(d => d.status === 'rejected').length
-  };
-
-  const getVerificationSteps = (document) => {
-    const steps = [
-      {
-        title: 'Submitted',
-        status: 'finish',
-        description: `Submitted on ${document?.submissionDate ? new Date(document.submissionDate).toLocaleDateString() : 'N/A'}`
-      },
-      {
-        title: 'Under Review',
-        status: document?.status === 'under_review' ? 'process' : 
-               document?.status === 'pending' ? 'wait' : 'finish',
-        description: 'Document being reviewed by officers'
-      },
-      {
-        title: 'Verification',
-        status: document?.status === 'approved' || document?.status === 'rejected' ? 'finish' : 'wait',
-        description: document?.status === 'approved' ? 'Approved' : 
-                    document?.status === 'rejected' ? 'Rejected' : 'Pending verification'
-      }
-    ];
-    return steps;
-  };
-
   return (
-    <div style={{ padding: '24px' }}>
-      <div style={{ marginBottom: '24px' }}>
-        <Title level={2}>
-          <SafetyOutlined style={{ marginRight: '8px' }} />
-          Document Verification
-        </Title>
-        <Text type="secondary">
-          Review and verify submitted documents for land registry processes
-        </Text>
-      </div>
+    <div>
+      <Title level={2}>
+        <FileTextOutlined /> Xác thực Tài liệu
+      </Title>
+      
+      <Alert
+        message="Tổ chức: Org2 (Đơn vị hành chính cấp xã)"
+        description="Bạn có quyền xác thực các tài liệu do công dân gửi lên. Hãy xem xét cẩn thận trước khi xác thực hoặc từ chối."
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+      />
 
-      {/* Statistics */}
-      <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-        <Col xs={24} sm={12} md={6}>
+      {/* Thống kê */}
+      <Row gutter={16} style={{ marginBottom: '24px' }}>
+        <Col span={6}>
           <Card>
             <Statistic
-              title="Total Documents"
+              title="Tổng số tài liệu"
               value={stats.total}
               prefix={<FileTextOutlined />}
-              valueStyle={{ color: '#1890ff' }}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
+        <Col span={6}>
           <Card>
             <Statistic
-              title="Pending Review"
-              value={stats.pending}
-              prefix={<ClockCircleOutlined />}
-              valueStyle={{ color: '#faad14' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="Approved"
-              value={stats.approved}
-              prefix={<CheckCircleOutlined />}
+              title="Đã xác thực"
+              value={stats.verified}
               valueStyle={{ color: '#52c41a' }}
+              prefix={<CheckCircleOutlined />}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
+        <Col span={6}>
           <Card>
             <Statistic
-              title="Rejected"
+              title="Chờ xử lý"
+              value={stats.pending}
+              valueStyle={{ color: '#faad14' }}
+              prefix={<ExclamationCircleOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="Bị từ chối"
               value={stats.rejected}
-              prefix={<CloseCircleOutlined />}
               valueStyle={{ color: '#ff4d4f' }}
+              prefix={<CloseCircleOutlined />}
             />
           </Card>
         </Col>
       </Row>
 
-      {/* Filters */}
-      <Card style={{ marginBottom: '16px' }}>
-        <Row gutter={[16, 16]} align="middle">
-          <Col xs={24} sm={12} md={8}>
-            <Input
-              placeholder="Search documents..."
-              prefix={<SearchOutlined />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8}>
-            <Select
-              style={{ width: '100%' }}
-              placeholder="Filter by status"
-              value={statusFilter}
-              onChange={setStatusFilter}
-            >
-              <Option value="all">All Status</Option>
-              <Option value="pending">Pending</Option>
-              <Option value="under_review">Under Review</Option>
-              <Option value="approved">Approved</Option>
-              <Option value="rejected">Rejected</Option>
-            </Select>
-          </Col>
-          <Col xs={24} sm={12} md={8}>
-            <Button
-              icon={<FilterOutlined />}
-              onClick={fetchDocuments}
-              loading={loading}
-            >
-              Refresh
-            </Button>
-          </Col>
-        </Row>
-      </Card>
+      {/* Bộ lọc tìm kiếm */}
+      <Form form={searchForm} layout="inline" style={{ marginBottom: '24px' }}>
+        <Form.Item name="keyword" label="Từ khóa">
+          <Input placeholder="Nhập từ khóa tìm kiếm" />
+        </Form.Item>
+        <Form.Item>
+          <Button type="primary" icon={<SearchOutlined />} onClick={() => handleSearch({ keyword: searchForm.getFieldValue('keyword') })}>
+            Tìm kiếm
+          </Button>
+          <Button icon={<ReloadOutlined />} onClick={handleResetFilters}>
+            Đặt lại
+          </Button>
+        </Form.Item>
+      </Form>
 
-      {/* Documents Table */}
+      {/* Bộ lọc nâng cao */}
+      {showAdvancedFilters && (
+        <Form form={searchForm} layout="inline" style={{ marginBottom: '24px' }}>
+          <Form.Item name="docType" label="Loại tài liệu">
+            <Select placeholder="Chọn loại tài liệu">
+              <Option value="">Tất cả</Option>
+              <Option value="CERTIFICATE">Giấy chứng nhận</Option>
+              <Option value="CONTRACT">Hợp đồng</Option>
+              <Option value="MAP">Bản đồ</Option>
+              <Option value="IDENTITY">Giấy tờ tùy thân</Option>
+              <Option value="APPLICATION">Đơn từ</Option>
+              <Option value="OTHER">Khác</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="uploadedBy" label="Người upload">
+            <Input placeholder="Nhập tên người upload" />
+          </Form.Item>
+          <Form.Item name="startDate" label="Từ ngày">
+            <DatePicker />
+          </Form.Item>
+          <Form.Item name="endDate" label="Đến ngày">
+            <DatePicker />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" icon={<FilterOutlined />} onClick={() => handleAdvancedSearch(searchForm.getFieldsValue())}>
+              Áp dụng bộ lọc
+            </Button>
+            <Button onClick={handleResetFilters}>Đặt lại</Button>
+          </Form.Item>
+        </Form>
+      )}
+
+      {/* Bảng danh sách tài liệu */}
       <Card>
         <Table
           columns={columns}
-          dataSource={getFilteredDocuments()}
+          dataSource={documents}
           loading={loading}
-          rowKey="id"
+          rowKey="docID"
           pagination={{
             pageSize: 10,
             showSizeChanger: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} documents`
+            showQuickJumper: true,
+            showTotal: (total, range) =>
+              `${range[0]}-${range[1]} trong ${total} tài liệu`
           }}
+          scroll={{ x: 1200 }}
         />
       </Card>
 
-      {/* Document Review Modal */}
+      {/* Chi tiết tài liệu Modal */}
       <Modal
-        title="Document Review"
+        title="Chi tiết Tài liệu"
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         width={800}
-        footer={null}
+        footer={[
+          <Button key="close" onClick={() => setModalVisible(false)}>
+            Đóng
+          </Button>
+        ]}
       >
         {selectedDocument && (
+          <Descriptions bordered column={2} size="small">
+            <Descriptions.Item label="Mã tài liệu" span={2}>
+              <Text code>{selectedDocument.docID}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Loại tài liệu">
+              <Tag color="blue">{getDocumentTypeText(selectedDocument.docType)}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Tiêu đề">
+              <Text>{selectedDocument.title}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Trạng thái">
+              <Tag color={getStatusColor(selectedDocument.verified)}>
+                {getStatusText(selectedDocument.verified)}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Người upload">
+              <Text code>{selectedDocument.uploadedBy}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Ngày tạo">
+              {selectedDocument.createdAt ? new Date(selectedDocument.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Kích thước">
+              {selectedDocument.fileSize ? `${(selectedDocument.fileSize / 1024).toFixed(2)} KB` : 'N/A'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Mô tả" span={2}>
+              {selectedDocument.description || 'Không có mô tả'}
+            </Descriptions.Item>
+            {selectedDocument.verifierComments && (
+              <Descriptions.Item label="Bình luận xác thực" span={2}>
+                {selectedDocument.verifierComments}
+              </Descriptions.Item>
+            )}
+            {selectedDocument.rejectionComments && (
+              <Descriptions.Item label="Bình luận từ chối" span={2}>
+                {selectedDocument.rejectionComments}
+              </Descriptions.Item>
+            )}
+          </Descriptions>
+        )}
+      </Modal>
+
+      {/* Xác thực tài liệu Modal */}
+      <Modal
+        title="Xác thực Tài liệu"
+        open={verificationModalVisible}
+        onCancel={() => {
+          setVerificationModalVisible(false);
+          setVerifyingDocument(null);
+          verificationForm.resetFields();
+        }}
+        footer={null}
+        width={600}
+      >
+        {verifyingDocument && (
           <div>
-            {/* Document Details */}
-            <Card style={{ marginBottom: '16px' }}>
-              <Descriptions title="Document Information" bordered column={2}>
-                <Descriptions.Item label="Document ID">
-                  {selectedDocument.id}
-                </Descriptions.Item>
-                <Descriptions.Item label="Type">
-                  {selectedDocument.type}
-                </Descriptions.Item>
-                <Descriptions.Item label="Submitted By">
-                  {selectedDocument.submittedBy}
-                </Descriptions.Item>
-                <Descriptions.Item label="Submission Date">
-                  {selectedDocument.submissionDate ? new Date(selectedDocument.submissionDate).toLocaleDateString() : 'N/A'}
-                </Descriptions.Item>
-                <Descriptions.Item label="Priority">
-                  <Tag color={selectedDocument.priority === 'high' ? 'red' : selectedDocument.priority === 'medium' ? 'orange' : 'green'}>
-                    {selectedDocument.priority}
-                  </Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="Current Status">
-                  <Tag color={selectedDocument.status === 'approved' ? 'green' : selectedDocument.status === 'rejected' ? 'red' : 'orange'}>
-                    {selectedDocument.status}
-                  </Tag>
-                </Descriptions.Item>
-              </Descriptions>
-            </Card>
+            <Alert
+              message="Thông tin tài liệu cần xác thực"
+              description={
+                <div>
+                  <p><strong>Mã tài liệu:</strong> {verifyingDocument.docID}</p>
+                  <p><strong>Tiêu đề:</strong> {verifyingDocument.title}</p>
+                  <p><strong>Loại:</strong> {getDocumentTypeText(verifyingDocument.docType)}</p>
+                  <p><strong>Người upload:</strong> {verifyingDocument.uploadedBy}</p>
+                </div>
+              }
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
 
-            {/* Verification Steps */}
-            <Card style={{ marginBottom: '16px' }}>
-              <Steps current={selectedDocument.status === 'approved' || selectedDocument.status === 'rejected' ? 2 : selectedDocument.status === 'under_review' ? 1 : 0}>
-                {getVerificationSteps(selectedDocument).map((step, index) => (
-                  <Step key={index} title={step.title} description={step.description} />
-                ))}
-              </Steps>
-            </Card>
-
-            {/* Verification Form */}
-            {selectedDocument.status === 'pending' && (
-              <Card title="Verification Decision">
-                <Form form={form} layout="vertical">
-                  <Form.Item
-                    name="status"
-                    label="Decision"
-                    rules={[{ required: true, message: 'Please select a decision' }]}
-                  >
-                    <Select>
-                      <Option value="approved">Approve</Option>
-                      <Option value="rejected">Reject</Option>
-                    </Select>
-                  </Form.Item>
-                  <Form.Item
-                    name="comments"
-                    label="Comments"
-                    rules={[{ required: true, message: 'Please provide comments' }]}
-                  >
-                    <Input.TextArea rows={4} placeholder="Provide verification comments..." />
-                  </Form.Item>
-                  <Form.Item>
+            <Form
+              form={verificationForm}
+              layout="vertical"
+              onFinish={handleVerifyDocument}
+            >
+              <Form.Item
+                name="action"
+                label="Hành động"
+                rules={[{ required: true, message: 'Vui lòng chọn hành động!' }]}
+              >
+                <Select placeholder="Chọn hành động">
+                  <Option value="VERIFIED">
                     <Space>
-                      <Button
-                        type="primary"
-                        onClick={async () => {
-                          const values = await form.validateFields();
-                          await handleVerifyDocument(selectedDocument.id, values.status, values.comments);
-                        }}
-                        loading={loading}
-                      >
-                        Submit Decision
-                      </Button>
-                      <Button onClick={() => setModalVisible(false)}>
-                        Cancel
-                      </Button>
+                      <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                      Xác thực
                     </Space>
-                  </Form.Item>
-                </Form>
-              </Card>
-            )}
+                  </Option>
+                  <Option value="REJECTED">
+                    <Space>
+                      <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
+                      Từ chối
+                    </Space>
+                  </Option>
+                </Select>
+              </Form.Item>
 
-            {selectedDocument.status !== 'pending' && (
-              <Alert
-                message={`Document ${selectedDocument.status}`}
-                description={`This document has already been ${selectedDocument.status}.`}
-                type={selectedDocument.status === 'approved' ? 'success' : 'error'}
-                showIcon
-              />
-            )}
+              <Form.Item
+                name="comments"
+                label="Bình luận"
+                rules={[{ required: true, message: 'Vui lòng nhập bình luận!' }]}
+              >
+                <TextArea 
+                  rows={4} 
+                  placeholder="Nhập bình luận về việc xác thực hoặc từ chối tài liệu"
+                />
+              </Form.Item>
+
+              <Form.Item>
+                <Space>
+                  <Button type="primary" htmlType="submit" loading={loading}>
+                    Xác nhận
+                  </Button>
+                  <Button onClick={() => {
+                    setVerificationModalVisible(false);
+                    setVerifyingDocument(null);
+                    verificationForm.resetFields();
+                  }}>
+                    Hủy
+                  </Button>
+                </Space>
+              </Form.Item>
+            </Form>
           </div>
         )}
       </Modal>

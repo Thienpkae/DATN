@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Layout, ConfigProvider, App as AntApp } from 'antd';
+import { Layout, ConfigProvider, App as AntApp, Spin, Result, theme } from 'antd';
 
 // Critical components (loaded immediately)
-import LoadingSpinner from './components/Common/LoadingSpinner';
 import ErrorBoundary from './components/Common/ErrorBoundary';
 
 // Direct imports for production
@@ -11,34 +10,28 @@ import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import VerifyOTP from './components/Auth/VerifyOTP';
 import AdminAccountPage from './components/Admin/AdminAccountPage';
-import EnhancedDashboard from './components/Common/EnhancedDashboard';
-import Org1Dashboard from './components/Organization/Org1Dashboard';
-import Org2Dashboard from './components/Organization/Org2Dashboard';
-import Org3Dashboard from './components/Organization/Org3Dashboard';
+import DashboardRouter from './components/Dashboard/DashboardRouter';
 
 // Services
-import { getAuthToken, removeAuthToken } from './services/auth';
-
-// Removed performance utilities for production
+import authService from './services/auth';
 
 // Styles
 import './styles/global.css';
-import './styles/organization-pages.css';
-import { getAntTheme, generateCSSCustomProperties } from './styles/theme';
 
 const { Content } = Layout;
+const { useToken } = theme;
 
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
-
-  // Removed performance monitoring for production
+  const [error, setError] = useState(null);
+  const { token: themeToken } = useToken();
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const token = getAuthToken();
+        const token = authService.getAuthToken();
         if (token && token !== 'null' && token !== 'undefined') {
           try {
             // Try to parse the token
@@ -48,30 +41,32 @@ function App() {
             const currentTime = Date.now() / 1000;
             if (payload.exp && payload.exp < currentTime) {
               console.log('Token expired');
-              removeAuthToken();
+              authService.logout();
               setUser(null);
             } else {
               // Ensure userId is properly set with fallback
               const userId = payload.cccd || payload.userId || payload.sub || payload.id || payload.user_id;
               const org = payload.org || payload.organization;
               const role = payload.role || 'user';
+              const name = payload.name || payload.username || 'User';
               
               if (userId && org) {
                 setUser({
                   userId: String(userId), // Ensure it's a string
                   org: String(org),
                   role: String(role),
+                  name: String(name),
                   token: token
                 });
               } else {
                 console.error('Invalid token payload - missing required fields:', payload);
-                removeAuthToken();
+                authService.logout();
                 setUser(null);
               }
             }
           } catch (error) {
             console.error('Invalid token format:', error);
-            removeAuthToken();
+            authService.logout();
             setUser(null);
           }
         } else {
@@ -79,6 +74,7 @@ function App() {
         }
       } catch (error) {
         console.error('Auth check error:', error);
+        setError('Authentication check failed. Please refresh the page.');
         setUser(null);
       } finally {
         setLoading(false);
@@ -92,72 +88,138 @@ function App() {
   const handleLogin = (userData) => {
     console.log('Login successful:', userData);
     
-    // Validate userData before setting
-    if (userData && userData.userId && userData.org) {
+    // After successful login, get user data from localStorage
+    // (set by authService.login)
+    const user = authService.getCurrentUser();
+    
+    if (user && user.userId && user.org) {
       const validatedUser = {
-        userId: String(userData.userId),
-        org: String(userData.org),
-        role: String(userData.role || 'user'),
+        userId: String(user.userId),
+        org: String(user.org),
+        role: String(user.role || 'user'),
+        name: String(user.name || user.username || 'User'),
         token: userData.token
       };
+      
       setUser(validatedUser);
+      setError(null); // Clear any previous errors
     } else {
       console.error('Invalid user data received:', userData);
+      setError('Invalid user data received. Please try logging in again.');
     }
   };
 
   const handleLogout = () => {
+    authService.logout();
     setUser(null);
-    removeAuthToken();
+    setError(null);
   };
+
+  // Show error state
+  if (error) {
+    return (
+      <ConfigProvider>
+        <AntApp>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100vh',
+            background: themeToken.colorBgContainer
+          }}>
+            <Result
+              status="error"
+              title="Authentication Error"
+              subTitle={error}
+              extra={[
+                <button 
+                  key="refresh" 
+                  onClick={() => window.location.reload()}
+                  style={{
+                    background: themeToken.colorPrimary,
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Refresh Page
+                </button>
+              ]}
+            />
+          </div>
+        </AntApp>
+      </ConfigProvider>
+    );
+  }
 
   // Show loading spinner while checking authentication
   if (loading || !authChecked) {
-    return <LoadingSpinner overlay text="Initializing Land Registry System..." size="large" />;
+    return (
+      <ConfigProvider>
+        <AntApp>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100vh',
+            background: `linear-gradient(135deg, ${themeToken.colorPrimary} 0%, ${themeToken.colorPrimaryBg} 100%)`
+          }}>
+            <Spin 
+              size="large" 
+              indicator={
+                <div style={{
+                  width: '64px',
+                  height: '64px',
+                  border: `4px solid ${themeToken.colorPrimary}20`,
+                  borderTop: `4px solid ${themeToken.colorPrimary}`,
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }} />
+              }
+            />
+            <div style={{ 
+              marginTop: '24px', 
+              fontSize: '18px',
+              color: 'white',
+              fontWeight: 500
+            }}>
+              Initializing Land Registry System...
+            </div>
+            <div style={{ 
+              marginTop: '8px', 
+              fontSize: '14px',
+              color: 'rgba(255,255,255,0.8)'
+            }}>
+              Please wait while we set up your secure environment
+            </div>
+          </div>
+        </AntApp>
+      </ConfigProvider>
+    );
   }
-
-  const getDashboardComponent = () => {
-    if (!user || !user.userId || !user.org) {
-      console.error('Invalid user data for dashboard:', user);
-      return null;
-    }
-
-    const org = user.org.toLowerCase();
-    switch (org) {
-      case 'org1':
-        return <Org1Dashboard user={user} onLogout={handleLogout} />;
-      case 'org2':
-        return <Org2Dashboard user={user} onLogout={handleLogout} />;
-      case 'org3':
-        return <Org3Dashboard user={user} onLogout={handleLogout} />;
-      default:
-        return <EnhancedDashboard user={user} onLogout={handleLogout} />;
-    }
-  };
 
   const isAdmin = () => {
     return user && (user.role === 'admin' || user.role === 'super_admin');
   };
 
-  // Enhanced Ant Design theme configuration
-  const getOrganization = () => {
-    if (!user?.org) return 'org1';
-    return user.org.toLowerCase();
-  };
-
-  const themeConfig = getAntTheme(getOrganization());
-
-  // Generate CSS custom properties for the current organization
-  const customProperties = generateCSSCustomProperties(getOrganization());
-
   return (
     <ErrorBoundary>
-      <div style={customProperties}>
-        <ConfigProvider theme={themeConfig}>
-          <AntApp>
-            <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-              <Layout className="full-height">
-                  <Content>
+      <ConfigProvider
+        theme={{
+          token: {
+            colorPrimary: '#1890ff',
+            borderRadius: 8,
+            wireframe: false,
+          },
+        }}
+      >
+        <AntApp>
+          <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Layout className="full-height">
+              <Content>
                 <Routes>
                   <Route
                     path="/login"
@@ -190,7 +252,7 @@ function App() {
                   <Route 
                     path="/" 
                     element={
-                      user ? getDashboardComponent() : <Navigate to="/login" replace />
+                      user ? <DashboardRouter user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />
                     } 
                   />
                   <Route 
@@ -198,12 +260,11 @@ function App() {
                     element={<Navigate to={user ? "/" : "/login"} replace />} 
                   />
                 </Routes>
-                </Content>
-              </Layout>
-            </Router>
-          </AntApp>
-        </ConfigProvider>
-      </div>
+              </Content>
+            </Layout>
+          </Router>
+        </AntApp>
+      </ConfigProvider>
     </ErrorBoundary>
   );
 }

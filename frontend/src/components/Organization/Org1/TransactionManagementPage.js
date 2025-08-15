@@ -8,47 +8,56 @@ import {
   Modal,
   Form,
   Input,
-  Select,
   message,
-  Descriptions,
   Typography,
   Row,
   Col,
   Statistic,
-  Progress
+  Descriptions,
+  Select,
+  DatePicker,
+  Tooltip,
+  Alert
 } from 'antd';
 import {
+  TransactionOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   EyeOutlined,
-  FileTextOutlined,
-  SwapOutlined,
-  SplitCellsOutlined,
-  MergeOutlined,
-  ClockCircleOutlined
+  SearchOutlined,
+  FilterOutlined,
+  ReloadOutlined,
+  ExclamationCircleOutlined,
+  ForwardOutlined
 } from '@ant-design/icons';
-import apiService from '../../../services/api';
+import transactionService from '../../../services/transactionService';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
+const { Option } = Select;
 
 /**
  * Transaction Management Page for Org1 (Land Registry Authority)
- * Handles approval/rejection of transfer, split, and merge requests
+ * Manages and approves all transactions in the system
  */
 const TransactionManagementPage = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [actionType, setActionType] = useState(''); // 'approve' or 'reject'
-  const [form] = Form.useForm();
+  const [approvalModalVisible, setApprovalModalVisible] = useState(false);
+  const [approvingTransaction, setApprovingTransaction] = useState(null);
+  const [searchForm] = Form.useForm();
+  const [approvalForm] = Form.useForm();
   const [stats, setStats] = useState({
+    total: 0,
     pending: 0,
     approved: 0,
     rejected: 0,
-    total: 0
+    forwarded: 0
   });
+  const [filters, setFilters] = useState({});
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   useEffect(() => {
     fetchTransactions();
@@ -58,11 +67,11 @@ const TransactionManagementPage = ({ user }) => {
   const fetchTransactions = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getAllTransactions();
-      setTransactions(response.transactions || []);
+      const response = await transactionService.getAllTransactions();
+      setTransactions(response.transactions || response || []);
     } catch (error) {
-      console.error('Error fetching transactions:', error);
-      message.error('Failed to fetch transactions');
+      console.error('Lỗi khi lấy danh sách giao dịch:', error);
+      message.error('Không thể lấy danh sách giao dịch');
     } finally {
       setLoading(false);
     }
@@ -70,371 +79,581 @@ const TransactionManagementPage = ({ user }) => {
 
   const fetchStats = async () => {
     try {
-      const response = await apiService.getTransactionStats();
-      setStats(response.stats || {
-        pending: 0,
-        approved: 0,
-        rejected: 0,
-        total: 0
+      const allTxs = await transactionService.getAllTransactions();
+      const txs = allTxs.transactions || allTxs || [];
+      
+      setStats({
+        total: txs.length,
+        pending: txs.filter(tx => tx.status === 'PENDING').length,
+        approved: txs.filter(tx => tx.status === 'APPROVED').length,
+        rejected: txs.filter(tx => tx.status === 'REJECTED').length,
+        forwarded: txs.filter(tx => tx.status === 'FORWARDED').length
       });
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error('Lỗi khi lấy thống kê:', error);
     }
   };
 
   const handleViewTransaction = (transaction) => {
     setSelectedTransaction(transaction);
     setModalVisible(true);
-    setActionType('view');
   };
 
-  const handleApproveTransaction = (transaction) => {
-    setSelectedTransaction(transaction);
-    setModalVisible(true);
-    setActionType('approve');
-    form.resetFields();
-  };
-
-  const handleRejectTransaction = (transaction) => {
-    setSelectedTransaction(transaction);
-    setModalVisible(true);
-    setActionType('reject');
-    form.resetFields();
-  };
-
-  const handleModalOk = async () => {
-    if (actionType === 'view') {
-      setModalVisible(false);
-      return;
-    }
-
+  const handleApproveTransaction = async (values) => {
     try {
-      const values = await form.validateFields();
       setLoading(true);
-
-      if (actionType === 'approve') {
-        await apiService.approveTransaction(selectedTransaction.txID, {
-          approverComments: values.comments || '',
-          approvedBy: user.cccd
-        });
-        message.success('Transaction approved successfully');
-      } else if (actionType === 'reject') {
-        await apiService.rejectTransaction(selectedTransaction.txID, {
-          rejectionReason: values.reason,
-          rejectionComments: values.comments || '',
-          rejectedBy: user.cccd
-        });
-        message.success('Transaction rejected successfully');
+      const { comments } = values;
+      const tx = approvingTransaction;
+      
+      switch (tx.type) {
+        case 'TRANSFER':
+          await transactionService.approveTransferTransaction(tx.txID, {
+            action: 'APPROVE',
+            comments,
+            approvedBy: user.cccd,
+            approvedAt: new Date().toISOString()
+          });
+          break;
+        case 'SPLIT':
+          await transactionService.approveSplitTransaction(tx.txID, {
+            action: 'APPROVE',
+            comments,
+            approvedBy: user.cccd,
+            approvedAt: new Date().toISOString()
+          });
+          break;
+        case 'MERGE':
+          await transactionService.approveMergeTransaction(tx.txID, {
+            action: 'APPROVE',
+            comments,
+            approvedBy: user.cccd,
+            approvedAt: new Date().toISOString()
+          });
+          break;
+        case 'CHANGE_PURPOSE':
+          await transactionService.approveChangePurposeTransaction(tx.txID, {
+            action: 'APPROVE',
+            comments,
+            approvedBy: user.cccd,
+            approvedAt: new Date().toISOString()
+          });
+          break;
+        case 'REISSUE':
+          await transactionService.approveReissueTransaction(tx.txID, {
+            action: 'APPROVE',
+            comments,
+            approvedBy: user.cccd,
+            approvedAt: new Date().toISOString()
+          });
+          break;
+        default:
+          throw new Error('Loại giao dịch không được hỗ trợ');
       }
-
-      setModalVisible(false);
+      
+      message.success('Giao dịch đã được phê duyệt thành công');
       fetchTransactions();
       fetchStats();
+      setApprovalModalVisible(false);
+      setApprovingTransaction(null);
+      approvalForm.resetFields();
     } catch (error) {
-      console.error('Transaction action error:', error);
-      message.error(error.message || `Failed to ${actionType} transaction`);
+      console.error('Lỗi khi phê duyệt giao dịch:', error);
+      message.error(error.message || 'Lỗi khi phê duyệt giao dịch');
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'pending': return 'orange';
-      case 'approved': return 'green';
-      case 'rejected': return 'red';
-      case 'completed': return 'blue';
-      default: return 'default';
+  const handleRejectTransaction = async (txID, rejectionData) => {
+    try {
+      setLoading(true);
+      await transactionService.rejectTransaction(txID, {
+        action: 'REJECT',
+        ...rejectionData,
+        rejectedBy: user.cccd,
+        rejectedAt: new Date().toISOString()
+      });
+      
+      message.success('Giao dịch đã bị từ chối');
+      fetchTransactions();
+      fetchStats();
+    } catch (error) {
+      console.error('Lỗi khi từ chối giao dịch:', error);
+      message.error(error.message || 'Lỗi khi từ chối giao dịch');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getTransactionTypeIcon = (type) => {
-    switch (type?.toLowerCase()) {
-      case 'transfer': return <SwapOutlined />;
-      case 'split': return <SplitCellsOutlined />;
-      case 'merge': return <MergeOutlined />;
-      default: return <FileTextOutlined />;
+  const openApprovalModal = (transaction) => {
+    setApprovingTransaction(transaction);
+    setApprovalModalVisible(true);
+  };
+
+  const handleSearch = async (values) => {
+    try {
+      setLoading(true);
+      if (values.keyword) {
+        const response = await transactionService.searchTransactions({
+          keyword: values.keyword,
+          filters: JSON.stringify(filters)
+        });
+        setTransactions(response.transactions || response || []);
+      } else {
+        fetchTransactions();
+      }
+    } catch (error) {
+      console.error('Lỗi khi tìm kiếm:', error);
+      message.error('Lỗi khi tìm kiếm giao dịch');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleAdvancedSearch = async (values) => {
+    try {
+      setLoading(true);
+      const response = await transactionService.advancedSearch(values);
+      setTransactions(response.transactions || response || []);
+    } catch (error) {
+      console.error('Lỗi khi tìm kiếm nâng cao:', error);
+      message.error('Lỗi khi tìm kiếm nâng cao');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetFilters = () => {
+    searchForm.resetFields();
+    setFilters({});
+    fetchTransactions();
+  };
+
+  const getStatusColor = (status) => {
+    const statusColors = {
+      'PENDING': 'orange',
+      'CONFIRMED': 'blue',
+      'FORWARDED': 'cyan',
+      'VERIFIED': 'purple',
+      'SUPPLEMENT_REQUESTED': 'gold',
+      'APPROVED': 'green',
+      'REJECTED': 'red'
+    };
+    return statusColors[status] || 'default';
+  };
+
+  const getStatusText = (status) => {
+    const statusTexts = {
+      'PENDING': 'Chờ xử lý',
+      'CONFIRMED': 'Đã xác nhận',
+      'FORWARDED': 'Đã chuyển tiếp',
+      'VERIFIED': 'Đã xác thực',
+      'SUPPLEMENT_REQUESTED': 'Yêu cầu bổ sung',
+      'APPROVED': 'Đã phê duyệt',
+      'REJECTED': 'Bị từ chối'
+    };
+    return statusTexts[status] || status;
+  };
+
+  const getTransactionTypeText = (type) => {
+    const typeTexts = {
+      'TRANSFER': 'Chuyển nhượng',
+      'SPLIT': 'Tách thửa',
+      'MERGE': 'Hợp thửa',
+      'CHANGE_PURPOSE': 'Thay đổi mục đích sử dụng',
+      'REISSUE': 'Cấp lại GCN'
+    };
+    return typeTexts[type] || type;
+  };
+
+  const getActionText = (action) => {
+    const actionTexts = {
+      'CREATE': 'Tạo mới',
+      'UPDATE': 'Cập nhật',
+      'QUERY': 'Truy vấn',
+      'APPROVE': 'Phê duyệt',
+      'REJECT': 'Từ chối'
+    };
+    return actionTexts[action] || action;
   };
 
   const columns = [
     {
-      title: 'Transaction ID',
+      title: 'Mã giao dịch',
       dataIndex: 'txID',
       key: 'txID',
-      width: 150,
+      width: 120,
       render: (text) => <Text code>{text}</Text>
     },
     {
-      title: 'Type',
+      title: 'Loại giao dịch',
       dataIndex: 'type',
       key: 'type',
-      width: 120,
-      render: (type) => (
-        <Space>
-          {getTransactionTypeIcon(type)}
-          <Text>{type}</Text>
-        </Space>
-      )
+      width: 150,
+      render: (type) => <Tag color="blue">{getTransactionTypeText(type)}</Tag>
     },
     {
-      title: 'Land Parcel ID',
+      title: 'Thửa đất',
       dataIndex: 'landParcelID',
       key: 'landParcelID',
-      width: 150,
+      width: 120,
       render: (text) => <Text code>{text}</Text>
     },
     {
-      title: 'From Owner',
-      dataIndex: 'fromOwnerID',
-      key: 'fromOwnerID',
-      width: 150,
-      render: (text) => <Text>{text}</Text>
+      title: 'Người thực hiện',
+      dataIndex: 'userID',
+      key: 'userID',
+      width: 120,
+      render: (text) => <Text code>{text}</Text>
     },
     {
-      title: 'To Owner',
-      dataIndex: 'toOwnerID',
-      key: 'toOwnerID',
-      width: 150,
-      render: (text) => <Text>{text || 'N/A'}</Text>
-    },
-    {
-      title: 'Status',
+      title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
       width: 120,
       render: (status) => (
-        <Tag color={getStatusColor(status)} icon={<ClockCircleOutlined />}>
-          {status}
+        <Tag color={getStatusColor(status)}>
+          {getStatusText(status)}
         </Tag>
       )
     },
     {
-      title: 'Created Date',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 150,
-      render: (date) => new Date(date).toLocaleDateString('vi-VN')
+      title: 'Hành động',
+      dataIndex: 'action',
+      key: 'action',
+      width: 100,
+      render: (action) => <Tag>{getActionText(action)}</Tag>
     },
     {
-      title: 'Actions',
+      title: 'Ngày tạo',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 120,
+      render: (date) => date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'
+    },
+    {
+      title: 'Thao tác',
       key: 'actions',
       width: 200,
       render: (_, record) => (
         <Space>
-          <Button
-            type="link"
-            icon={<EyeOutlined />}
-            onClick={() => handleViewTransaction(record)}
-          >
-            View
-          </Button>
-          {record.status === 'Pending' && (
-            <>
-              <Button
-                type="link"
-                icon={<CheckCircleOutlined />}
-                onClick={() => handleApproveTransaction(record)}
-                style={{ color: '#52c41a' }}
+          <Tooltip title="Xem chi tiết">
+            <Button 
+              icon={<EyeOutlined />} 
+              size="small"
+              onClick={() => handleViewTransaction(record)}
+            />
+          </Tooltip>
+          {record.status === 'VERIFIED' && (
+            <Tooltip title="Phê duyệt">
+              <Button 
+                icon={<CheckCircleOutlined />} 
+                size="small"
+                type="primary"
+                onClick={() => openApprovalModal(record)}
               >
-                Approve
+                Phê duyệt
               </Button>
-              <Button
-                type="link"
-                icon={<CloseCircleOutlined />}
-                onClick={() => handleRejectTransaction(record)}
+            </Tooltip>
+          )}
+          {record.status === 'VERIFIED' && (
+            <Tooltip title="Từ chối">
+              <Button 
+                icon={<CloseCircleOutlined />} 
+                size="small"
                 danger
+                onClick={() => handleRejectTransaction(record.txID, {
+                  rejectionComments: 'Giao dịch không đáp ứng yêu cầu'
+                })}
               >
-                Reject
+                Từ chối
               </Button>
-            </>
+            </Tooltip>
           )}
         </Space>
-      )
-    }
+      ),
+    },
   ];
 
-  const renderTransactionDetails = () => {
-    if (!selectedTransaction) return null;
-
-    return (
-      <Descriptions bordered column={2} size="small">
-        <Descriptions.Item label="Transaction ID" span={2}>
-          <Text code>{selectedTransaction.txID}</Text>
-        </Descriptions.Item>
-        <Descriptions.Item label="Type">
-          <Space>
-            {getTransactionTypeIcon(selectedTransaction.type)}
-            {selectedTransaction.type}
-          </Space>
-        </Descriptions.Item>
-        <Descriptions.Item label="Status">
-          <Tag color={getStatusColor(selectedTransaction.status)}>
-            {selectedTransaction.status}
-          </Tag>
-        </Descriptions.Item>
-        <Descriptions.Item label="Land Parcel ID">
-          <Text code>{selectedTransaction.landParcelID}</Text>
-        </Descriptions.Item>
-        <Descriptions.Item label="From Owner">
-          {selectedTransaction.fromOwnerID}
-        </Descriptions.Item>
-        <Descriptions.Item label="To Owner">
-          {selectedTransaction.toOwnerID || 'N/A'}
-        </Descriptions.Item>
-        <Descriptions.Item label="Created Date">
-          {new Date(selectedTransaction.createdAt).toLocaleString('vi-VN')}
-        </Descriptions.Item>
-        <Descriptions.Item label="Details" span={2}>
-          {selectedTransaction.details || 'No additional details'}
-        </Descriptions.Item>
-        {selectedTransaction.approverComments && (
-          <Descriptions.Item label="Approver Comments" span={2}>
-            {selectedTransaction.approverComments}
-          </Descriptions.Item>
-        )}
-        {selectedTransaction.rejectionReason && (
-          <Descriptions.Item label="Rejection Reason" span={2}>
-            {selectedTransaction.rejectionReason}
-          </Descriptions.Item>
-        )}
-      </Descriptions>
-    );
-  };
-
   return (
-    <div style={{ padding: '24px' }}>
-      <Title level={2}>Transaction Management</Title>
-      <Text type="secondary">
-        Manage and process land transaction requests from citizens
-      </Text>
+    <div>
+      <Title level={2}>
+        <TransactionOutlined /> Quản lý Giao dịch
+      </Title>
+      
+      <Alert
+        message="Tổ chức: Org1 (Cơ quan quản lý đất đai)"
+        description="Bạn có quyền phê duyệt hoặc từ chối các giao dịch đã được xác thực. Hãy xem xét cẩn thận trước khi đưa ra quyết định."
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+      />
 
-      {/* Statistics Cards */}
-      <Row gutter={16} style={{ marginTop: '24px', marginBottom: '24px' }}>
-        <Col span={6}>
+      {/* Thống kê */}
+      <Row gutter={16} style={{ marginBottom: '24px' }}>
+        <Col span={4}>
           <Card>
             <Statistic
-              title="Pending Transactions"
-              value={stats.pending}
-              valueStyle={{ color: '#faad14' }}
-              prefix={<ClockCircleOutlined />}
+              title="Tổng số giao dịch"
+              value={stats.total}
+              prefix={<TransactionOutlined />}
             />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={4}>
           <Card>
             <Statistic
-              title="Approved"
+              title="Chờ xử lý"
+              value={stats.pending}
+              valueStyle={{ color: '#faad14' }}
+              prefix={<ExclamationCircleOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col span={4}>
+          <Card>
+            <Statistic
+              title="Đã phê duyệt"
               value={stats.approved}
               valueStyle={{ color: '#52c41a' }}
               prefix={<CheckCircleOutlined />}
             />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={4}>
           <Card>
             <Statistic
-              title="Rejected"
+              title="Bị từ chối"
               value={stats.rejected}
               valueStyle={{ color: '#ff4d4f' }}
               prefix={<CloseCircleOutlined />}
             />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={4}>
           <Card>
             <Statistic
-              title="Total Transactions"
-              value={stats.total}
-              prefix={<FileTextOutlined />}
-            />
-            <Progress
-              percent={stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0}
-              size="small"
-              status="active"
-              style={{ marginTop: '8px' }}
+              title="Đã chuyển tiếp"
+              value={stats.forwarded}
+              valueStyle={{ color: '#1890ff' }}
+              prefix={<ForwardOutlined />}
             />
           </Card>
         </Col>
       </Row>
 
-      {/* Transactions Table */}
+      {/* Bộ lọc tìm kiếm */}
+      <Form form={searchForm} layout="inline" style={{ marginBottom: '24px' }}>
+        <Form.Item name="keyword" label="Từ khóa">
+          <Input placeholder="Nhập từ khóa tìm kiếm" />
+        </Form.Item>
+        <Form.Item>
+          <Button type="primary" icon={<SearchOutlined />} onClick={() => handleSearch({ keyword: searchForm.getFieldValue('keyword') })}>
+            Tìm kiếm
+          </Button>
+          <Button icon={<FilterOutlined />} onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}>
+            {showAdvancedFilters ? 'Ẩn' : 'Hiện'} Bộ lọc nâng cao
+          </Button>
+          <Button icon={<ReloadOutlined />} onClick={handleResetFilters}>
+            Đặt lại
+          </Button>
+        </Form.Item>
+      </Form>
+
+      {/* Bộ lọc nâng cao */}
+      {showAdvancedFilters && (
+        <Form form={searchForm} layout="inline" style={{ marginBottom: '24px' }}>
+          <Form.Item name="type" label="Loại giao dịch">
+            <Select placeholder="Chọn loại giao dịch">
+              <Option value="">Tất cả</Option>
+              <Option value="TRANSFER">Chuyển nhượng</Option>
+              <Option value="SPLIT">Tách thửa</Option>
+              <Option value="MERGE">Hợp thửa</Option>
+              <Option value="CHANGE_PURPOSE">Thay đổi mục đích sử dụng</Option>
+              <Option value="REISSUE">Cấp lại GCN</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="status" label="Trạng thái">
+            <Select placeholder="Chọn trạng thái">
+              <Option value="">Tất cả</Option>
+              <Option value="PENDING">Chờ xử lý</Option>
+              <Option value="VERIFIED">Đã xác thực</Option>
+              <Option value="APPROVED">Đã phê duyệt</Option>
+              <Option value="REJECTED">Bị từ chối</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="startDate" label="Từ ngày">
+            <DatePicker />
+          </Form.Item>
+          <Form.Item name="endDate" label="Đến ngày">
+            <DatePicker />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" icon={<FilterOutlined />} onClick={() => handleAdvancedSearch(searchForm.getFieldsValue())}>
+              Áp dụng bộ lọc
+            </Button>
+            <Button onClick={handleResetFilters}>Đặt lại</Button>
+          </Form.Item>
+        </Form>
+      )}
+
+      {/* Bảng danh sách giao dịch */}
       <Card>
         <Table
           columns={columns}
           dataSource={transactions}
-          rowKey="txID"
           loading={loading}
+          rowKey="txID"
           pagination={{
             pageSize: 10,
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} transactions`
+              `${range[0]}-${range[1]} trong ${total} giao dịch`
           }}
           scroll={{ x: 1200 }}
         />
       </Card>
 
-      {/* Transaction Details/Action Modal */}
+      {/* Chi tiết giao dịch Modal */}
       <Modal
-        title={
-          actionType === 'view' ? 'Transaction Details' :
-          actionType === 'approve' ? 'Approve Transaction' :
-          'Reject Transaction'
-        }
+        title="Chi tiết Giao dịch"
         open={modalVisible}
-        onOk={handleModalOk}
         onCancel={() => setModalVisible(false)}
         width={800}
-        okText={
-          actionType === 'view' ? 'Close' :
-          actionType === 'approve' ? 'Approve' :
-          'Reject'
-        }
-        okButtonProps={{
-          danger: actionType === 'reject',
-          type: actionType === 'approve' ? 'primary' : 'default'
-        }}
-        confirmLoading={loading}
+        footer={[
+          <Button key="close" onClick={() => setModalVisible(false)}>
+            Đóng
+          </Button>
+        ]}
       >
-        {renderTransactionDetails()}
-        
-        {actionType !== 'view' && (
-          <Form form={form} layout="vertical" style={{ marginTop: '24px' }}>
-            {actionType === 'reject' && (
+        {selectedTransaction && (
+          <Descriptions bordered column={2} size="small">
+            <Descriptions.Item label="Mã giao dịch" span={2}>
+              <Text code>{selectedTransaction.txID}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Loại giao dịch">
+              <Tag color="blue">{getTransactionTypeText(selectedTransaction.type)}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Trạng thái">
+              <Tag color={getStatusColor(selectedTransaction.status)}>
+                {getStatusText(selectedTransaction.status)}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Thửa đất">
+              <Text code>{selectedTransaction.landParcelID}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Người thực hiện">
+              <Text code>{selectedTransaction.userID}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Hành động">
+              <Tag>{getActionText(selectedTransaction.action)}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Ngày tạo">
+              {selectedTransaction.createdAt ? new Date(selectedTransaction.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Chi tiết" span={2}>
+              {selectedTransaction.details || 'Không có chi tiết'}
+            </Descriptions.Item>
+            {selectedTransaction.fromOwnerID && (
+              <Descriptions.Item label="Người chuyển nhượng">
+                <Text code>{selectedTransaction.fromOwnerID}</Text>
+              </Descriptions.Item>
+            )}
+            {selectedTransaction.toOwnerID && (
+              <Descriptions.Item label="Người nhận chuyển nhượng">
+                <Text code>{selectedTransaction.toOwnerID}</Text>
+              </Descriptions.Item>
+            )}
+            {selectedTransaction.parcelIDs && selectedTransaction.parcelIDs.length > 0 && (
+              <Descriptions.Item label="Danh sách thửa đất" span={2}>
+                {selectedTransaction.parcelIDs.map((id, index) => (
+                  <Tag key={index} color="blue" style={{ marginBottom: 4 }}>
+                    {id}
+                  </Tag>
+                ))}
+              </Descriptions.Item>
+            )}
+          </Descriptions>
+        )}
+      </Modal>
+
+      {/* Phê duyệt giao dịch Modal */}
+      <Modal
+        title="Phê duyệt Giao dịch"
+        open={approvalModalVisible}
+        onCancel={() => {
+          setApprovalModalVisible(false);
+          setApprovingTransaction(null);
+          approvalForm.resetFields();
+        }}
+        footer={null}
+        width={600}
+      >
+        {approvingTransaction && (
+          <div>
+            <Alert
+              message="Thông tin giao dịch cần phê duyệt"
+              description={
+                <div>
+                  <p><strong>Mã giao dịch:</strong> {approvingTransaction.txID}</p>
+                  <p><strong>Loại:</strong> {getTransactionTypeText(approvingTransaction.type)}</p>
+                  <p><strong>Thửa đất:</strong> {approvingTransaction.landParcelID}</p>
+                  <p><strong>Người thực hiện:</strong> {approvingTransaction.userID}</p>
+                </div>
+              }
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+
+            <Form
+              form={approvalForm}
+              layout="vertical"
+              onFinish={handleApproveTransaction}
+            >
               <Form.Item
-                name="reason"
-                label="Rejection Reason"
-                rules={[{ required: true, message: 'Please provide a rejection reason' }]}
+                name="action"
+                label="Hành động"
+                rules={[{ required: true, message: 'Vui lòng chọn hành động!' }]}
               >
-                <Select placeholder="Select rejection reason">
-                  <Select.Option value="Insufficient Documentation">
-                    Insufficient Documentation
-                  </Select.Option>
-                  <Select.Option value="Invalid Land Parcel">
-                    Invalid Land Parcel
-                  </Select.Option>
-                  <Select.Option value="Ownership Dispute">
-                    Ownership Dispute
-                  </Select.Option>
-                  <Select.Option value="Legal Issues">
-                    Legal Issues
-                  </Select.Option>
-                  <Select.Option value="Other">Other</Select.Option>
+                <Select placeholder="Chọn hành động">
+                  <Option value="APPROVE">
+                    <Space>
+                      <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                      Phê duyệt
+                    </Space>
+                  </Option>
                 </Select>
               </Form.Item>
-            )}
-            <Form.Item
-              name="comments"
-              label={actionType === 'approve' ? 'Approval Comments' : 'Additional Comments'}
-            >
-              <TextArea
-                rows={4}
-                placeholder={`Enter ${actionType === 'approve' ? 'approval' : 'rejection'} comments...`}
-              />
-            </Form.Item>
-          </Form>
+
+              <Form.Item
+                name="comments"
+                label="Bình luận phê duyệt"
+                rules={[{ required: true, message: 'Vui lòng nhập bình luận!' }]}
+              >
+                <TextArea 
+                  rows={4} 
+                  placeholder="Nhập bình luận về việc phê duyệt giao dịch"
+                />
+              </Form.Item>
+
+              <Form.Item>
+                <Space>
+                  <Button type="primary" htmlType="submit" loading={loading}>
+                    Xác nhận phê duyệt
+                  </Button>
+                  <Button onClick={() => {
+                    setApprovalModalVisible(false);
+                    setApprovingTransaction(null);
+                    approvalForm.resetFields();
+                  }}>
+                    Hủy
+                  </Button>
+                </Space>
+              </Form.Item>
+            </Form>
+          </div>
         )}
       </Modal>
     </div>

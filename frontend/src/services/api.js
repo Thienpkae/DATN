@@ -1,595 +1,340 @@
-/**
- * API Service Layer
- * Handles all communication with the backend server
- * Updated to match actual backend endpoints
- */
+import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+// API Configuration
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+const API_TIMEOUT = 30000; // 30 seconds
 
-class ApiError extends Error {
-  constructor(message, status, data) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-    this.data = data;
-  }
-}
+// API Endpoints Structure - Updated to match backend exactly
+export const API_ENDPOINTS = {
+  AUTH: {
+    REGISTER: '/auth/register',
+    LOGIN: '/auth/login',
+    LOGOUT: '/auth/logout',
+    VERIFY_OTP: '/auth/verify-otp',
+    RESEND_OTP: '/auth/resend-otp',
+    FORGOT_PASSWORD: '/auth/forgot-password',
+    RESET_PASSWORD: '/auth/reset-password',
+    CHANGE_PASSWORD: '/auth/change-password',
+    LOCK_UNLOCK: '/auth/lock-unlock',
+    DELETE_ACCOUNT: '/auth/delete',
+  },
+  USER: {
+    PROFILE: '/users/profile',
+    UPDATE_PROFILE: '/users/profile',
+    LIST_ALL: '/users',
+    GET_BY_CCCD: '/users/:cccd',
+    UPDATE_BY_CCCD: '/users/:cccd',
+  },
+  LAND: {
+    CREATE: '/land-parcels',
+    UPDATE: '/land-parcels/:id',
+    GET_BY_ID: '/land-parcels/:id',
+    GET_ALL: '/land-parcels',
+    SEARCH: '/land-parcels/search',
+    GET_BY_OWNER: '/land-parcels/owner/:ownerID',
+    GET_HISTORY: '/land-parcels/:id/history',
+    ISSUE_CERTIFICATE: '/land-parcels/issue-certificate',
+  },
+  DOCUMENT: {
+    CREATE: '/documents',
+    UPDATE: '/documents/:docID',
+    DELETE: '/documents/:docID',
+    GET_BY_ID: '/documents/:docID',
+    GET_ALL: '/documents',
+    SEARCH: '/documents/search',
+    GET_BY_STATUS: '/documents/status/:status',
+    GET_BY_TYPE: '/documents/type/:docType',
+    GET_BY_LAND: '/documents/land-parcel/:landParcelID',
+    GET_BY_TRANSACTION: '/documents/transaction/:txID',
+    GET_BY_UPLOADER: '/documents/uploader/:uploaderID',
+    GET_HISTORY: '/documents/history/:ipfsHash',
+    VERIFY: '/documents/:docID/verify',
+    REJECT: '/documents/:docID/reject',
+    ANALYZE: '/documents/:docID/analyze',
+    LINK_TO_LAND: '/documents/land',
+    LINK_TO_TRANSACTION: '/documents/transaction',
+  },
+  TRANSACTION: {
+    PROCESS: '/transactions/:txID/process',
+    TRANSFER: '/transactions/transfer',
+    CONFIRM: '/transactions/confirm',
+    SPLIT: '/transactions/split',
+    MERGE: '/transactions/merge',
+    CHANGE_PURPOSE: '/transactions/change-purpose',
+    REISSUE: '/transactions/reissue',
+    FORWARD: '/transactions/:txID/forward',
+    APPROVE_TRANSFER: '/transactions/:txID/approve/transfer',
+    APPROVE_SPLIT: '/transactions/:txID/approve/split',
+    APPROVE_MERGE: '/transactions/:txID/approve/merge',
+    APPROVE_CHANGE_PURPOSE: '/transactions/:txID/approve/change-purpose',
+    APPROVE_REISSUE: '/transactions/:txID/approve/reissue',
+    REJECT: '/transactions/:txID/reject',
+    SEARCH: '/transactions/search',
+    GET_BY_STATUS: '/transactions/status/:status',
+    GET_BY_LAND: '/transactions/land-parcel/:landParcelID',
+    GET_BY_OWNER: '/transactions/owner/:ownerID',
+    GET_HISTORY: '/transactions/:txID/history',
+    GET_ALL: '/transactions',
+    GET_BY_ID: '/transactions/:txID',
+  },
+  DASHBOARD: {
+    MAIN: '/dashboard',
+    STATS: '/dashboard',
+  },
+  REPORTS: {
+    SYSTEM: '/reports/system',
+    ANALYTICS: '/reports/analytics',
+    EXPORT: '/reports/export/:dataType',
+  },
+  SYSTEM: {
+    CONFIGS: '/system/configs',
+    CONFIG_CATEGORIES: '/system/configs/categories',
+    GET_CONFIG: '/system/configs/:key',
+    UPDATE_CONFIG: '/system/configs/:key',
+    DELETE_CONFIG: '/system/configs/:key',
+    RESET_CONFIG: '/system/configs/:key/reset',
+    INITIALIZE_CONFIG: '/system/configs/initialize',
+  },
+  NOTIFICATIONS: {
+    LIST: '/notifications',
+    UNREAD_COUNT: '/notifications/unread-count',
+    MARK_READ: '/notifications/mark-read',
+    MARK_ALL_READ: '/notifications/mark-all-read',
+    PREFERENCES: '/notifications/preferences',
+    SEND: '/notifications/send',
+  },
+  IPFS: {
+    UPLOAD: '/ipfs/upload',
+    GET: '/ipfs/:hash',
+    DELETE: '/ipfs/:hash',
+    PIN: '/ipfs/pin',
+    UNPIN: '/ipfs/unpin',
+  },
+  LOGS: {
+    SEARCH: '/logs/:txID',
+  },
+};
 
-class ApiService {
-  constructor() {
-    this.baseURL = API_BASE_URL;
-    this.token = localStorage.getItem('authToken');
-  }
+// Create axios instance
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: API_TIMEOUT,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
-  // Set authentication token
-  setToken(token) {
-    this.token = token;
+// Request interceptor - Add JWT token
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('jwt_token');
     if (token) {
-      localStorage.setItem('authToken', token);
-    } else {
-      localStorage.removeItem('authToken');
+      config.headers.Authorization = `Bearer ${token}`;
     }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
+);
 
-  // Get authentication token
-  getToken() {
-    return this.token || localStorage.getItem('authToken');
-  }
+// Response interceptor - Handle token refresh and errors
+apiClient.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  async (error) => {
+    const originalRequest = error.config;
 
-  // Clear authentication
-  clearAuth() {
-    this.token = null;
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-  }
+    // Handle 401 Unauthorized - Try to refresh token
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
 
-  // Make HTTP request
-  async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    const token = this.getToken();
+      try {
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (refreshToken) {
+          const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+            refreshToken,
+          });
 
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-      ...options,
-    };
+          const { token } = response.data;
+          localStorage.setItem('jwt_token', token);
 
-    if (config.body && typeof config.body === 'object') {
-      config.body = JSON.stringify(config.body);
-    }
-
-    try {
-      const response = await fetch(url, config);
-      
-      // Handle 401 unauthorized
-      if (response.status === 401) {
-        this.clearAuth();
+          // Retry original request with new token
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return apiClient(originalRequest);
+        }
+      } catch (refreshError) {
+        // Refresh failed - redirect to login
+        localStorage.removeItem('jwt_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
         window.location.href = '/login';
-        return;
+        return Promise.reject(refreshError);
       }
+    }
 
-      const data = await response.json();
+    return Promise.reject(error);
+  }
+);
 
-      if (!response.ok) {
-        throw new ApiError(
-          data.error || `HTTP error! status: ${response.status}`,
-          response.status,
-          data
-        );
+// Request/Response Transformers
+export const transformRequest = (data) => {
+  // Transform frontend data format to backend format
+  if (data && typeof data === 'object') {
+    // Handle date formatting
+    if (data.createdAt && data.createdAt instanceof Date) {
+      data.createdAt = data.createdAt.toISOString();
+    }
+    if (data.updatedAt && data.updatedAt instanceof Date) {
+      data.updatedAt = data.updatedAt.toISOString();
+    }
+    
+    // Handle file uploads
+    if (data.file && data.file instanceof File) {
+      const formData = new FormData();
+      formData.append('file', data.file);
+      // Add other fields
+      Object.keys(data).forEach(key => {
+        if (key !== 'file') {
+          formData.append(key, data[key]);
+        }
+      });
+      return formData;
+    }
+  }
+  return data;
+};
+
+export const transformResponse = (data) => {
+  // Transform backend data format to frontend format
+  if (data && typeof data === 'object') {
+    // Handle date parsing
+    if (data.createdAt && typeof data.createdAt === 'string') {
+      data.createdAt = new Date(data.createdAt);
+    }
+    if (data.updatedAt && typeof data.updatedAt === 'string') {
+      data.updatedAt = new Date(data.updatedAt);
+    }
+    
+    // Handle nested objects
+    if (data.landParcel && typeof data.landParcel === 'string') {
+      try {
+        data.landParcel = JSON.parse(data.landParcel);
+      } catch (e) {
+        // Keep as string if parsing fails
       }
+    }
+  }
+  return data;
+};
 
-      return data;
+// Error Handling Middleware
+export const handleApiError = (error) => {
+  let message = 'Đã xảy ra lỗi không xác định';
+  let type = 'error';
+
+  if (error.response) {
+    // Server responded with error status
+    const { status, data } = error.response;
+    
+    switch (status) {
+      case 400:
+        message = data.message || 'Dữ liệu không hợp lệ';
+        type = 'warning';
+        break;
+      case 401:
+        message = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+        type = 'error';
+        // Redirect to login
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+        break;
+      case 403:
+        message = 'Bạn không có quyền thực hiện hành động này';
+        type = 'error';
+        break;
+      case 404:
+        message = 'Không tìm thấy dữ liệu yêu cầu';
+        type = 'warning';
+        break;
+      case 409:
+        message = data.message || 'Dữ liệu đã tồn tại';
+        type = 'warning';
+        break;
+      case 422:
+        message = data.message || 'Dữ liệu không hợp lệ';
+        type = 'warning';
+        break;
+      case 500:
+        message = 'Lỗi server. Vui lòng thử lại sau.';
+        type = 'error';
+        break;
+      default:
+        message = data.message || `Lỗi ${status}: ${data.error || 'Unknown error'}`;
+        type = 'error';
+    }
+  } else if (error.request) {
+    // Request was made but no response received
+    message = 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.';
+    type = 'error';
+  } else {
+    // Something else happened
+    message = error.message || 'Đã xảy ra lỗi không xác định';
+    type = 'error';
+  }
+
+  return { message, type, originalError: error };
+};
+
+// Retry Logic for Failed Requests
+export const retryRequest = async (requestFn, maxRetries = 3, delay = 1000) => {
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await requestFn();
     } catch (error) {
-      if (error instanceof ApiError) {
+      lastError = error;
+      
+      // Don't retry on client errors (4xx)
+      if (error.response && error.response.status >= 400 && error.response.status < 500) {
         throw error;
       }
-      throw new ApiError(`Network error: ${error.message}`, 0, null);
+      
+      // Don't retry on last attempt
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Wait before retrying with exponential backoff
+      const waitTime = delay * Math.pow(2, attempt - 1);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     }
   }
-
-  // HTTP methods
-  async get(endpoint, params = {}) {
-    const queryString = new URLSearchParams(params).toString();
-    const url = queryString ? `${endpoint}?${queryString}` : endpoint;
-    return this.request(url, { method: 'GET' });
-  }
-
-  async post(endpoint, data = {}) {
-    return this.request(endpoint, {
-      method: 'POST',
-      body: data,
-    });
-  }
-
-  async put(endpoint, data = {}) {
-    return this.request(endpoint, {
-      method: 'PUT',
-      body: data,
-    });
-  }
-
-  async delete(endpoint, data = {}) {
-    return this.request(endpoint, {
-      method: 'DELETE',
-      body: data,
-    });
-  }
-
-  // Authentication APIs
-  async login(credentials) {
-    const response = await this.post('/login', credentials);
-    if (response.token) {
-      this.setToken(response.token);
-    }
-    return response;
-  }
-
-  async logout() {
-    try {
-      await this.post('/logout');
-    } finally {
-      this.clearAuth();
-    }
-  }
-
-  async register(userData) {
-    return this.post('/register', userData);
-  }
-
-  // verifyOTP method moved to avoid duplicates
-
-  async resendOTP(cccd) {
-    return this.post('/resend-otp', { cccd });
-  }
-
-  // changePassword method moved to avoid duplicates
-
-  async forgotPassword(data) {
-    return this.post('/forgot-password', data);
-  }
-
-  async resetPassword(data) {
-    return this.post('/reset-password', data);
-  }
-
-  // User Management APIs
-  async lockUnlockAccount(targetCccd, lock) {
-    return this.post('/account/lock-unlock', { targetCccd, lock });
-  }
-
-  async deleteAccount(targetCccd) {
-    return this.delete('/account/delete', { targetCccd });
-  }
-
-  // Land Parcel APIs
-  async createLandParcel(landParcelData) {
-    return this.post('/land-parcels', landParcelData);
-  }
-
-  async updateLandParcel(landParcelID, updateData) {
-    // Updated to match chaincode parameters: area, location, landUsePurpose, legalStatus
-    return this.put(`/land-parcels/${landParcelID}`, updateData);
-  }
-
-  async getLandParcel(id) {
-    return this.get(`/land-parcels/${id}`);
-  }
-
-  async getLandParcelsByOwner(ownerID) {
-    return this.get(`/land-parcels/owner/${ownerID}`);
-  }
-
-  async searchLandParcels(keyword) {
-    return this.get('/land-parcels/search', { keyword });
-  }
-
-  // Certificate APIs
-  async issueCertificate(certificateData) {
-    return this.post('/certificates', certificateData);
-  }
-
-  async getCertificate(certificateID) {
-    return this.get(`/certificates/${certificateID}`);
-  }
-
-  async getCertificatesByOwner(ownerID) {
-    return this.get(`/certificates/owner/${ownerID}`);
-  }
-
-  async getCertificatesByLandParcel(landParcelID) {
-    return this.get(`/certificates/land-parcel/${landParcelID}`);
-  }
-
-  async searchCertificates(params) {
-    return this.get('/certificates/search', params);
-  }
-
-  // Transaction APIs
-  async createTransferRequest(transferData) {
-    return this.post('/transfer-requests', transferData);
-  }
-
-  async confirmTransfer(txID, confirmData) {
-    return this.post(`/transfer-requests/${txID}/confirm`, confirmData);
-  }
-
-  async createSplitRequest(splitData) {
-    return this.post('/split-requests', splitData);
-  }
-
-  async createMergeRequest(mergeData) {
-    return this.post('/merge-requests', mergeData);
-  }
-
-  async createChangePurposeRequest(changePurposeData) {
-    return this.post('/change-purpose-requests', changePurposeData);
-  }
-
-  async createReissueRequest(reissueData) {
-    return this.post('/reissue-requests', reissueData);
-  }
-
-  // processTransaction and forwardTransaction methods moved to avoid duplicates
-
-  async approveTransaction(txID, approveDetails) {
-    return this.post(`/transactions/${txID}/approve`, { approveDetails });
-  }
-
-  async rejectTransaction(txID, rejectDetails) {
-    return this.post(`/transactions/${txID}/reject`, { rejectDetails });
-  }
-
-  async getTransaction(txID) {
-    return this.get(`/transactions/${txID}`);
-  }
-
-  async searchTransactions(params) {
-    return this.get('/transactions/search', params);
-  }
-
-  async getTransactionsByLandParcel(landParcelID) {
-    return this.get(`/transactions/land-parcel/${landParcelID}`);
-  }
-
-  async getTransactionsByOwner(ownerID) {
-    return this.get(`/transactions/owner/${ownerID}`);
-  }
-
-  // Document APIs
-  async uploadDocument(documentData) {
-    return this.post('/documents', documentData);
-  }
-
-  async updateDocument(documentID, updateData) {
-    // Updated to match chaincode parameters: ipfsHash, description (not metadata)
-    return this.put(`/documents/${documentID}`, updateData);
-  }
-
-  async verifyDocument(docID, verificationData = {}) {
-    return this.post(`/documents/${docID}/verify`, { verificationData });
-  }
-
-  async analyzeDocument(ipfsHash, expectedCCCD = null, expectedLandParcelID = null) {
-    const params = {};
-    if (expectedCCCD) params.expectedCCCD = expectedCCCD;
-    if (expectedLandParcelID) params.expectedLandParcelID = expectedLandParcelID;
-    
-    return this.get(`/documents/analyze/${ipfsHash}`, params);
-  }
-
-  async getDocument(docID) {
-    return this.get(`/documents/${docID}`);
-  }
-
-  async searchDocuments(id, keyword) {
-    return this.get(`/documents/search/${id}`, { keyword });
-  }
-
-  async getDocumentsByTransaction(txID) {
-    return this.get(`/documents/transaction/${txID}`);
-  }
-
-  async getDocumentsByIPFS(keyword) {
-    return this.get(`/documents/ipfs/${keyword}`);
-  }
-
-  // Logs APIs
-  async searchLogs(txID, keyword) {
-    return this.get(`/logs/search/${txID}`, { keyword });
-  }
-
-  // Transaction Management APIs
-  async getAllTransactions() {
-    return this.get('/transactions');
-  }
-
-  async getTransactionStats() {
-    return this.get('/transactions/stats');
-  }
-
-  async getTransactionStatsByOwner(ownerID) {
-    return this.get(`/transactions/stats/owner/${ownerID}`);
-  }
-
-  // Document Management APIs
-  async getAllDocuments() {
-    return this.get('/documents');
-  }
-
-  async getDocumentStats() {
-    return this.get('/documents/stats');
-  }
-
-  // Certificate Verification APIs
-  async getAllCertificates() {
-    return this.get('/certificates');
-  }
-
-  async verifyCertificate(certificateID, verificationData) {
-    return this.post(`/certificates/${certificateID}/verify`, verificationData);
-  }
-
-  async getCertificateStats() {
-    return this.get('/certificates/stats');
-  }
-
-  async getCertificateStatsByOwner(ownerID) {
-    return this.get(`/certificates/stats/owner/${ownerID}`);
-  }
-
-  async searchCertificatesByOwner(ownerID, keyword) {
-    return this.get(`/certificates/search/owner/${ownerID}`, { keyword });
-  }
-
-  async downloadCertificate(certificateID) {
-    return this.get(`/certificates/${certificateID}/download`, {}, {
-      responseType: 'blob'
-    });
-  }
-
-  // Additional Transaction Request APIs are already defined above
-
-  // System APIs
-  async getSystemHealth() {
-    return this.get('/system/health');
-  }
-
-  async getSystemStats() {
-    return this.get('/system/stats');
-  }
-
-  // Reports APIs
-  async getReports(params) {
-    return this.get('/reports', params);
-  }
-
-  async exportReport(params) {
-    return this.get('/reports/export', params, { responseType: 'blob' });
-  }
-
-  // User Management APIs
-  async getUsers() {
-    return this.get('/users');
-  }
-
-  async getUserStats() {
-    return this.get('/users/stats');
-  }
-
-  async createUser(userData) {
-    return this.post('/users', userData);
-  }
-
-  async updateUser(userId, userData) {
-    return this.put(`/users/${userId}`, userData);
-  }
-
-  async deleteUser(userId) {
-    return this.delete(`/users/${userId}`);
-  }
-
-  async updateUserStatus(userId, active) {
-    return this.put(`/users/${userId}/status`, { active });
-  }
-
-  // System Settings APIs
-  async getSystemSettings() {
-    return this.get('/system/settings');
-  }
-
-  async updateSystemSettings(settings) {
-    return this.put('/system/settings', settings);
-  }
-
-  async testSystemConnection() {
-    return this.get('/system/test-connection');
-  }
-
-  // Land Parcel History APIs
-  async getLandParcelHistory(landParcelId, params = {}) {
-    return this.get(`/land-parcels/${landParcelId}/history`, params);
-  }
-
-  // Bulk Operations APIs
-  async uploadBulkFile(formData) {
-    return this.post('/land-parcels/bulk/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-  }
-
-  // Bulk Operations API - DISABLED: Function not implemented in chaincode
-  // async performBulkOperation(operationData) {
-  //   return this.post('/land-parcels/bulk', operationData);
-  // }
-
-  async exportData(params) {
-    return this.get('/export/land-parcels', params, { responseType: 'blob' });
-  }
-
-  // Global Search APIs
-  async globalSearch(params) {
-    return this.get('/search/global', params);
-  }
-
-  // Transaction Processing APIs (Org2)
-  async processTransaction(txID, processData) {
-    return this.post(`/transactions/${txID}/process`, processData);
-  }
-
-  async forwardTransaction(txID, forwardData) {
-    return this.post(`/transactions/${txID}/forward`, forwardData);
-  }
-
-  async getTransactionProcessingStats() {
-    return this.get('/transactions/processing/stats');
-  }
-
-  // Profile Management APIs (Org3)
-  async getProfile() {
-    return this.get('/profile');
-  }
-
-  async updateProfile(profileData) {
-    return this.put('/profile', profileData);
-  }
-
-  async changePassword(passwordData) {
-    return this.post('/change-password', passwordData);
-  }
-
-  async requestOTP(otpData) {
-    return this.post('/request-otp', otpData);
-  }
-
-  async verifyOTP(otpData) {
-    return this.post('/verify-otp', otpData);
-  }
-
-  async uploadAvatar(formData) {
-    return this.post('/profile/avatar', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-  }
-
-  // Certificate Revocation API (Org1) - DISABLED: Function not implemented in chaincode
-  // async revokeCertificate(certificateID, revocationData) {
-  //   return this.post(`/certificates/${certificateID}/revoke`, revocationData);
-  // }
-
-  // Document Rejection API (Org2) - DISABLED: Function not implemented in chaincode
-  // async rejectDocument(docID, rejectionData) {
-  //   return this.post(`/documents/${docID}/reject`, rejectionData);
-  // }
-
-  // Pending Documents API (Org2)
-  async getPendingDocuments() {
-    return this.get('/documents/pending');
-  }
-
-  // Additional Transaction Types methods already defined above
-
-  // Personal Statistics API (Org3)
-  async getPersonalStats() {
-    return this.get('/dashboard/stats');
-  }
-
-  // Analytics API
-  async getAnalytics(params = {}) {
-    return this.get('/analytics', params);
-  }
-
-  // ===== BACKEND-MATCHED API METHODS =====
-
-  // Land Parcel APIs (matching server.js exactly)
-  async getAllLandParcels(params = {}) {
-    return this.get('/land-parcels', params);
-  }
-
-  // Delete Land Parcel API - DISABLED: Function not implemented in chaincode
-  // async deleteLandParcel(id) {
-  //   return this.delete(`/land-parcels/${id}`);
-  // }
-
-  // Additional Backend-Matched API Methods (non-duplicates only)
-
-  // System Reports API (new)
-  async getSystemReports(startDate = '', endDate = '', type = '') {
-    return this.get('/reports/system', { startDate, endDate, type });
-  }
-
-  // Analytics Data API (new)
-  async getAnalyticsData(period = '30d') {
-    return this.get('/analytics', { period });
-  }
-
-  // Bulk Operations API - DISABLED: BulkUpdate/BulkDelete functions not implemented in chaincode
-  // async bulkLandParcelOperation(operation, landParcelIds, data = {}) {
-  //   return this.post('/land-parcels/bulk', { operation, landParcelIds, data });
-  // }
-
-  // ===== ADDITIONAL MAIN FUNCTIONS (Non-duplicates only) =====
-
-  // User Management APIs (All Orgs - Admin only) - New methods only
-  async registerUser(userData) {
-    return this.post('/register', userData);
-  }
-
-  async getAllUsers(params = {}) {
-    return this.get('/users', params);
-  }
-
-  async getUserByCccd(cccd) {
-    return this.get(`/users/${cccd}`);
-  }
-
-  // Note: updateDocument, lockUnlockAccount, deleteAccount, and updateUser
-  // are already defined earlier in this file
-
-  // ==========================================
-  // SYSTEM CONFIGURATION ENDPOINTS (UC-67)
-  // ==========================================
-
-  // Get all system configurations
-  async getSystemConfigs(params = {}) {
-    return this.get('/system/configs', params);
-  }
-
-  // Get system configuration categories
-  async getSystemConfigCategories() {
-    return this.get('/system/configs/categories');
-  }
-
-  // Get system configuration by key
-  async getSystemConfig(key) {
-    return this.get(`/system/configs/${key}`);
-  }
-
-  // Update system configuration
-  async updateSystemConfig(key, configData) {
-    return this.put(`/system/configs/${key}`, configData);
-  }
-
-  // Delete system configuration
-  async deleteSystemConfig(key) {
-    return this.delete(`/system/configs/${key}`);
-  }
-
-  // Reset configuration to default
-  async resetSystemConfig(key) {
-    return this.post(`/system/configs/${key}/reset`);
-  }
-
-  // Initialize default configurations
-  async initializeSystemConfigs() {
-    return this.post('/system/configs/initialize');
-  }
-}
-
-// Create singleton instance
-const apiService = new ApiService();
-
-export default apiService;
-export { ApiError };
+  
+  throw lastError;
+};
+
+// API Helper Functions
+export const createApiCall = (endpoint, method = 'GET', data = null, config = {}) => {
+  const url = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  
+  const requestConfig = {
+    method,
+    url,
+    ...config,
+  };
+
+  if (data && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
+    requestConfig.data = transformRequest(data);
+  }
+
+  return apiClient(requestConfig).then(response => {
+    return transformResponse(response.data);
+  });
+};
+
+// Export default apiClient for direct use
+export default apiClient;

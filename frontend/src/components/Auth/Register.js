@@ -12,7 +12,7 @@ import {
   BankOutlined,
   TeamOutlined
 } from '@ant-design/icons';
-import { register, registerCitizen } from '../../services/auth';
+import authService from '../../services/auth';
 import useMessage from '../../hooks/useMessage';
 
 const { Title, Text } = Typography;
@@ -54,8 +54,8 @@ const Register = () => {
           org: 'Org3',
           role: 'user',
         };
-        const result = await registerCitizen(citizenData);
-        message.success('Registration successful! Please verify your phone number.');
+        const result = await authService.register(citizenData);
+        message.success('Đăng ký thành công! Vui lòng xác thực số điện thoại.');
         navigate('/verify-otp', { 
           state: { 
             cccd: values.cccd, 
@@ -65,18 +65,18 @@ const Register = () => {
         });
       } else {
         // Admin registration for org1 and org2 users
-        await register(values);
-        message.success('Account created successfully! Admin approval required.');
+        await authService.register(values);
+        message.success('Tài khoản đã được tạo thành công! Cần sự chấp thuận của quản trị viên.');
         navigate('/login');
       }
     } catch (error) {
-      console.error('Registration error details:', error);
-      console.error('Error response:', error.response?.data);
+      console.error('Chi tiết lỗi đăng ký:', error);
+      console.error('Phản hồi lỗi:', error.response?.data);
       
       const errorMessage = error.response?.data?.error || 
                           error.response?.data?.message || 
                           error.message || 
-                          'Registration failed';
+                          'Đăng ký thất bại';
       message.error(errorMessage);
     } finally {
       setLoading(false);
@@ -98,63 +98,46 @@ const Register = () => {
             borderRadius: '16px',
             overflow: 'hidden'
           }}
+          bodyStyle={{ padding: '32px' }}
         >
-          {/* Header Section */}
-          <div style={{ 
-            textAlign: 'center', 
-            marginBottom: '2rem',
-            padding: '1rem 0'
-          }}>
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <div style={{
               width: '80px',
               height: '80px',
-              background: isAdminRegistration 
-                ? 'linear-gradient(135deg, #52c41a, #389e0d)' 
-                : 'linear-gradient(135deg, #fa8c16, #d46b08)',
+              background: 'linear-gradient(135deg, #667eea, #764ba2)',
               borderRadius: '20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 1.5rem',
-              boxShadow: '0 8px 16px rgba(0, 0, 0, 0.2)'
+              boxShadow: '0 8px 16px rgba(102, 126, 234, 0.3)'
             }}>
-              {isAdminRegistration ? <BankOutlined style={{ fontSize: '2rem', color: 'white' }} /> : <HomeOutlined style={{ fontSize: '2rem', color: 'white' }} />}
+              <HomeOutlined style={{ fontSize: '2rem', color: 'white' }} />
             </div>
-            <Title level={2} style={{ margin: '0 0 0.5rem', color: '#1f1f1f' }}>
-              {isAdminRegistration ? 'Admin Registration' : 'Citizen Registration'}
+            <Title level={2} style={{ margin: '0 0 0.5rem' }}>
+              {isAdminRegistration ? 'Tạo tài khoản quản trị' : 'Đăng ký tài khoản'}
             </Title>
             <Text type="secondary" style={{ fontSize: '16px' }}>
               {isAdminRegistration 
-                ? 'Create an administrative account for land registry management' 
-                : 'Join the blockchain-based land registry system'}
+                ? 'Tạo tài khoản cho cán bộ quản lý đất đai' 
+                : 'Tham gia hệ thống quản lý đất đai blockchain'
+              }
             </Text>
           </div>
 
-          {/* Alert Messages */}
-          {isAdminRegistration ? (
-            <Alert
-              message="Administrative Account"
-              description="This registration is for Land Authority and Government Officers. Your account requires admin approval and will be activated after verification."
-              type="info"
-              showIcon
-              icon={<BankOutlined />}
-              style={{ marginBottom: '1.5rem' }}
-              className="notification-info"
-            />
-          ) : (
-            <Alert
-              message="Citizen Account"
-              description="Register to manage your land parcels, request transfers, and access all citizen services on the blockchain."
-              type="success"
-              showIcon
-              icon={<HomeOutlined />}
-              style={{ marginBottom: '1.5rem' }}
-              className="notification-success"
-            />
-          )}
+          <Divider />
 
-          <Divider style={{ margin: '1.5rem 0' }} />
-          
+          {/* Security Notice */}
+          <Alert
+            message="Bảo mật thông tin"
+            description="Thông tin cá nhân của bạn được bảo vệ theo quy định của pháp luật và được mã hóa an toàn."
+            type="info"
+            showIcon
+            icon={<SafetyOutlined />}
+            style={{ marginBottom: '1.5rem' }}
+          />
+
           <Form
             form={form}
             name="register"
@@ -162,272 +145,221 @@ const Register = () => {
             layout="vertical"
             size="large"
             autoComplete="off"
+            requiredMark={false}
           >
-            {/* Admin Registration Fields */}
-            {isAdminRegistration && (
-              <div className="form-section">
-                <div className="form-section-title">Organization Details</div>
-                
-                <Form.Item
-                  name="userType"
-                  label={<span style={{ fontWeight: 600 }}>Account Type</span>}
-                  rules={[{ required: true, message: 'Please select account type!' }]}
-                  initialValue="authority"
-                >
-                  <Select 
-                    placeholder="Select your role"
-                    style={{ borderRadius: '8px' }}
-                  >
-                    <Option value="authority">
-                      <Space>
-                        <BankOutlined style={{ color: '#1890ff' }} />
-                        <span>Land Authority Officer</span>
-                      </Space>
-                    </Option>
-                    <Option value="officer">
-                      <Space>
-                        <TeamOutlined style={{ color: '#52c41a' }} />
-                        <span>Government Officer</span>
-                      </Space>
-                    </Option>
-                  </Select>
-                </Form.Item>
-
-                <Form.Item
-                  name="org"
-                  label={<span style={{ fontWeight: 600 }}>Organization</span>}
-                  rules={[{ required: true, message: 'Please select organization!' }]}
-                >
-                  <Select 
-                    placeholder="Select your organization"
-                    style={{ borderRadius: '8px' }}
-                  >
-                    <Option value="Org1">
-                      <Space>
-                        <BankOutlined style={{ color: '#1890ff' }} />
-                        <span>Land Authority</span>
-                      </Space>
-                    </Option>
-                    <Option value="Org2">
-                      <Space>
-                        <TeamOutlined style={{ color: '#52c41a' }} />
-                        <span>Government Officers</span>
-                      </Space>
-                    </Option>
-                  </Select>
-                </Form.Item>
-
-                <Form.Item
-                  name="userId"
-                  label={<span style={{ fontWeight: 600 }}>Employee ID</span>}
-                  rules={[
-                    { required: true, message: 'Please input your employee ID!' },
-                    { pattern: /^[A-Z0-9]{6,12}$/, message: 'Employee ID must be 6-12 alphanumeric characters!' }
-                  ]}
-                >
-                  <Input 
-                    prefix={<UserOutlined style={{ color: '#8c8c8c' }} />} 
-                    placeholder="Enter your employee ID"
-                    style={{ borderRadius: '8px', padding: '12px 16px' }}
-                  />
-                </Form.Item>
-              </div>
-            )}
-
-            {/* Personal Information */}
-            <div className="form-section">
-              <div className="form-section-title">Personal Information</div>
+            {/* Basic Information */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <Title level={4} style={{ marginBottom: '1rem' }}>
+                <UserOutlined style={{ marginRight: '8px' }} />
+                Thông tin cơ bản
+              </Title>
               
               <Form.Item
                 name="fullName"
-                label={<span style={{ fontWeight: 600 }}>Full Name</span>}
+                label="Họ và tên đầy đủ"
                 rules={[
-                  { required: true, message: 'Please input your full name!' },
-                  { min: 2, message: 'Name must be at least 2 characters!' }
+                  { required: true, message: 'Vui lòng nhập họ và tên!' },
+                  { min: 2, message: 'Họ và tên phải có ít nhất 2 ký tự!' }
                 ]}
               >
                 <Input 
-                  prefix={<UserOutlined style={{ color: '#8c8c8c' }} />} 
-                  placeholder="Enter your full legal name"
-                  style={{ borderRadius: '8px', padding: '12px 16px' }}
+                  prefix={<UserOutlined />}
+                  placeholder="Nhập họ và tên đầy đủ"
+                  maxLength={100}
                 />
               </Form.Item>
 
               <Form.Item
                 name="cccd"
-                label={<span style={{ fontWeight: 600 }}>Citizen ID (CCCD)</span>}
+                label="CCCD"
                 rules={[
-                  { required: true, message: 'Please input your CCCD!' },
-                  { pattern: /^\d{12}$/, message: 'CCCD must be exactly 12 digits!' }
+                  { required: true, message: 'Vui lòng nhập CCCD!' },
+                  { pattern: /^\d{12}$/, message: 'CCCD phải có đúng 12 chữ số!' }
                 ]}
               >
                 <Input 
-                  prefix={<IdcardOutlined style={{ color: '#8c8c8c' }} />} 
-                  placeholder="Enter your 12-digit CCCD number"
-                  style={{ borderRadius: '8px', padding: '12px 16px' }}
+                  prefix={<IdcardOutlined />}
+                  placeholder="Nhập CCCD 12 chữ số"
                   maxLength={12}
                 />
               </Form.Item>
 
               <Form.Item
                 name="phone"
-                label={<span style={{ fontWeight: 600 }}>Phone Number</span>}
+                label="Số điện thoại"
                 rules={[
-                  { required: true, message: 'Please input your phone number!' },
-                  { pattern: /^(0[3|5|7|8|9])+([0-9]{8})$/, message: 'Please enter a valid Vietnamese phone number!' }
+                  { required: true, message: 'Vui lòng nhập số điện thoại!' },
+                  { pattern: /^(0[3|5|7|8|9])+([0-9]{8})$/, message: 'Vui lòng nhập số điện thoại Việt Nam hợp lệ!' }
                 ]}
               >
                 <Input 
-                  prefix={<PhoneOutlined style={{ color: '#8c8c8c' }} />} 
-                  placeholder="Enter your phone number (e.g., 0901234567)"
-                  style={{ borderRadius: '8px', padding: '12px 16px' }}
+                  prefix={<PhoneOutlined />}
+                  placeholder="Nhập số điện thoại (ví dụ: 0901234567)"
                   maxLength={10}
                 />
               </Form.Item>
             </div>
 
-            {/* Security Section */}
-            <div className="form-section">
-              <div className="form-section-title">Security Setup</div>
+            {/* Organization Selection (Admin Only) */}
+            {isAdminRegistration && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <Title level={4} style={{ marginBottom: '1rem' }}>
+                  <BankOutlined style={{ marginRight: '8px' }} />
+                  Thông tin tổ chức
+                </Title>
+                
+                <Form.Item
+                  name="org"
+                  label="Tổ chức"
+                  rules={[{ required: true, message: 'Vui lòng chọn tổ chức!' }]}
+                >
+                  <Select placeholder="Chọn tổ chức">
+                    <Option value="Org1">
+                      <Space>
+                        <BankOutlined />
+                        Org1 - Cơ quan quản lý đất đai
+                      </Space>
+                    </Option>
+                    <Option value="Org2">
+                      <Space>
+                        <TeamOutlined />
+                        Org2 - Đơn vị hành chính cấp xã
+                      </Space>
+                    </Option>
+                  </Select>
+                </Form.Item>
+
+                <Form.Item
+                  name="role"
+                  label="Vai trò"
+                  rules={[{ required: true, message: 'Vui lòng chọn vai trò!' }]}
+                >
+                  <Select placeholder="Chọn vai trò">
+                    <Option value="admin">Quản trị viên</Option>
+                    <Option value="user">Người dùng</Option>
+                  </Select>
+                </Form.Item>
+              </div>
+            )}
+
+            {/* Password Section */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <Title level={4} style={{ marginBottom: '1rem' }}>
+                <LockOutlined style={{ marginRight: '8px' }} />
+                Mật khẩu
+              </Title>
               
               <Form.Item
                 name="password"
-                label={<span style={{ fontWeight: 600 }}>Password</span>}
+                label="Mật khẩu"
                 rules={[
-                  { required: true, message: 'Please input your password!' },
-                  {
-                    pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>?])[A-Za-z\d!@#$%^&*()_+\-=[\]{};':"\\|,.<>?]{8,}$/,
-                    message: 'Password must be at least 8 characters long, include uppercase, lowercase, number, and special character!'
+                  { required: true, message: 'Vui lòng nhập mật khẩu!' },
+                  { min: 8, message: 'Mật khẩu phải có ít nhất 8 ký tự!' },
+                  { 
+                    pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
+                    message: 'Mật khẩu phải chứa chữ hoa, chữ thường, số và ký tự đặc biệt!'
                   }
                 ]}
               >
                 <Input.Password 
-                  prefix={<LockOutlined style={{ color: '#8c8c8c' }} />} 
-                  placeholder="Create a strong password with special characters"
-                  style={{ borderRadius: '8px', padding: '12px 16px' }}
+                  prefix={<LockOutlined />}
+                  placeholder="Nhập mật khẩu mạnh"
                   onChange={(e) => setPasswordStrength(checkPasswordStrength(e.target.value))}
                 />
               </Form.Item>
 
               {/* Password Strength Indicator */}
-              <div style={{ marginBottom: '1rem' }}>
-                <Text type="secondary" style={{ fontSize: '12px' }}>Password Strength:</Text>
-                <Progress 
-                  percent={passwordStrength} 
-                  size="small" 
-                  status={passwordStrength < 50 ? 'exception' : passwordStrength < 75 ? 'normal' : 'success'}
-                  showInfo={false}
-                  style={{ marginTop: '4px' }}
-                />
-                <Text type="secondary" style={{ fontSize: '11px' }}>
-                  {passwordStrength < 50 ? 'Weak' : passwordStrength < 75 ? 'Medium' : 'Strong'}
-                </Text>
-                <Text type="secondary" style={{ fontSize: '10px', display: 'block', marginTop: 2 }}>
-                  Must include: lowercase, uppercase, number, special character (!@#$%^&*()_+-=[]{}|;':",./{`<>`}?)
-                </Text>
-              </div>
+              {passwordStrength > 0 && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <Text type="secondary" style={{ fontSize: '12px', marginBottom: '4px', display: 'block' }}>
+                    Độ mạnh mật khẩu:
+                  </Text>
+                  <Progress 
+                    percent={passwordStrength} 
+                    size="small"
+                    status={passwordStrength < 40 ? 'exception' : passwordStrength < 80 ? 'normal' : 'success'}
+                    strokeColor={{
+                      '0%': '#ff4d4f',
+                      '50%': '#faad14',
+                      '100%': '#52c41a',
+                    }}
+                  />
+                  <Text type="secondary" style={{ fontSize: '11px' }}>
+                    {passwordStrength < 40 ? 'Yếu' : passwordStrength < 80 ? 'Trung bình' : 'Mạnh'}
+                  </Text>
+                </div>
+              )}
 
               <Form.Item
                 name="confirmPassword"
-                label={<span style={{ fontWeight: 600 }}>Confirm Password</span>}
+                label="Xác nhận mật khẩu"
                 dependencies={['password']}
                 rules={[
-                  { required: true, message: 'Please confirm your password!' },
+                  { required: true, message: 'Vui lòng xác nhận mật khẩu!' },
                   ({ getFieldValue }) => ({
                     validator(_, value) {
                       if (!value || getFieldValue('password') === value) {
                         return Promise.resolve();
                       }
-                      return Promise.reject(new Error('Passwords do not match!'));
+                      return Promise.reject(new Error('Mật khẩu xác nhận không khớp!'));
                     },
                   }),
                 ]}
               >
                 <Input.Password 
-                  prefix={<LockOutlined style={{ color: '#8c8c8c' }} />} 
-                  placeholder="Confirm your password"
-                  style={{ borderRadius: '8px', padding: '12px 16px' }}
+                  prefix={<LockOutlined />}
+                  placeholder="Nhập lại mật khẩu"
                 />
               </Form.Item>
             </div>
 
+            {/* Submit Button */}
             <Form.Item style={{ marginBottom: '1rem' }}>
               <Button 
                 type="primary" 
                 htmlType="submit" 
                 loading={loading}
                 icon={<CheckCircleOutlined />}
-                className="btn-primary"
                 style={{ 
                   width: '100%', 
                   height: '48px',
                   fontSize: '16px',
-                  fontWeight: 600,
+                  fontWeight: '600',
                   borderRadius: '8px',
-                  background: isAdminRegistration 
-                    ? 'linear-gradient(135deg, #52c41a, #389e0d)' 
-                    : 'linear-gradient(135deg, #fa8c16, #d46b08)',
+                  background: 'linear-gradient(135deg, #667eea, #764ba2)',
                   border: 'none',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
+                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
                 }}
               >
-                {loading 
-                  ? 'Creating Account...' 
-                  : isAdminRegistration 
-                    ? 'Create Admin Account' 
-                    : 'Register as Citizen'
-                }
+                {loading ? 'Đang đăng ký...' : 'Đăng ký tài khoản'}
               </Button>
             </Form.Item>
 
             <Divider style={{ margin: '1.5rem 0' }}>
-              <Text type="secondary" style={{ fontSize: '14px' }}>Already registered?</Text>
+              <Text type="secondary" style={{ fontSize: '14px' }}>
+                {isAdminRegistration ? 'Đã có tài khoản?' : 'Đã có tài khoản?'}
+              </Text>
             </Divider>
 
             <div style={{ textAlign: 'center' }}>
               <Space direction="vertical" size="small">
                 <Text type="secondary" style={{ fontSize: '14px' }}>
-                  Already have an account?
+                  {isAdminRegistration ? 'Quay lại đăng nhập?' : 'Quay lại đăng nhập?'}
                 </Text>
                 <Link 
                   to="/login" 
                   style={{ 
                     fontSize: '16px', 
-                    fontWeight: 600,
-                    textDecoration: 'none'
+                    fontWeight: '600',
+                    textDecoration: 'none',
+                    color: '#667eea'
                   }}
                 >
-                  Sign In to Your Account
+                  Đăng nhập ngay
                 </Link>
               </Space>
             </div>
           </Form>
-
-          {/* Security Notice */}
-          <div style={{
-            marginTop: '2rem',
-            padding: '1rem',
-            background: '#f6f8fa',
-            borderRadius: '8px',
-            border: '1px solid #e1e4e8'
-          }}>
-            <Space align="start">
-              <SafetyOutlined style={{ color: '#52c41a', marginTop: '2px' }} />
-              <div>
-                <Text strong style={{ fontSize: '14px', color: '#24292e' }}>
-                  Secure Registration
-                </Text>
-                <br />
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  Your information is encrypted and stored securely on the blockchain. 
-                  {isAdminRegistration 
-                    ? ' Admin accounts require additional verification before activation.'
-                    : ' Citizen accounts are activated immediately after phone verification.'
-                  }
-                </Text>
-              </div>
-            </Space>
-          </div>
         </Card>
       </div>
     </div>

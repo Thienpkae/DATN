@@ -26,10 +26,10 @@ const UserManagement = ({ user }) => {
       // For now, we'll show empty list since there's no user listing API
       // In a real implementation, you'd need a backend endpoint to list users
       setUsers([]);
-      message.info('User listing functionality requires additional backend endpoints');
+      message.info('Chức năng liệt kê người dùng cần thêm các endpoint backend');
     } catch (error) {
-      console.error('Fetch users error:', error);
-      message.error(error.message || 'Failed to fetch users');
+      console.error('Lỗi khi lấy danh sách người dùng:', error);
+      message.error(error.message || 'Không thể lấy danh sách người dùng');
     } finally {
       setLoading(false);
     }
@@ -38,27 +38,27 @@ const UserManagement = ({ user }) => {
   const handleLockUnlock = async (targetCccd, lock) => {
     try {
       await apiService.lockUnlockAccount(targetCccd, lock);
-      message.success(`User ${lock ? 'locked' : 'unlocked'} successfully`);
+      message.success(`Người dùng đã được ${lock ? 'khóa' : 'mở khóa'} thành công`);
       fetchUsers();
     } catch (error) {
-      console.error('Lock/unlock user error:', error);
-      message.error(error.message || 'Failed to update user status');
+      console.error('Lỗi khóa/mở khóa người dùng:', error);
+      message.error(error.message || 'Không thể cập nhật trạng thái người dùng');
     }
   };
 
   const columns = [
     {
-      title: 'User ID',
+      title: 'ID người dùng',
       dataIndex: 'userId',
       key: 'userId',
     },
     {
-      title: 'Full Name',
+      title: 'Họ và tên',
       dataIndex: 'fullName',
       key: 'fullName',
     },
     {
-      title: 'Organization',
+      title: 'Tổ chức',
       dataIndex: 'org',
       key: 'org',
       render: (org) => (
@@ -68,28 +68,28 @@ const UserManagement = ({ user }) => {
       ),
     },
     {
-      title: 'Phone',
+      title: 'Số điện thoại',
       dataIndex: 'phone',
       key: 'phone',
     },
     {
-      title: 'Status',
+      title: 'Trạng thái',
       dataIndex: 'isLocked',
       key: 'isLocked',
       render: (isLocked) => (
         <span className={`transaction-status ${isLocked ? 'status-rejected' : 'status-approved'}`}>
-          {isLocked ? 'Locked' : 'Active'}
+          {isLocked ? 'Đã khóa' : 'Hoạt động'}
         </span>
       ),
     },
     {
-      title: 'Phone Verified',
+      title: 'Xác thực điện thoại',
       dataIndex: 'isPhoneVerified',
       key: 'isPhoneVerified',
-      render: (verified) => verified ? 'Yes' : 'No',
+      render: (verified) => verified ? 'Có' : 'Chưa',
     },
     {
-      title: 'Actions',
+      title: 'Thao tác',
       key: 'actions',
       render: (_, record) => (
         <Space>
@@ -98,7 +98,7 @@ const UserManagement = ({ user }) => {
             type={record.isLocked ? "primary" : "danger"}
             onClick={() => handleLockUnlock(record.userId, !record.isLocked)}
           >
-            {record.isLocked ? 'Unlock' : 'Lock'}
+            {record.isLocked ? 'Mở khóa' : 'Khóa'}
           </Button>
         </Space>
       ),
@@ -106,16 +106,22 @@ const UserManagement = ({ user }) => {
   ];
 
   return (
-    <div>
-      <Title level={2}>User Management</Title>
-      
-      <Card title="System Users">
+    <div style={{ padding: '24px' }}>
+      <Card>
+        <Title level={2}>Quản lý người dùng</Title>
+        <p>Quản lý tài khoản người dùng trong hệ thống</p>
+        
         <Table
           columns={columns}
           dataSource={users}
           loading={loading}
           rowKey="userId"
-          pagination={{ pageSize: 10 }}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} người dùng`,
+          }}
         />
       </Card>
     </div>

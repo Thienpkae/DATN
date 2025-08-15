@@ -1,16 +1,40 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Form, Input, Button, Card, Typography, Space, Divider, Radio } from 'antd';
-import { LockOutlined, SafetyOutlined, HomeOutlined, PhoneOutlined, IdcardOutlined } from '@ant-design/icons';
-import { login } from '../../services/auth';
+import { 
+  Form, 
+  Input, 
+  Button, 
+  Card, 
+  Typography, 
+  Space, 
+  Divider, 
+  Radio, 
+  Alert,
+  Row,
+  Col,
+  theme
+} from 'antd';
+import { 
+  LockOutlined, 
+  SafetyOutlined, 
+  HomeOutlined, 
+  PhoneOutlined, 
+  IdcardOutlined,
+  UserOutlined,
+  KeyOutlined
+} from '@ant-design/icons';
+import authService from '../../services/auth';
 import useMessage from '../../hooks/useMessage';
 
 const { Title, Text } = Typography;
+const { useToken } = theme;
 
 const Login = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
   const [loginType, setLoginType] = useState('cccd'); // 'cccd' or 'phone'
+  const [form] = Form.useForm();
   const message = useMessage();
+  const { token: themeToken } = useToken();
 
   const onFinish = async (values) => {
     setLoading(true);
@@ -21,55 +45,55 @@ const Login = ({ onLogin }) => {
       } else {
         loginData.phone = values.identifier;
       }
+      
       if (process.env.NODE_ENV === 'development') {
-        // Only log in development
-        console.log('Attempting login with:', { ...loginData, password: '[HIDDEN]' });
+        console.log('Đang thử đăng nhập với:', { ...loginData, password: '[ẨN]' });
       }
-      const userData = await login(loginData);
+      
+      const userData = await authService.login(loginData);
+      
       if (process.env.NODE_ENV === 'development') {
-        console.log('Login successful:', userData);
+        console.log('Đăng nhập thành công:', userData);
       }
-      message.success('Login successful!');
+      
+      message.success('Đăng nhập thành công!');
       onLogin(userData);
     } catch (error) {
-      console.error('Login error details:', error);
-      console.error('Error response:', error.response);
+      console.error('Chi tiết lỗi đăng nhập:', error);
+      console.error('Phản hồi lỗi:', error.response);
       
-      let errorMessage = 'Login failed. Please try again.';
+      let errorMessage = 'Đăng nhập thất bại. Vui lòng thử lại.';
       
       if (error.response) {
-        // Server responded with error status
         const status = error.response.status;
         const data = error.response.data;
         
         switch (status) {
           case 401:
-            errorMessage = data?.error || 'Invalid credentials. Please check your CCCD/phone and password.';
+            errorMessage = data?.error || 'Thông tin đăng nhập không đúng. Vui lòng kiểm tra CCCD/số điện thoại và mật khẩu.';
             break;
           case 403:
             if (data?.error?.includes('locked')) {
-              errorMessage = 'Your account has been locked. Please contact administrator.';
+              errorMessage = 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.';
             } else if (data?.error?.includes('not verified')) {
-              errorMessage = 'Please verify your phone number before logging in.';
+              errorMessage = 'Vui lòng xác thực số điện thoại trước khi đăng nhập.';
             } else {
-              errorMessage = data?.error || 'Access denied. Please contact administrator.';
+              errorMessage = data?.error || 'Truy cập bị từ chối. Vui lòng liên hệ quản trị viên.';
             }
             break;
           case 404:
-            errorMessage = 'Account not found. Please check your credentials or register first.';
+            errorMessage = 'Tài khoản không tồn tại. Vui lòng kiểm tra thông tin hoặc đăng ký trước.';
             break;
           case 500:
-            errorMessage = 'Server error. Please try again later.';
+            errorMessage = 'Lỗi máy chủ. Vui lòng thử lại sau.';
             break;
           default:
-            errorMessage = data?.error || data?.message || `Login failed (Error ${status})`;
+            errorMessage = data?.error || data?.message || `Đăng nhập thất bại (Lỗi ${status})`;
         }
       } else if (error.request) {
-        // Network error
-        errorMessage = 'Network error. Please check your connection and try again.';
+        errorMessage = 'Lỗi mạng. Vui lòng kiểm tra kết nối và thử lại.';
       } else {
-        // Other error
-        errorMessage = error.message || 'An unexpected error occurred.';
+        errorMessage = error.message || 'Đã xảy ra lỗi không mong muốn.';
       }
       
       message.error(errorMessage);
@@ -81,194 +105,207 @@ const Login = ({ onLogin }) => {
   const getIdentifierRules = () => {
     if (loginType === 'cccd') {
       return [
-        { required: true, message: 'Please input your CCCD!' },
-        { pattern: /^\d{12}$/, message: 'CCCD must be exactly 12 digits!' }
+        { required: true, message: 'Vui lòng nhập CCCD!' },
+        { pattern: /^\d{12}$/, message: 'CCCD phải có đúng 12 chữ số!' }
       ];
     } else {
       return [
-        { required: true, message: 'Please input your phone number!' },
-        { pattern: /^(0[3|5|7|8|9])+([0-9]{8})$/, message: 'Please enter a valid Vietnamese phone number!' }
+        { required: true, message: 'Vui lòng nhập số điện thoại!' },
+        { pattern: /^(0[3|5|7|8|9])+([0-9]{8})$/, message: 'Vui lòng nhập số điện thoại Việt Nam hợp lệ!' }
       ];
     }
   };
 
   const getIdentifierPlaceholder = () => {
-    return loginType === 'cccd' ? 'Enter your 12-digit CCCD' : 'Enter your phone number (e.g., 0901234567)';
+    return loginType === 'cccd' ? 'Nhập CCCD 12 chữ số' : 'Nhập số điện thoại (ví dụ: 0901234567)';
   };
 
   const getIdentifierIcon = () => {
-    return loginType === 'cccd' ? <IdcardOutlined style={{ color: '#8c8c8c' }} /> : <PhoneOutlined style={{ color: '#8c8c8c' }} />;
+    return loginType === 'cccd' ? 
+      <IdcardOutlined style={{ color: themeToken.colorTextSecondary }} /> : 
+      <PhoneOutlined style={{ color: themeToken.colorTextSecondary }} />;
+  };
+
+  const getIdentifierLabel = () => {
+    return loginType === 'cccd' ? 'CCCD' : 'Số điện thoại';
   };
 
   return (
-    <div className="center-content" style={{ 
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    <div style={{ 
+      background: `linear-gradient(135deg, ${themeToken.colorPrimary} 0%, ${themeToken.colorPrimaryBg} 100%)`,
       minHeight: '100vh',
-      padding: '2rem'
+      padding: '2rem',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
     }}>
-      <div className="fade-in" style={{ width: '100%', maxWidth: '420px' }}>
-        <Card 
-          className="professional-card"
-          style={{ 
-            boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-            border: 'none',
-            borderRadius: '16px',
-            overflow: 'hidden'
-          }}
-        >
-          {/* Header Section */}
-          <div style={{ 
-            textAlign: 'center', 
-            marginBottom: '2rem',
-            padding: '1rem 0'
-          }}>
-            <div style={{
-              width: '80px',
-              height: '80px',
-              background: 'linear-gradient(135deg, #1890ff, #0050b3)',
-              borderRadius: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1.5rem',
-              boxShadow: '0 8px 16px rgba(24, 144, 255, 0.3)'
-            }}>
-              <HomeOutlined style={{ fontSize: '2rem', color: 'white' }} />
-            </div>
-            <Title level={2} style={{ margin: '0 0 0.5rem', color: '#1f1f1f' }}>
-              Land Registry System
-            </Title>
-            <Text type="secondary" style={{ fontSize: '16px' }}>
-              Secure Blockchain-Based Land Management
-            </Text>
-          </div>
-
-          <Divider style={{ margin: '1.5rem 0' }} />
-
-          {/* Login Type Selection */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <Text strong style={{ fontSize: '14px', marginBottom: '8px', display: 'block' }}>
-              Login Method
-            </Text>
-            <Radio.Group 
-              value={loginType} 
-              onChange={(e) => setLoginType(e.target.value)}
-              style={{ width: '100%' }}
-            >
-              <Radio.Button value="cccd" style={{ width: '50%', textAlign: 'center' }}>
-                <Space>
-                  <IdcardOutlined />
-                  CCCD
-                </Space>
-              </Radio.Button>
-              <Radio.Button value="phone" style={{ width: '50%', textAlign: 'center' }}>
-                <Space>
-                  <PhoneOutlined />
-                  Phone
-                </Space>
-              </Radio.Button>
-            </Radio.Group>
-          </div>
-          
-          <Form
-            name="login"
-            onFinish={onFinish}
-            layout="vertical"
-            size="large"
-            autoComplete="off"
-            className="login-form"
+      <Row justify="center" align="middle" style={{ width: '100%' }}>
+        <Col xs={24} sm={20} md={16} lg={12} xl={8}>
+          <Card 
+            style={{ 
+              boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+              border: 'none',
+              borderRadius: '16px',
+              overflow: 'hidden'
+            }}
+            bodyStyle={{ padding: '32px' }}
           >
-            <Form.Item
-              name="identifier"
-              label={<span style={{ fontWeight: 600 }}>{loginType === 'cccd' ? 'Citizen ID (CCCD)' : 'Phone Number'}</span>}
-              rules={getIdentifierRules()}
-            >
-              <Input
-                prefix={getIdentifierIcon()}
-                placeholder={getIdentifierPlaceholder()}
-                maxLength={loginType === 'cccd' ? 12 : 10}
-              />
-            </Form.Item>
+            {/* Header Section */}
+            <div style={{ 
+              textAlign: 'center', 
+              marginBottom: '2rem',
+              padding: '1rem 0'
+            }}>
+              <div style={{
+                width: '80px',
+                height: '80px',
+                background: `linear-gradient(135deg, ${themeToken.colorPrimary}, ${themeToken.colorPrimaryHover})`,
+                borderRadius: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1.5rem',
+                boxShadow: `0 8px 16px ${themeToken.colorPrimary}40`
+              }}>
+                <HomeOutlined style={{ fontSize: '2rem', color: 'white' }} />
+              </div>
+              <Title level={2} style={{ margin: '0 0 0.5rem', color: themeToken.colorText }}>
+                Hệ thống quản lý đất đai
+              </Title>
+              <Text type="secondary" style={{ fontSize: '16px' }}>
+                Quản lý đất đai an toàn dựa trên blockchain
+              </Text>
+            </div>
 
-            <Form.Item
-              name="password"
-              label={<span style={{ fontWeight: 600 }}>Password</span>}
-              rules={[{ required: true, message: 'Please input your password!' }]}
-            >
-              <Input.Password
-                prefix={<LockOutlined style={{ color: '#8c8c8c' }} />}
-                placeholder="Enter your password"
-              />
-            </Form.Item>
+            <Divider style={{ margin: '1.5rem 0' }} />
 
-            <Form.Item style={{ marginBottom: '1rem' }}>
-              <Button 
-                type="primary" 
-                htmlType="submit" 
-                loading={loading}
-                icon={<SafetyOutlined />}
-                className="btn-primary"
-                style={{ 
-                  width: '100%', 
-                  height: '48px',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #1890ff, #0050b3)',
-                  border: 'none',
-                  boxShadow: '0 4px 12px rgba(24, 144, 255, 0.3)'
-                }}
+            {/* Security Notice */}
+            <Alert
+              message="Truy cập an toàn"
+              description="Dữ liệu của bạn được bảo vệ bởi công nghệ blockchain và bảo mật cấp doanh nghiệp."
+              type="info"
+              showIcon
+              icon={<SafetyOutlined />}
+              style={{ marginBottom: '1.5rem' }}
+            />
+
+            {/* Login Type Selection */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <Text strong style={{ fontSize: '14px', marginBottom: '8px', display: 'block' }}>
+                Phương thức đăng nhập
+              </Text>
+              <Radio.Group 
+                value={loginType} 
+                onChange={(e) => setLoginType(e.target.value)}
+                style={{ width: '100%' }}
+                buttonStyle="solid"
               >
-                {loading ? 'Signing In...' : 'Sign In Securely'}
-              </Button>
-            </Form.Item>
+                <Radio.Button value="cccd" style={{ width: '50%', textAlign: 'center' }}>
+                  <Space>
+                    <IdcardOutlined />
+                    CCCD
+                  </Space>
+                </Radio.Button>
+                <Radio.Button value="phone" style={{ width: '50%', textAlign: 'center' }}>
+                  <Space>
+                    <PhoneOutlined />
+                    Số điện thoại
+                  </Space>
+                </Radio.Button>
+              </Radio.Group>
+            </div>
+            
+            <Form
+              form={form}
+              name="login"
+              onFinish={onFinish}
+              layout="vertical"
+              size="large"
+              autoComplete="off"
+              requiredMark={false}
+            >
+              <Form.Item
+                name="identifier"
+                label={
+                  <Space>
+                    <UserOutlined />
+                    <span style={{ fontWeight: 600 }}>{getIdentifierLabel()}</span>
+                  </Space>
+                }
+                rules={getIdentifierRules()}
+              >
+                <Input
+                  prefix={getIdentifierIcon()}
+                  placeholder={getIdentifierPlaceholder()}
+                  maxLength={loginType === 'cccd' ? 12 : 10}
+                  style={{ height: '48px' }}
+                />
+              </Form.Item>
 
-            <Divider style={{ margin: '1.5rem 0' }}>
-              <Text type="secondary" style={{ fontSize: '14px' }}>New to the system?</Text>
-            </Divider>
+              <Form.Item
+                name="password"
+                label={
+                  <Space>
+                    <KeyOutlined />
+                    <span style={{ fontWeight: 600 }}>Mật khẩu</span>
+                  </Space>
+                }
+                rules={[{ required: true, message: 'Vui lòng nhập mật khẩu!' }]}
+              >
+                <Input.Password
+                  prefix={<LockOutlined style={{ color: themeToken.colorTextSecondary }} />}
+                  placeholder="Nhập mật khẩu của bạn"
+                  style={{ height: '48px' }}
+                />
+              </Form.Item>
 
-            <div style={{ textAlign: 'center' }}>
-              <Space direction="vertical" size="small">
-                <Text type="secondary" style={{ fontSize: '14px' }}>
-                  Don't have an account?
-                </Text>
-                <Link 
-                  to="/register" 
+              <Form.Item style={{ marginBottom: '1rem' }}>
+                <Button 
+                  type="primary" 
+                  htmlType="submit" 
+                  loading={loading}
+                  icon={<SafetyOutlined />}
                   style={{ 
-                    fontSize: '16px', 
-                    fontWeight: 600,
-                    textDecoration: 'none'
+                    width: '100%', 
+                    height: '48px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    borderRadius: '8px',
+                    background: `linear-gradient(135deg, ${themeToken.colorPrimary}, ${themeToken.colorPrimaryHover})`,
+                    border: 'none',
+                    boxShadow: `0 4px 12px ${themeToken.colorPrimary}30`
                   }}
                 >
-                  Register for Land Registry Access
-                </Link>
-              </Space>
-            </div>
-          </Form>
+                  {loading ? 'Đang đăng nhập...' : 'Đăng nhập an toàn'}
+                </Button>
+              </Form.Item>
 
-          {/* Security Notice */}
-          <div style={{
-            marginTop: '2rem',
-            padding: '1rem',
-            background: '#f6f8fa',
-            borderRadius: '8px',
-            border: '1px solid #e1e4e8'
-          }}>
-            <Space align="start">
-              <SafetyOutlined style={{ color: '#52c41a', marginTop: '2px' }} />
-              <div>
-                <Text strong style={{ fontSize: '14px', color: '#24292e' }}>
-                  Secure Access
-                </Text>
-                <br />
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  Your data is protected by blockchain technology and enterprise-grade security.
-                </Text>
+              <Divider style={{ margin: '1.5rem 0' }}>
+                <Text type="secondary" style={{ fontSize: '14px' }}>Mới với hệ thống?</Text>
+              </Divider>
+
+              <div style={{ textAlign: 'center' }}>
+                <Space direction="vertical" size="small">
+                  <Text type="secondary" style={{ fontSize: '14px' }}>
+                    Chưa có tài khoản?
+                  </Text>
+                  <Link 
+                    to="/register" 
+                    style={{ 
+                      fontSize: '16px', 
+                      fontWeight: '600',
+                      textDecoration: 'none',
+                      color: themeToken.colorPrimary
+                    }}
+                  >
+                    Đăng ký để truy cập hệ thống quản lý đất đai
+                  </Link>
+                </Space>
               </div>
-            </Space>
-          </div>
-        </Card>
-      </div>
+            </Form>
+          </Card>
+        </Col>
+      </Row>
     </div>
   );
 };

@@ -6,49 +6,45 @@ import {
   Space,
   Tag,
   Modal,
-  Form,
-  Input,
-  Upload,
-  message,
   Typography,
   Row,
   Col,
   Statistic,
   Descriptions,
+  Tooltip,
+  Alert,
+  Form,
+  Input,
   Select,
-  DatePicker,
-  Tooltip
+  DatePicker
 } from 'antd';
 import {
   FileTextOutlined,
-  UploadOutlined,
   EyeOutlined,
   DownloadOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  FileImageOutlined,
-  FilePdfOutlined,
   SearchOutlined,
   FilterOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  ExclamationCircleOutlined,
+  UploadOutlined
 } from '@ant-design/icons';
 import documentService from '../../../services/documentService';
+import { useNavigate } from 'react-router-dom';
 
 const { Title, Text } = Typography;
-const { TextArea } = Input;
 const { Option } = Select;
 
 /**
- * Document Management Page for Org1 (Land Registry Authority)
- * Manages all documents in the system with verification capabilities
+ * My Documents Page for Org3 (Citizens)
+ * View and manage own documents
  */
-const DocumentManagementPage = ({ user }) => {
+const MyDocuments = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [uploadModalVisible, setUploadModalVisible] = useState(false);
-  const [form] = Form.useForm();
   const [searchForm] = Form.useForm();
   const [stats, setStats] = useState({
     total: 0,
@@ -58,16 +54,17 @@ const DocumentManagementPage = ({ user }) => {
   });
   const [filters, setFilters] = useState({});
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchDocuments();
+    fetchMyDocuments();
     fetchStats();
-  }, []);
+  }, [user?.cccd]);
 
-  const fetchDocuments = async () => {
+  const fetchMyDocuments = async () => {
     try {
       setLoading(true);
-      const response = await documentService.getAllDocuments();
+      const response = await documentService.getDocumentsByUploader(user?.cccd);
       setDocuments(response.documents || response || []);
     } catch (error) {
       console.error('Lỗi khi lấy danh sách tài liệu:', error);
@@ -79,9 +76,8 @@ const DocumentManagementPage = ({ user }) => {
 
   const fetchStats = async () => {
     try {
-      // Tính toán stats từ documents hiện có
-      const allDocs = await documentService.getAllDocuments();
-      const docs = allDocs.documents || allDocs || [];
+      const myDocs = await documentService.getDocumentsByUploader(user?.cccd);
+      const docs = myDocs.documents || myDocs || [];
       
       setStats({
         total: docs.length,
@@ -99,46 +95,20 @@ const DocumentManagementPage = ({ user }) => {
     setModalVisible(true);
   };
 
-  const handleVerifyDocument = async (docID, status, comments = '') => {
-    try {
-      setLoading(true);
-      if (status === 'VERIFIED') {
-        await documentService.verifyDocument(docID, {
-          status,
-          verifierComments: comments,
-          verifiedBy: user.cccd
-        });
-        message.success('Tài liệu đã được xác thực thành công');
-      } else if (status === 'REJECTED') {
-        await documentService.rejectDocument(docID, {
-          status,
-          rejectionComments: comments,
-          rejectedBy: user.cccd
-        });
-        message.success('Tài liệu đã bị từ chối');
-      }
-      fetchDocuments();
-      fetchStats();
-      setModalVisible(false);
-    } catch (error) {
-      console.error('Lỗi khi xác thực tài liệu:', error);
-      message.error(error.message || 'Lỗi khi xác thực tài liệu');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSearch = async (values) => {
     try {
       setLoading(true);
       if (values.keyword) {
         const response = await documentService.searchDocuments({
           keyword: values.keyword,
-          filters: JSON.stringify(filters)
+          filters: JSON.stringify({
+            ...filters,
+            uploaderID: user?.cccd
+          })
         });
         setDocuments(response.documents || response || []);
       } else {
-        fetchDocuments();
+        fetchMyDocuments();
       }
     } catch (error) {
       console.error('Lỗi khi tìm kiếm:', error);
@@ -151,7 +121,10 @@ const DocumentManagementPage = ({ user }) => {
   const handleAdvancedSearch = async (values) => {
     try {
       setLoading(true);
-      const response = await documentService.advancedSearch(values);
+      const response = await documentService.advancedSearch({
+        ...values,
+        uploaderID: user?.cccd
+      });
       setDocuments(response.documents || response || []);
     } catch (error) {
       console.error('Lỗi khi tìm kiếm nâng cao:', error);
@@ -164,7 +137,7 @@ const DocumentManagementPage = ({ user }) => {
   const handleResetFilters = () => {
     searchForm.resetFields();
     setFilters({});
-    fetchDocuments();
+    fetchMyDocuments();
   };
 
   const getStatusColor = (status) => {
@@ -228,24 +201,17 @@ const DocumentManagementPage = ({ user }) => {
       )
     },
     {
-      title: 'Người upload',
-      dataIndex: 'uploadedBy',
-      key: 'uploadedBy',
-      width: 120,
-      render: (text) => <Text code>{text}</Text>
-    },
-    {
       title: 'Trạng thái',
       dataIndex: 'verified',
       key: 'verified',
       width: 120,
       render: (verified, record) => {
         if (record.rejected) {
-          return <Tag color="red">Bị từ chối</Tag>;
+          return <Tag color="red" icon={<CloseCircleOutlined />}>Bị từ chối</Tag>;
         }
         return verified ? 
           <Tag color="green" icon={<CheckCircleOutlined />}>Đã xác thực</Tag> : 
-          <Tag color="orange">Chờ xử lý</Tag>;
+          <Tag color="orange" icon={<ExclamationCircleOutlined />}>Chờ xử lý</Tag>;
       }
     },
     {
@@ -253,10 +219,7 @@ const DocumentManagementPage = ({ user }) => {
       dataIndex: 'fileType',
       key: 'fileType',
       width: 100,
-      render: (fileType) => {
-        const icon = fileType === 'PDF' ? <FilePdfOutlined /> : <FileImageOutlined />;
-        return <Tag icon={icon}>{fileType}</Tag>;
-      }
+      render: (fileType) => <Tag>{fileType}</Tag>
     },
     {
       title: 'Kích thước',
@@ -285,23 +248,12 @@ const DocumentManagementPage = ({ user }) => {
               onClick={() => handleViewDocument(record)}
             />
           </Tooltip>
-          {!record.verified && !record.rejected && (
-            <Tooltip title="Xác thực">
+          {record.ipfsHash && (
+            <Tooltip title="Tải xuống">
               <Button 
-                icon={<CheckCircleOutlined />} 
+                icon={<DownloadOutlined />} 
                 size="small"
-                type="primary"
-                onClick={() => handleVerifyDocument(record.docID, 'VERIFIED')}
-              />
-            </Tooltip>
-          )}
-          {!record.verified && !record.rejected && (
-            <Tooltip title="Từ chối">
-              <Button 
-                icon={<CloseCircleOutlined />} 
-                size="small"
-                danger
-                onClick={() => handleVerifyDocument(record.docID, 'REJECTED')}
+                onClick={() => window.open(`/api/ipfs/${record.ipfsHash}`, '_blank')}
               />
             </Tooltip>
           )}
@@ -310,46 +262,36 @@ const DocumentManagementPage = ({ user }) => {
     },
   ];
 
-  const uploadProps = {
-    name: 'file',
-    multiple: false,
-    beforeUpload: (file) => {
-      const isValidType = file.type === 'application/pdf' || file.type.startsWith('image/');
-      if (!isValidType) {
-        message.error('Bạn chỉ có thể tải lên các tệp PDF hoặc hình ảnh!');
-        return false;
-      }
-      const isLt10M = file.size / 1024 / 1024 < 10;
-      if (!isLt10M) {
-        message.error('Tệp phải nhỏ hơn 10MB!');
-        return false;
-      }
-      return false; // Prevent auto upload
-    },
-    onChange: (info) => {
-      if (info.fileList.length > 0) {
-        form.setFieldsValue({ file: info.fileList[0] });
-      }
-    }
-  };
-
   return (
-    <div style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div>
-          <Title level={2}>Quản lý Tài liệu</Title>
+    <div>
+      <Row justify="space-between" align="middle" style={{ marginBottom: '24px' }}>
+        <Col>
+          <Title level={2}>
+            <FileTextOutlined /> Tài liệu của tôi
+          </Title>
           <Text type="secondary">
-            Quản lý và xác thực tất cả các tài liệu trong hệ thống đăng ký đất đai
+            Quản lý và theo dõi trạng thái các tài liệu bạn đã tải lên
           </Text>
-        </div>
-        <Button
-          type="primary"
-          icon={<UploadOutlined />}
-          onClick={() => setUploadModalVisible(true)}
-        >
-          Tải lên Tài liệu
-        </Button>
-      </div>
+        </Col>
+        <Col>
+          <Space>
+            <Button 
+              type="primary" 
+              icon={<UploadOutlined />}
+              onClick={() => navigate('/documents/upload')}
+            >
+              Tải lên tài liệu mới
+            </Button>
+            <Button 
+              icon={<ReloadOutlined />}
+              onClick={fetchMyDocuments}
+              loading={loading}
+            >
+              Làm mới
+            </Button>
+          </Space>
+        </Col>
+      </Row>
 
       {/* Thống kê */}
       <Row gutter={16} style={{ marginBottom: '24px' }}>
@@ -378,7 +320,7 @@ const DocumentManagementPage = ({ user }) => {
               title="Chờ xử lý"
               value={stats.pending}
               valueStyle={{ color: '#faad14' }}
-              prefix={<FileTextOutlined />}
+              prefix={<ExclamationCircleOutlined />}
             />
           </Card>
         </Col>
@@ -403,13 +345,16 @@ const DocumentManagementPage = ({ user }) => {
           <Button type="primary" icon={<SearchOutlined />} onClick={() => handleSearch({ keyword: searchForm.getFieldValue('keyword') })}>
             Tìm kiếm
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={handleResetFilters}>
+          <Button icon={<FilterOutlined />} onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}>
+            {showAdvancedFilters ? 'Ẩn' : 'Hiện'} Bộ lọc nâng cao
+          </Button>
+          <Button onClick={handleResetFilters}>
             Đặt lại
           </Button>
         </Form.Item>
       </Form>
 
-      {/* Bộ lọc nâng cao (nếu cần) */}
+      {/* Bộ lọc nâng cao */}
       {showAdvancedFilters && (
         <Form form={searchForm} layout="inline" style={{ marginBottom: '24px' }}>
           <Form.Item name="docType" label="Loại tài liệu">
@@ -422,9 +367,6 @@ const DocumentManagementPage = ({ user }) => {
               <Option value="APPLICATION">Đơn từ</Option>
               <Option value="OTHER">Khác</Option>
             </Select>
-          </Form.Item>
-          <Form.Item name="uploadedBy" label="Người upload">
-            <Input placeholder="Nhập tên người upload" />
           </Form.Item>
           <Form.Item name="startDate" label="Từ ngày">
             <DatePicker />
@@ -446,8 +388,8 @@ const DocumentManagementPage = ({ user }) => {
         <Table
           columns={columns}
           dataSource={documents}
-          rowKey="docID"
           loading={loading}
+          rowKey="docID"
           pagination={{
             pageSize: 10,
             showSizeChanger: true,
@@ -468,14 +410,6 @@ const DocumentManagementPage = ({ user }) => {
         footer={[
           <Button key="close" onClick={() => setModalVisible(false)}>
             Đóng
-          </Button>,
-          <Button
-            key="download"
-            type="primary"
-            icon={<DownloadOutlined />}
-            onClick={() => window.open(selectedDocument?.ipfsUrl, '_blank')}
-          >
-            Tải xuống
           </Button>
         ]}
       >
@@ -495,11 +429,8 @@ const DocumentManagementPage = ({ user }) => {
                 {getStatusText(selectedDocument.verified)}
               </Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="Người upload">
-              <Text code>{selectedDocument.uploadedBy}</Text>
-            </Descriptions.Item>
             <Descriptions.Item label="Ngày tạo">
-              {new Date(selectedDocument.createdAt).toLocaleDateString('vi-VN')}
+              {selectedDocument.createdAt ? new Date(selectedDocument.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
             </Descriptions.Item>
             <Descriptions.Item label="Kích thước">
               {selectedDocument.fileSize ? `${(selectedDocument.fileSize / 1024).toFixed(2)} KB` : 'N/A'}
@@ -517,71 +448,21 @@ const DocumentManagementPage = ({ user }) => {
                 {selectedDocument.rejectionComments}
               </Descriptions.Item>
             )}
+            {selectedDocument.verifiedAt && (
+              <Descriptions.Item label="Ngày xác thực">
+                {new Date(selectedDocument.verifiedAt).toLocaleDateString('vi-VN')}
+              </Descriptions.Item>
+            )}
+            {selectedDocument.rejectedAt && (
+              <Descriptions.Item label="Ngày từ chối">
+                {new Date(selectedDocument.rejectedAt).toLocaleDateString('vi-VN')}
+              </Descriptions.Item>
+            )}
           </Descriptions>
         )}
-      </Modal>
-
-      {/* Tải lên Tài liệu Modal */}
-      <Modal
-        title="Tải lên Tài liệu mới"
-        open={uploadModalVisible}
-        onOk={() => form.validateFields().then(handleUploadDocument)}
-        onCancel={() => {
-          setUploadModalVisible(false);
-          form.resetFields();
-        }}
-        confirmLoading={loading}
-        width={600}
-      >
-        <Form form={form} layout="vertical">
-          <Form.Item
-            name="docID"
-            label="Mã tài liệu"
-            rules={[{ required: true, message: 'Vui lòng nhập mã tài liệu' }]}
-          >
-            <Input placeholder="Nhập mã tài liệu duy nhất" />
-          </Form.Item>
-          <Form.Item
-            name="docType"
-            label="Loại tài liệu"
-            rules={[{ required: true, message: 'Vui lòng chọn loại tài liệu' }]}
-          >
-            <Select placeholder="Chọn loại tài liệu">
-              <Option value="CERTIFICATE">Giấy chứng nhận</Option>
-              <Option value="CONTRACT">Hợp đồng</Option>
-              <Option value="MAP">Bản đồ</Option>
-              <Option value="IDENTITY">Giấy tờ tùy thân</Option>
-              <Option value="APPLICATION">Đơn từ</Option>
-              <Option value="OTHER">Khác</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item
-            name="title"
-            label="Tiêu đề"
-            rules={[{ required: true, message: 'Vui lòng nhập tiêu đề' }]}
-          >
-            <Input placeholder="Nhập tiêu đề tài liệu" />
-          </Form.Item>
-          <Form.Item
-            name="description"
-            label="Mô tả"
-            rules={[{ required: true, message: 'Vui lòng nhập mô tả' }]}
-          >
-            <TextArea rows={3} placeholder="Nhập mô tả tài liệu" />
-          </Form.Item>
-          <Form.Item
-            name="file"
-            label="Tài liệu"
-            rules={[{ required: true, message: 'Vui lòng chọn tài liệu để tải lên' }]}
-          >
-            <Upload {...uploadProps}>
-              <Button icon={<UploadOutlined />}>Chọn tệp để tải lên</Button>
-            </Upload>
-          </Form.Item>
-        </Form>
       </Modal>
     </div>
   );
 };
 
-export default DocumentManagementPage;
+export default MyDocuments;

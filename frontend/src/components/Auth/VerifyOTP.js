@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Form, Input, Button, Card, Typography, Space, Divider, Alert } from 'antd';
 import { SafetyOutlined, PhoneOutlined, IdcardOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
-import { verifyOTP, resendOTP } from '../../services/auth';
+import authService from '../../services/auth';
 import useMessage from '../../hooks/useMessage';
 
 const { Title, Text } = Typography;
@@ -14,6 +14,7 @@ const VerifyOTP = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const message = useMessage();
+  const [form] = Form.useForm();
   
   const { cccd, phone, message: registrationMessage } = location.state || {};
 
@@ -27,18 +28,18 @@ const VerifyOTP = () => {
 
   const onFinish = async (values) => {
     if (!cccd) {
-      message.error('CCCD not found. Please register again.');
+      message.error('Không tìm thấy CCCD. Vui lòng đăng ký lại.');
       navigate('/register');
       return;
     }
 
     setLoading(true);
     try {
-      await verifyOTP({ cccd, otp: values.otp });
-      message.success('Phone number verified successfully! You can now login.');
+      await authService.verifyOTP(cccd, values.otp);
+      message.success('Số điện thoại đã được xác thực thành công! Bây giờ bạn có thể đăng nhập.');
       navigate('/login');
     } catch (error) {
-      message.error(error.response?.data?.error || 'OTP verification failed');
+      message.error(error.response?.data?.error || 'Xác thực OTP thất bại');
     } finally {
       setLoading(false);
     }
@@ -46,18 +47,18 @@ const VerifyOTP = () => {
 
   const handleResendOTP = async () => {
     if (!cccd) {
-      message.error('CCCD not found. Please register again.');
+      message.error('Không tìm thấy CCCD. Vui lòng đăng ký lại.');
       navigate('/register');
       return;
     }
 
     setResendLoading(true);
     try {
-      await resendOTP({ cccd });
-      message.success('OTP resent successfully!');
+      await authService.resendOTP(cccd);
+      message.success('OTP đã được gửi lại thành công!');
       setCountdown(60); // 60 seconds countdown
     } catch (error) {
-      message.error(error.response?.data?.error || 'Failed to resend OTP');
+      message.error(error.response?.data?.error || 'Không thể gửi lại OTP');
     } finally {
       setResendLoading(false);
     }
@@ -91,12 +92,12 @@ const VerifyOTP = () => {
             }}>
               <ClockCircleOutlined style={{ fontSize: '2rem', color: 'white' }} />
             </div>
-            <Title level={3} style={{ color: '#ff4d4f' }}>Invalid Access</Title>
-            <Text type="secondary">Please register first to verify your account.</Text>
+            <Title level={3} style={{ color: '#ff4d4f' }}>Truy cập không hợp lệ</Title>
+            <Text type="secondary">Vui lòng đăng ký trước để xác thực tài khoản.</Text>
           </div>
           <Link to="/register">
             <Button type="primary" size="large" style={{ width: '100%' }}>
-              Go to Register
+              Đi đến đăng ký
             </Button>
           </Link>
         </Card>
@@ -104,16 +105,13 @@ const VerifyOTP = () => {
     );
   }
 
-  // Mask phone number for display
-  const maskedPhone = phone ? phone.replace(/(\d{3})(\d{3})(\d{4})/, '$1***$3') : '';
-
   return (
     <div className="center-content" style={{ 
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       minHeight: '100vh',
       padding: '2rem'
     }}>
-      <div className="fade-in" style={{ width: '100%', maxWidth: '420px' }}>
+      <div className="fade-in" style={{ width: '100%', maxWidth: '500px' }}>
         <Card 
           className="professional-card"
           style={{ 
@@ -122,13 +120,10 @@ const VerifyOTP = () => {
             borderRadius: '16px',
             overflow: 'hidden'
           }}
+          bodyStyle={{ padding: '32px' }}
         >
-          {/* Header Section */}
-          <div style={{ 
-            textAlign: 'center', 
-            marginBottom: '2rem',
-            padding: '1rem 0'
-          }}>
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <div style={{
               width: '80px',
               height: '80px',
@@ -140,47 +135,58 @@ const VerifyOTP = () => {
               margin: '0 auto 1.5rem',
               boxShadow: '0 8px 16px rgba(82, 196, 26, 0.3)'
             }}>
-              <PhoneOutlined style={{ fontSize: '2rem', color: 'white' }} />
+              <CheckCircleOutlined style={{ fontSize: '2rem', color: 'white' }} />
             </div>
-            <Title level={2} style={{ margin: '0 0 0.5rem', color: '#1f1f1f' }}>
-              Verify Phone Number
+            <Title level={2} style={{ margin: '0 0 0.5rem' }}>
+              Xác thực số điện thoại
             </Title>
             <Text type="secondary" style={{ fontSize: '16px' }}>
-              Enter the 6-digit OTP sent to your phone
+              Nhập mã OTP đã được gửi đến số điện thoại của bạn
             </Text>
           </div>
 
-          {/* User Info Alert */}
-          <Alert
-            message="Verification Required"
-            description={
-              <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                <div>
-                  <Text strong>CCCD: </Text>
-                  <Text code>{cccd}</Text>
-                </div>
-                <div>
-                  <Text strong>Phone: </Text>
-                  <Text code>{maskedPhone}</Text>
-                </div>
-                {registrationMessage && (
-                  <div>
-                    <Text type="secondary" style={{ fontSize: '12px' }}>
-                      {registrationMessage}
-                    </Text>
-                  </div>
-                )}
-              </Space>
-            }
-            type="info"
-            showIcon
-            icon={<IdcardOutlined />}
-            style={{ marginBottom: '1.5rem' }}
-          />
+          <Divider />
 
-          <Divider style={{ margin: '1.5rem 0' }} />
-          
+          {/* User Info */}
+          <div style={{ 
+            background: '#f6f8fa', 
+            padding: '16px', 
+            borderRadius: '8px', 
+            marginBottom: '1.5rem',
+            border: '1px solid #e1e4e8'
+          }}>
+            <Space direction="vertical" size="small" style={{ width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Space>
+                  <IdcardOutlined style={{ color: '#1890ff' }} />
+                  <Text strong>CCCD:</Text>
+                  <Text>{cccd}</Text>
+                </Space>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Space>
+                  <PhoneOutlined style={{ color: '#52c41a' }} />
+                  <Text strong>Số điện thoại:</Text>
+                  <Text>{phone}</Text>
+                </Space>
+              </div>
+            </Space>
+          </div>
+
+          {/* Success Message */}
+          {registrationMessage && (
+            <Alert
+              message="Đăng ký thành công!"
+              description={registrationMessage}
+              type="success"
+              showIcon
+              style={{ marginBottom: '1.5rem' }}
+            />
+          )}
+
+          {/* OTP Form */}
           <Form
+            form={form}
             name="verifyOTP"
             onFinish={onFinish}
             layout="vertical"
@@ -189,15 +195,14 @@ const VerifyOTP = () => {
           >
             <Form.Item
               name="otp"
-              label={<span style={{ fontWeight: 600 }}>OTP Code</span>}
+              label="Mã OTP"
               rules={[
-                { required: true, message: 'Please input the OTP!' },
-                { pattern: /^\d{6}$/, message: 'OTP must be exactly 6 digits!' }
+                { required: true, message: 'Vui lòng nhập mã OTP!' },
+                { pattern: /^\d{6}$/, message: 'Mã OTP phải có đúng 6 chữ số!' }
               ]}
             >
-              <Input 
-                prefix={<SafetyOutlined style={{ color: '#8c8c8c' }} />} 
-                placeholder="Enter 6-digit OTP"
+              <Input
+                placeholder="Nhập mã OTP 6 chữ số"
                 style={{ 
                   borderRadius: '8px',
                   padding: '12px 16px',
@@ -220,24 +225,24 @@ const VerifyOTP = () => {
                   width: '100%', 
                   height: '48px',
                   fontSize: '16px',
-                  fontWeight: 600,
+                  fontWeight: '600',
                   borderRadius: '8px',
                   background: 'linear-gradient(135deg, #52c41a, #389e0d)',
                   border: 'none',
                   boxShadow: '0 4px 12px rgba(82, 196, 26, 0.3)'
                 }}
               >
-                {loading ? 'Verifying...' : 'Verify OTP'}
+                {loading ? 'Đang xác thực...' : 'Xác thực OTP'}
               </Button>
             </Form.Item>
 
             <Divider style={{ margin: '1.5rem 0' }}>
-              <Text type="secondary" style={{ fontSize: '14px' }}>Need help?</Text>
+              <Text type="secondary" style={{ fontSize: '14px' }}>Cần hỗ trợ?</Text>
             </Divider>
 
             <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
               <Text type="secondary" style={{ fontSize: '14px' }}>
-                Didn't receive the OTP? 
+                Không nhận được mã OTP? 
               </Text>
               <br />
               <Button 
@@ -248,27 +253,27 @@ const VerifyOTP = () => {
                 style={{ 
                   padding: '4px 0',
                   fontSize: '14px',
-                  fontWeight: 600
+                  fontWeight: '600'
                 }}
               >
-                {countdown > 0 ? `Resend OTP (${countdown}s)` : 'Resend OTP'}
+                {countdown > 0 ? `Gửi lại OTP (${countdown}s)` : 'Gửi lại OTP'}
               </Button>
             </div>
 
             <div style={{ textAlign: 'center' }}>
               <Space direction="vertical" size="small">
                 <Text type="secondary" style={{ fontSize: '14px' }}>
-                  Already verified?
+                  Đã xác thực rồi?
                 </Text>
                 <Link 
                   to="/login" 
                   style={{ 
                     fontSize: '16px', 
-                    fontWeight: 600,
+                    fontWeight: '600',
                     textDecoration: 'none'
                   }}
                 >
-                  Go to Login
+                  Đi đến đăng nhập
                 </Link>
               </Space>
             </div>
@@ -286,11 +291,11 @@ const VerifyOTP = () => {
               <SafetyOutlined style={{ color: '#52c41a', marginTop: '2px' }} />
               <div>
                 <Text strong style={{ fontSize: '14px', color: '#24292e' }}>
-                  Secure Verification
+                  Xác thực an toàn
                 </Text>
                 <br />
                 <Text type="secondary" style={{ fontSize: '12px' }}>
-                  Your OTP is valid for 5 minutes. Please enter it within this time frame to complete your registration.
+                  Mã OTP của bạn có hiệu lực trong 5 phút. Vui lòng nhập mã trong khoảng thời gian này để hoàn tất đăng ký.
                 </Text>
               </div>
             </Space>

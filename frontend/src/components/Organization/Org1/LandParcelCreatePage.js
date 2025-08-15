@@ -13,7 +13,10 @@ import {
   message,
   Steps,
   Space,
-  Divider
+  Divider,
+  Alert,
+  Tag,
+  Descriptions
 } from 'antd';
 import {
   HomeOutlined,
@@ -21,13 +24,30 @@ import {
   UserOutlined,
   EnvironmentOutlined,
   FileTextOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
+  InfoCircleOutlined
 } from '@ant-design/icons';
-import apiService from '../../../services/api';
+import landService from '../../../services/landService';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 const { Step } = Steps;
+
+// Constants từ chaincode
+const LAND_USE_PURPOSES = [
+  'Đất ở',
+  'Đất nông nghiệp', 
+  'Đất thương mại',
+  'Đất công nghiệp',
+  'Đất phi nông nghiệp'
+];
+
+const LEGAL_STATUSES = [
+  'Có giấy chứng nhận',
+  'Chưa có GCN',
+  'Đang tranh chấp',
+  'Đang thế chấp'
+];
 
 /**
  * Land Parcel Creation Page for Org1 (Authority)
@@ -38,34 +58,17 @@ const LandParcelCreatePage = ({ user, onSuccess }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [form] = Form.useForm();
 
-  const landUsePurposes = [
-    'Residential',
-    'Commercial',
-    'Industrial',
-    'Agricultural',
-    'Forestry',
-    'Public Use',
-    'Mixed Use',
-    'Recreational',
-    'Educational',
-    'Healthcare'
-  ];
-
-  const legalStatuses = [
-    'Registered',
-    'Pending Registration',
-    'Under Review',
-    'Disputed',
-    'Transferred',
-    'Subdivided',
-    'Merged',
-    'Cancelled'
-  ];
-
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
       setLoading(true);
+
+      // Validate data before submission
+      const validation = landService.validateLandData(values);
+      if (!validation.isValid) {
+        message.error(validation.errors.join(', '));
+        return;
+      }
 
       const landParcelData = {
         id: values.id,
@@ -74,7 +77,8 @@ const LandParcelCreatePage = ({ user, onSuccess }) => {
         landUsePurpose: values.landUsePurpose,
         legalStatus: values.legalStatus,
         area: values.area,
-        registrationDate: values.registrationDate?.toISOString(),
+        certificateID: values.certificateID || '',
+        legalInfo: values.legalInfo || '',
         description: values.description,
         coordinates: values.coordinates,
         district: values.district,
@@ -82,8 +86,8 @@ const LandParcelCreatePage = ({ user, onSuccess }) => {
         streetAddress: values.streetAddress
       };
 
-      await apiService.createLandParcel(landParcelData);
-      message.success('Land parcel created successfully!');
+      await landService.createLandParcel(landParcelData);
+      message.success('Thửa đất đã được tạo thành công!');
       form.resetFields();
       setCurrentStep(0);
       
@@ -91,266 +95,356 @@ const LandParcelCreatePage = ({ user, onSuccess }) => {
         onSuccess();
       }
     } catch (error) {
-      console.error('Create land parcel error:', error);
-      message.error(error.response?.data?.error || 'Failed to create land parcel');
+      console.error('Lỗi khi tạo thửa đất:', error);
+      message.error(error.response?.data?.error || error.message || 'Lỗi khi tạo thửa đất');
     } finally {
       setLoading(false);
     }
   };
 
+  const nextStep = () => {
+    form.validateFields().then(() => {
+      setCurrentStep(currentStep + 1);
+    });
+  };
+
+  const prevStep = () => {
+    setCurrentStep(currentStep - 1);
+  };
+
   const steps = [
     {
-      title: 'Basic Information',
+      title: 'Thông tin cơ bản',
+      icon: <HomeOutlined />,
+      content: (
+        <div>
+          <Alert
+            message="Thông tin cơ bản thửa đất"
+            description="Điền các thông tin cơ bản cho thửa đất mới. Các trường đánh dấu * là bắt buộc."
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+          
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="id"
+                label="Mã thửa đất *"
+                rules={[
+                  { required: true, message: 'Vui lòng nhập mã thửa đất!' },
+                  { pattern: /^[A-Z0-9]{6,12}$/, message: 'Mã phải có 6-12 ký tự, chỉ chữ hoa và số!' }
+                ]}
+              >
+                <Input placeholder="Ví dụ: LAND001" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="ownerID"
+                label="CCCD chủ sở hữu *"
+                rules={[
+                  { required: true, message: 'Vui lòng nhập CCCD chủ sở hữu!' },
+                  { pattern: /^\d{12}$/, message: 'CCCD phải có đúng 12 chữ số!' }
+                ]}
+              >
+                <Input placeholder="Ví dụ: 123456789012" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="area"
+                label="Diện tích (m²) *"
+                rules={[
+                  { required: true, message: 'Vui lòng nhập diện tích!' },
+                  { type: 'number', min: 0.01, message: 'Diện tích phải lớn hơn 0!' }
+                ]}
+              >
+                <InputNumber 
+                  placeholder="Ví dụ: 100.5" 
+                  style={{ width: '100%' }}
+                  min={0.01}
+                  step={0.01}
+                  precision={2}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="landUsePurpose"
+                label="Mục đích sử dụng đất *"
+                rules={[{ required: true, message: 'Vui lòng chọn mục đích sử dụng!' }]}
+              >
+                <Select placeholder="Chọn mục đích sử dụng">
+                  {LAND_USE_PURPOSES.map(purpose => (
+                    <Select.Option key={purpose} value={purpose}>
+                      {purpose}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="location"
+            label="Vị trí *"
+            rules={[{ required: true, message: 'Vui lòng nhập vị trí!' }]}
+          >
+            <TextArea 
+              rows={3} 
+              placeholder="Nhập thông tin vị trí chi tiết bao gồm địa chỉ, quận, phường, v.v."
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="description"
+            label="Mô tả"
+          >
+            <TextArea 
+              rows={2} 
+              placeholder="Mô tả bổ sung hoặc ghi chú về thửa đất"
+            />
+          </Form.Item>
+        </div>
+      )
+    },
+    {
+      title: 'Thông tin pháp lý',
       icon: <FileTextOutlined />,
       content: (
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item
-              name="id"
-              label="Land Parcel ID"
-              rules={[
-                { required: true, message: 'Please enter land parcel ID' },
-                { pattern: /^LP\d{6}$/, message: 'ID must be in format LP123456' }
-              ]}
-            >
-              <Input placeholder="LP123456" prefix={<HomeOutlined />} />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              name="ownerID"
-              label="Owner ID (CCCD)"
-              rules={[
-                { required: true, message: 'Please enter owner ID' },
-                { len: 12, message: 'CCCD must be 12 digits' }
-              ]}
-            >
-              <Input placeholder="123456789012" prefix={<UserOutlined />} />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              name="landUsePurpose"
-              label="Land Use Purpose"
-              rules={[{ required: true, message: 'Please select land use purpose' }]}
-            >
-              <Select placeholder="Select land use purpose">
-                {landUsePurposes.map(purpose => (
-                  <Select.Option key={purpose} value={purpose}>
-                    {purpose}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              name="legalStatus"
-              label="Legal Status"
-              rules={[{ required: true, message: 'Please select legal status' }]}
-            >
-              <Select placeholder="Select legal status">
-                {legalStatuses.map(status => (
-                  <Select.Option key={status} value={status}>
-                    {status}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              name="area"
-              label="Area (m²)"
-              rules={[
-                { required: true, message: 'Please enter area' },
-                { type: 'number', min: 1, message: 'Area must be greater than 0' }
-              ]}
-            >
-              <InputNumber
-                style={{ width: '100%' }}
-                placeholder="Enter area in square meters"
-                min={1}
-                formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={value => value.replace(/\$\s?|(,*)/g, '')}
-              />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              name="registrationDate"
-              label="Registration Date"
-              rules={[{ required: true, message: 'Please select registration date' }]}
-            >
-              <DatePicker style={{ width: '100%' }} />
-            </Form.Item>
-          </Col>
-        </Row>
+        <div>
+          <Alert
+            message="Thông tin pháp lý"
+            description="Cung cấp trạng thái pháp lý và thông tin giấy chứng nhận nếu có."
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="legalStatus"
+                label="Trạng thái pháp lý *"
+                rules={[{ required: true, message: 'Vui lòng chọn trạng thái pháp lý!' }]}
+              >
+                <Select placeholder="Chọn trạng thái pháp lý">
+                  {LEGAL_STATUSES.map(status => (
+                    <Select.Option key={status} value={status}>
+                      {status}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="certificateID"
+                label="Mã giấy chứng nhận (Tùy chọn)"
+                rules={[
+                  { pattern: /^[A-Z0-9]{8,16}$/, message: 'Mã GCN phải có 8-16 ký tự, chỉ chữ hoa và số!' }
+                ]}
+              >
+                <Input placeholder="Ví dụ: CERT001" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="legalInfo"
+            label="Thông tin pháp lý"
+            rules={[
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  const certificateID = getFieldValue('certificateID');
+                  if (certificateID && !value) {
+                    return Promise.reject(new Error('Thông tin pháp lý là bắt buộc khi có mã giấy chứng nhận!'));
+                  }
+                  return Promise.resolve();
+                },
+              }),
+            ]}
+          >
+            <TextArea 
+              rows={4} 
+              placeholder="Thông tin pháp lý, chi tiết quyền sở hữu, hạn chế, v.v. (Bắt buộc nếu có Mã GCN)"
+            />
+          </Form.Item>
+
+          <Alert
+            message="Lưu ý"
+            description="Nếu bạn cung cấp Mã giấy chứng nhận, Thông tin pháp lý trở thành bắt buộc. Điều này đảm bảo tài liệu đầy đủ cho giấy chứng nhận."
+            type="warning"
+            showIcon
+          />
+        </div>
       )
     },
     {
-      title: 'Location Details',
+      title: 'Thông tin bổ sung',
       icon: <EnvironmentOutlined />,
       content: (
-        <Row gutter={16}>
-          <Col span={24}>
-            <Form.Item
-              name="location"
-              label="General Location"
-              rules={[{ required: true, message: 'Please enter location' }]}
-            >
-              <TextArea
-                rows={2}
-                placeholder="Enter general location description"
-              />
-            </Form.Item>
-          </Col>
-          <Col span={8}>
-            <Form.Item
-              name="district"
-              label="District"
-              rules={[{ required: true, message: 'Please enter district' }]}
-            >
-              <Input placeholder="Enter district" />
-            </Form.Item>
-          </Col>
-          <Col span={8}>
-            <Form.Item
-              name="ward"
-              label="Ward"
-              rules={[{ required: true, message: 'Please enter ward' }]}
-            >
-              <Input placeholder="Enter ward" />
-            </Form.Item>
-          </Col>
-          <Col span={8}>
-            <Form.Item
-              name="streetAddress"
-              label="Street Address"
-            >
-              <Input placeholder="Enter street address" />
-            </Form.Item>
-          </Col>
-          <Col span={24}>
-            <Form.Item
-              name="coordinates"
-              label="GPS Coordinates (Optional)"
-            >
-              <Input placeholder="e.g., 10.762622, 106.660172" />
-            </Form.Item>
-          </Col>
-          <Col span={24}>
-            <Form.Item
-              name="description"
-              label="Additional Description"
-            >
-              <TextArea
-                rows={3}
-                placeholder="Enter any additional description or notes"
-              />
-            </Form.Item>
-          </Col>
-        </Row>
+        <div>
+          <Alert
+            message="Thông tin bổ sung"
+            description="Các thông tin bổ sung để xác định và quản lý thửa đất tốt hơn."
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                name="district"
+                label="Quận/Huyện"
+              >
+                <Input placeholder="Ví dụ: Quận 1" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="ward"
+                label="Phường/Xã"
+              >
+                <Input placeholder="Ví dụ: Phường Bến Nghé" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="streetAddress"
+                label="Địa chỉ đường"
+              >
+                <Input placeholder="Ví dụ: 123 Đường Nguyễn Huệ" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="coordinates"
+            label="Tọa độ (Tùy chọn)"
+          >
+            <TextArea 
+              rows={2} 
+              placeholder="Tọa độ GPS hoặc tham chiếu bản đồ (Ví dụ: 10.762622, 106.660172)"
+            />
+          </Form.Item>
+
+          <Alert
+            message="Định dạng tọa độ"
+            description="Tọa độ nên ở định dạng thập phân (vĩ độ, kinh độ). Ví dụ: 10.762622, 106.660172"
+            type="info"
+            showIcon
+          />
+        </div>
       )
     },
     {
-      title: 'Review & Submit',
+      title: 'Xem lại & Gửi',
       icon: <CheckCircleOutlined />,
       content: (
         <div>
-          <Title level={4}>Review Land Parcel Information</Title>
-          <Text type="secondary">
-            Please review all information before submitting. Once created, some fields may require special permissions to modify.
-          </Text>
-          <Divider />
-          <Row gutter={16}>
-            <Col span={12}>
-              <Text strong>Land Parcel ID:</Text>
-              <div>{form.getFieldValue('id')}</div>
-            </Col>
-            <Col span={12}>
-              <Text strong>Owner ID:</Text>
-              <div>{form.getFieldValue('ownerID')}</div>
-            </Col>
-            <Col span={12}>
-              <Text strong>Land Use Purpose:</Text>
-              <div>{form.getFieldValue('landUsePurpose')}</div>
-            </Col>
-            <Col span={12}>
-              <Text strong>Legal Status:</Text>
-              <div>{form.getFieldValue('legalStatus')}</div>
-            </Col>
-            <Col span={12}>
-              <Text strong>Area:</Text>
-              <div>{form.getFieldValue('area')} m²</div>
-            </Col>
-            <Col span={12}>
-              <Text strong>Registration Date:</Text>
-              <div>{form.getFieldValue('registrationDate')?.format('DD/MM/YYYY')}</div>
-            </Col>
-          </Row>
+          <Alert
+            message="Xem lại thông tin"
+            description="Vui lòng xem lại tất cả thông tin trước khi gửi. Bạn có thể quay lại các bước trước để thay đổi."
+            type="success"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+
+          <Card title="Tóm tắt thửa đất" size="small">
+            <Descriptions column={2} bordered size="small">
+              <Descriptions.Item label="Mã thửa đất">
+                <Tag color="blue">{form.getFieldValue('id') || 'Chưa nhập'}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="CCCD chủ sở hữu">
+                <Tag color="green">{form.getFieldValue('ownerID') || 'Chưa nhập'}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Diện tích">
+                <Tag color="orange">{form.getFieldValue('area') ? `${form.getFieldValue('area')} m²` : 'Chưa nhập'}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Mục đích sử dụng">
+                <Tag color="purple">{form.getFieldValue('landUsePurpose') || 'Chưa chọn'}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Trạng thái pháp lý">
+                <Tag color="red">{form.getFieldValue('legalStatus') || 'Chưa chọn'}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Vị trí">
+                <Text ellipsis style={{ maxWidth: 200 }}>
+                  {form.getFieldValue('location') || 'Chưa nhập'}
+                </Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Mã giấy chứng nhận">
+                <Tag color={form.getFieldValue('certificateID') ? 'green' : 'default'}>
+                  {form.getFieldValue('certificateID') || 'Chưa cung cấp'}
+                </Tag>
+              </Descriptions.Item>
+            </Descriptions>
+          </Card>
+
+          <Alert
+            message="Sẵn sàng gửi"
+            description="Tất cả thông tin bắt buộc đã được cung cấp. Nhấn nút Gửi để tạo thửa đất trên blockchain."
+            type="success"
+            showIcon
+            style={{ marginTop: 16 }}
+          />
         </div>
       )
     }
   ];
 
-  const next = () => {
-    form.validateFields().then(() => {
-      setCurrentStep(currentStep + 1);
-    }).catch(() => {
-      message.error('Please fill in all required fields');
-    });
-  };
-
-  const prev = () => {
-    setCurrentStep(currentStep - 1);
-  };
-
   return (
-    <div style={{ padding: '24px' }}>
+    <div>
       <Title level={2}>
-        <HomeOutlined style={{ marginRight: '8px', color: '#1890ff' }} />
-        Create New Land Parcel
+        <HomeOutlined /> Tạo thửa đất mới
       </Title>
-      <Text type="secondary">
-        Create a new land parcel record in the system. This is a main authority function for Org1.
-      </Text>
+      
+      <Alert
+        message="Tổ chức: Org1 (Cơ quan quản lý)"
+        description="Bạn có quyền tạo thửa đất mới và cấp giấy chứng nhận. Tất cả thay đổi sẽ được ghi lại trên blockchain."
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+      />
 
-      <Card style={{ marginTop: '24px' }}>
-        <Steps current={currentStep} style={{ marginBottom: '32px' }}>
-          {steps.map((step, index) => (
-            <Step key={index} title={step.title} icon={step.icon} />
+      <Card>
+        <Steps current={currentStep} style={{ marginBottom: 24 }}>
+          {steps.map(item => (
+            <Step key={item.title} title={item.title} icon={item.icon} />
           ))}
         </Steps>
 
-        <Form
-          form={form}
-          layout="vertical"
-          style={{ marginTop: '32px' }}
-        >
+        <div style={{ minHeight: 400 }}>
           {steps[currentStep].content}
-        </Form>
+        </div>
 
-        <div style={{ marginTop: '32px', textAlign: 'right' }}>
+        <Divider />
+
+        <div style={{ textAlign: 'right' }}>
           <Space>
             {currentStep > 0 && (
-              <Button onClick={prev}>
-                Previous
+              <Button onClick={prevStep}>
+                Trước
               </Button>
             )}
             {currentStep < steps.length - 1 && (
-              <Button type="primary" onClick={next}>
-                Next
+              <Button type="primary" onClick={nextStep}>
+                Tiếp theo
               </Button>
             )}
             {currentStep === steps.length - 1 && (
-              <Button
-                type="primary"
+              <Button 
+                type="primary" 
                 icon={<SaveOutlined />}
                 onClick={handleSubmit}
                 loading={loading}
               >
-                Create Land Parcel
+                Tạo thửa đất
               </Button>
             )}
           </Space>

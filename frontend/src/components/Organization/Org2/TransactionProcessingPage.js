@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   Table,
@@ -8,47 +8,61 @@ import {
   Modal,
   Form,
   Input,
-  Select,
   message,
   Typography,
   Row,
   Col,
   Statistic,
-  Steps,
   Descriptions,
-  Alert
+  Select,
+  DatePicker,
+  Tooltip,
+  Alert,
+  Divider,
+  Steps
 } from 'antd';
 import {
-  SwapOutlined,
-  SendOutlined,
+  TransactionOutlined,
   CheckCircleOutlined,
-  ClockCircleOutlined,
+  CloseCircleOutlined,
   EyeOutlined,
+  SearchOutlined,
+  FilterOutlined,
+  ReloadOutlined,
+  ExclamationCircleOutlined,
   ForwardOutlined,
-  ToolOutlined
+  HistoryOutlined,
+  ClockCircleOutlined
 } from '@ant-design/icons';
-import apiService from '../../../services/api';
+import transactionService from '../../../services/transactionService';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
+const { Option } = Select;
+const { Step } = Steps;
 
 /**
- * Transaction Processing Page for Org2
- * Process and forward transactions
+ * Transaction Processing Page for Org2 (Commune Administrative Unit)
+ * Processes and forwards transactions to Org1 for approval
  */
 const TransactionProcessingPage = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [actionType, setActionType] = useState(''); // 'process', 'forward', 'view'
-  const [form] = Form.useForm();
+  const [processingModalVisible, setProcessingModalVisible] = useState(false);
+  const [processingTransaction, setProcessingTransaction] = useState(null);
+  const [searchForm] = Form.useForm();
+  const [processingForm] = Form.useForm();
   const [stats, setStats] = useState({
+    total: 0,
     pending: 0,
-    processed: 0,
+    confirmed: 0,
     forwarded: 0,
-    total: 0
+    verified: 0
   });
+  const [filters, setFilters] = useState({});
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   useEffect(() => {
     fetchTransactions();
@@ -58,15 +72,11 @@ const TransactionProcessingPage = ({ user }) => {
   const fetchTransactions = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getAllTransactions();
-      // Filter transactions that Org2 can process
-      const processableTransactions = response.transactions?.filter(tx => 
-        tx.status === 'Pending' || tx.status === 'Under Review'
-      ) || [];
-      setTransactions(processableTransactions);
+      const response = await transactionService.getAllTransactions();
+      setTransactions(response.transactions || response || []);
     } catch (error) {
-      console.error('Error fetching transactions:', error);
-      message.error('Failed to fetch transactions');
+      console.error('Lỗi khi lấy danh sách giao dịch:', error);
+      message.error('Không thể lấy danh sách giao dịch');
     } finally {
       setLoading(false);
     }
@@ -74,434 +84,542 @@ const TransactionProcessingPage = ({ user }) => {
 
   const fetchStats = async () => {
     try {
-      const response = await apiService.getTransactionProcessingStats();
-      setStats(response.stats || {
-        pending: 0,
-        processed: 0,
-        forwarded: 0,
-        total: 0
+      const allTxs = await transactionService.getAllTransactions();
+      const txs = allTxs.transactions || allTxs || [];
+      
+      setStats({
+        total: txs.length,
+        pending: txs.filter(tx => tx.status === 'PENDING').length,
+        confirmed: txs.filter(tx => tx.status === 'CONFIRMED').length,
+        forwarded: txs.filter(tx => tx.status === 'FORWARDED').length,
+        verified: txs.filter(tx => tx.status === 'VERIFIED').length
       });
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error('Lỗi khi lấy thống kê:', error);
     }
   };
 
   const handleViewTransaction = (transaction) => {
     setSelectedTransaction(transaction);
     setModalVisible(true);
-    setActionType('view');
   };
 
-  const handleProcessTransaction = (transaction) => {
-    setSelectedTransaction(transaction);
-    setModalVisible(true);
-    setActionType('process');
-    form.resetFields();
-  };
-
-  const handleForwardTransaction = (transaction) => {
-    setSelectedTransaction(transaction);
-    setModalVisible(true);
-    setActionType('forward');
-    form.resetFields();
-  };
-
-  const handleModalOk = async () => {
-    if (actionType === 'view') {
-      setModalVisible(false);
-      return;
-    }
-
+  const handleProcessTransaction = async (values) => {
     try {
-      const values = await form.validateFields();
       setLoading(true);
-
-      if (actionType === 'process') {
-        await apiService.processTransaction(selectedTransaction.txID, {
-          processingNotes: values.notes || '',
-          processedBy: user.cccd,
-          nextStep: values.nextStep
+      const { action, comments } = values;
+      const tx = processingTransaction;
+      
+      if (action === 'PROCESS') {
+        await transactionService.processTransaction(tx.txID);
+        message.success('Giao dịch đã được xử lý thành công');
+      } else if (action === 'FORWARD') {
+        await transactionService.forwardTransaction(tx.txID, {
+          action: 'FORWARD',
+          comments,
+          forwardedBy: user.cccd,
+          forwardedAt: new Date().toISOString()
         });
-        message.success('Transaction processed successfully');
-      } else if (actionType === 'forward') {
-        await apiService.forwardTransaction(selectedTransaction.txID, {
-          forwardTo: values.forwardTo,
-          forwardReason: values.reason,
-          forwardNotes: values.notes || '',
-          forwardedBy: user.cccd
-        });
-        message.success('Transaction forwarded successfully');
+        message.success('Giao dịch đã được chuyển tiếp thành công');
       }
-
-      setModalVisible(false);
+      
       fetchTransactions();
       fetchStats();
+      setProcessingModalVisible(false);
+      setProcessingTransaction(null);
+      processingForm.resetFields();
     } catch (error) {
-      console.error('Transaction action error:', error);
-      message.error(error.message || `Failed to ${actionType} transaction`);
+      console.error('Lỗi khi xử lý giao dịch:', error);
+      message.error(error.message || 'Lỗi khi xử lý giao dịch');
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'pending': return 'orange';
-      case 'under review': return 'blue';
-      case 'processed': return 'green';
-      case 'forwarded': return 'purple';
-      case 'completed': return 'green';
-      default: return 'default';
-    }
+  const openProcessingModal = (transaction) => {
+    setProcessingTransaction(transaction);
+    setProcessingModalVisible(true);
   };
 
-  const getTransactionTypeIcon = (type) => {
-    switch (type?.toLowerCase()) {
-      case 'transfer': return <SwapOutlined />;
-      case 'split': return <SwapOutlined />;
-      case 'merge': return <SwapOutlined />;
-      default: return <SwapOutlined />;
-    }
-  };
-
-  const getProcessingSteps = (transaction) => {
-    const steps = [
-      {
-        title: 'Submitted',
-        status: 'finish',
-        description: 'Transaction submitted by citizen'
-      },
-      {
-        title: 'Under Review',
-        status: transaction.status === 'Pending' ? 'process' : 'finish',
-        description: 'Being reviewed by officers'
-      },
-      {
-        title: 'Processed',
-        status: transaction.status === 'Processed' || transaction.status === 'Forwarded' ? 'finish' : 'wait',
-        description: 'Processed by Org2'
-      },
-      {
-        title: 'Final Approval',
-        status: transaction.status === 'Completed' ? 'finish' : 'wait',
-        description: 'Final approval by Org1'
+  const handleSearch = async (values) => {
+    try {
+      setLoading(true);
+      if (values.keyword) {
+        const response = await transactionService.searchTransactions({
+          keyword: values.keyword,
+          filters: JSON.stringify(filters)
+        });
+        setTransactions(response.transactions || response || []);
+      } else {
+        fetchTransactions();
       }
-    ];
+    } catch (error) {
+      console.error('Lỗi khi tìm kiếm:', error);
+      message.error('Lỗi khi tìm kiếm giao dịch');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return steps;
+  const handleAdvancedSearch = async (values) => {
+    try {
+      setLoading(true);
+      const response = await transactionService.advancedSearch(values);
+      setTransactions(response.transactions || response || []);
+    } catch (error) {
+      console.error('Lỗi khi tìm kiếm nâng cao:', error);
+      message.error('Lỗi khi tìm kiếm nâng cao');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetFilters = () => {
+    searchForm.resetFields();
+    setFilters({});
+    fetchTransactions();
+  };
+
+  const getStatusColor = (status) => {
+    const statusColors = {
+      'PENDING': 'orange',
+      'CONFIRMED': 'blue',
+      'FORWARDED': 'cyan',
+      'VERIFIED': 'purple',
+      'SUPPLEMENT_REQUESTED': 'gold',
+      'APPROVED': 'green',
+      'REJECTED': 'red'
+    };
+    return statusColors[status] || 'default';
+  };
+
+  const getStatusText = (status) => {
+    const statusTexts = {
+      'PENDING': 'Chờ xử lý',
+      'CONFIRMED': 'Đã xác nhận',
+      'FORWARDED': 'Đã chuyển tiếp',
+      'VERIFIED': 'Đã xác thực',
+      'SUPPLEMENT_REQUESTED': 'Yêu cầu bổ sung',
+      'APPROVED': 'Đã phê duyệt',
+      'REJECTED': 'Bị từ chối'
+    };
+    return statusTexts[status] || status;
+  };
+
+  const getTransactionTypeText = (type) => {
+    const typeTexts = {
+      'TRANSFER': 'Chuyển nhượng',
+      'SPLIT': 'Tách thửa',
+      'MERGE': 'Hợp thửa',
+      'CHANGE_PURPOSE': 'Thay đổi mục đích sử dụng',
+      'REISSUE': 'Cấp lại GCN'
+    };
+    return typeTexts[type] || type;
+  };
+
+  const getActionText = (action) => {
+    const actionTexts = {
+      'CREATE': 'Tạo mới',
+      'UPDATE': 'Cập nhật',
+      'QUERY': 'Truy vấn',
+      'APPROVE': 'Phê duyệt',
+      'REJECT': 'Từ chối'
+    };
+    return actionTexts[action] || action;
+  };
+
+  const canProcessTransaction = (transaction) => {
+    return transaction.status === 'PENDING' || transaction.status === 'CONFIRMED';
+  };
+
+  const canForwardTransaction = (transaction) => {
+    return transaction.status === 'CONFIRMED' || transaction.status === 'VERIFIED';
   };
 
   const columns = [
     {
-      title: 'Transaction ID',
+      title: 'Mã giao dịch',
       dataIndex: 'txID',
       key: 'txID',
-      width: 150,
+      width: 120,
       render: (text) => <Text code>{text}</Text>
     },
     {
-      title: 'Type',
+      title: 'Loại giao dịch',
       dataIndex: 'type',
       key: 'type',
-      width: 120,
-      render: (type) => (
-        <Space>
-          {getTransactionTypeIcon(type)}
-          <Text>{type}</Text>
-        </Space>
-      )
+      width: 150,
+      render: (type) => <Tag color="blue">{getTransactionTypeText(type)}</Tag>
     },
     {
-      title: 'Land Parcel ID',
+      title: 'Thửa đất',
       dataIndex: 'landParcelID',
       key: 'landParcelID',
-      width: 150,
+      width: 120,
       render: (text) => <Text code>{text}</Text>
     },
     {
-      title: 'From Owner',
-      dataIndex: 'fromOwnerID',
-      key: 'fromOwnerID',
-      width: 150
+      title: 'Người thực hiện',
+      dataIndex: 'userID',
+      key: 'userID',
+      width: 120,
+      render: (text) => <Text code>{text}</Text>
     },
     {
-      title: 'Status',
+      title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
       width: 120,
       render: (status) => (
-        <Tag color={getStatusColor(status)} icon={<ClockCircleOutlined />}>
-          {status}
+        <Tag color={getStatusColor(status)}>
+          {getStatusText(status)}
         </Tag>
       )
     },
     {
-      title: 'Priority',
-      dataIndex: 'priority',
-      key: 'priority',
+      title: 'Hành động',
+      dataIndex: 'action',
+      key: 'action',
       width: 100,
-      render: (priority) => (
-        <Tag color={priority === 'High' ? 'red' : priority === 'Medium' ? 'orange' : 'green'}>
-          {priority || 'Normal'}
-        </Tag>
-      )
+      render: (action) => <Tag>{getActionText(action)}</Tag>
     },
     {
-      title: 'Created Date',
+      title: 'Ngày tạo',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: 150,
-      render: (date) => new Date(date).toLocaleDateString('vi-VN')
+      width: 120,
+      render: (date) => date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'
     },
     {
-      title: 'Actions',
+      title: 'Thao tác',
       key: 'actions',
-      width: 250,
+      width: 200,
       render: (_, record) => (
         <Space>
-          <Button
-            type="link"
-            icon={<EyeOutlined />}
-            onClick={() => handleViewTransaction(record)}
-          >
-            View
-          </Button>
-          {record.status === 'Pending' && (
-            <>
-              <Button
-                type="link"
-                icon={<ToolOutlined />}
-                onClick={() => handleProcessTransaction(record)}
-                style={{ color: '#52c41a' }}
+          <Tooltip title="Xem chi tiết">
+            <Button 
+              icon={<EyeOutlined />} 
+              size="small"
+              onClick={() => handleViewTransaction(record)}
+            />
+          </Tooltip>
+          {canProcessTransaction(record) && (
+            <Tooltip title="Xử lý giao dịch">
+              <Button 
+                icon={<CheckCircleOutlined />} 
+                size="small"
+                type="primary"
+                onClick={() => openProcessingModal(record)}
               >
-                Process
+                Xử lý
               </Button>
-              <Button
-                type="link"
-                icon={<ForwardOutlined />}
-                onClick={() => handleForwardTransaction(record)}
-                style={{ color: '#1890ff' }}
+            </Tooltip>
+          )}
+          {canForwardTransaction(record) && (
+            <Tooltip title="Chuyển tiếp">
+              <Button 
+                icon={<ForwardOutlined />} 
+                size="small"
+                onClick={() => openProcessingModal(record)}
               >
-                Forward
+                Chuyển tiếp
               </Button>
-            </>
+            </Tooltip>
           )}
         </Space>
-      )
-    }
+      ),
+    },
   ];
 
-  const renderTransactionDetails = () => {
-    if (!selectedTransaction) return null;
-
-    return (
-      <>
-        <Steps
-          current={
-            selectedTransaction.status === 'Pending' ? 1 :
-            selectedTransaction.status === 'Processed' ? 2 :
-            selectedTransaction.status === 'Completed' ? 3 : 1
-          }
-          items={getProcessingSteps(selectedTransaction)}
-          style={{ marginBottom: '24px' }}
-        />
-
-        <Descriptions bordered column={2} size="small">
-          <Descriptions.Item label="Transaction ID" span={2}>
-            <Text code>{selectedTransaction.txID}</Text>
-          </Descriptions.Item>
-          <Descriptions.Item label="Type">
-            <Space>
-              {getTransactionTypeIcon(selectedTransaction.type)}
-              {selectedTransaction.type}
-            </Space>
-          </Descriptions.Item>
-          <Descriptions.Item label="Status">
-            <Tag color={getStatusColor(selectedTransaction.status)}>
-              {selectedTransaction.status}
-            </Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label="Land Parcel ID">
-            <Text code>{selectedTransaction.landParcelID}</Text>
-          </Descriptions.Item>
-          <Descriptions.Item label="From Owner">
-            {selectedTransaction.fromOwnerID}
-          </Descriptions.Item>
-          <Descriptions.Item label="To Owner">
-            {selectedTransaction.toOwnerID || 'N/A'}
-          </Descriptions.Item>
-          <Descriptions.Item label="Priority">
-            <Tag color={selectedTransaction.priority === 'High' ? 'red' : 'green'}>
-              {selectedTransaction.priority || 'Normal'}
-            </Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label="Created Date">
-            {new Date(selectedTransaction.createdAt).toLocaleString('vi-VN')}
-          </Descriptions.Item>
-          <Descriptions.Item label="Details" span={2}>
-            {selectedTransaction.details || 'No additional details'}
-          </Descriptions.Item>
-          {selectedTransaction.processingNotes && (
-            <Descriptions.Item label="Processing Notes" span={2}>
-              {selectedTransaction.processingNotes}
-            </Descriptions.Item>
-          )}
-        </Descriptions>
-      </>
-    );
-  };
-
   return (
-    <div style={{ padding: '24px' }}>
-      <Title level={2}>Transaction Processing</Title>
-      <Text type="secondary">
-        Process and forward land transaction requests
-      </Text>
+    <div>
+      <Title level={2}>
+        <TransactionOutlined /> Xử lý Giao dịch
+      </Title>
+      
+      <Alert
+        message="Tổ chức: Org2 (Đơn vị hành chính cấp xã)"
+        description="Bạn có quyền xử lý và chuyển tiếp các giao dịch. Sau khi xử lý, giao dịch sẽ được chuyển đến cơ quan quản lý đất đai để phê duyệt cuối cùng."
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+      />
 
-      {/* Statistics Cards */}
-      <Row gutter={16} style={{ marginTop: '24px', marginBottom: '24px' }}>
-        <Col span={6}>
+      {/* Thống kê */}
+      <Row gutter={16} style={{ marginBottom: '24px' }}>
+        <Col span={4}>
           <Card>
             <Statistic
-              title="Pending Processing"
+              title="Tổng số giao dịch"
+              value={stats.total}
+              prefix={<TransactionOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col span={4}>
+          <Card>
+            <Statistic
+              title="Chờ xử lý"
               value={stats.pending}
               valueStyle={{ color: '#faad14' }}
               prefix={<ClockCircleOutlined />}
             />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={4}>
           <Card>
             <Statistic
-              title="Processed"
-              value={stats.processed}
-              valueStyle={{ color: '#52c41a' }}
+              title="Đã xác nhận"
+              value={stats.confirmed}
+              valueStyle={{ color: '#1890ff' }}
               prefix={<CheckCircleOutlined />}
             />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={4}>
           <Card>
             <Statistic
-              title="Forwarded"
+              title="Đã chuyển tiếp"
               value={stats.forwarded}
-              valueStyle={{ color: '#1890ff' }}
-              prefix={<SendOutlined />}
+              valueStyle={{ color: '#722ed1' }}
+              prefix={<ForwardOutlined />}
             />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={4}>
           <Card>
             <Statistic
-              title="Total Transactions"
-              value={stats.total}
-              prefix={<SwapOutlined />}
+              title="Đã xác thực"
+              value={stats.verified}
+              valueStyle={{ color: '#52c41a' }}
+              prefix={<ExclamationCircleOutlined />}
             />
           </Card>
         </Col>
       </Row>
 
-      {/* Processing Guidelines */}
-      <Alert
-        message="Processing Guidelines"
-        description="Review transaction details carefully. Process transactions that meet all requirements or forward them to the appropriate authority for further review."
-        type="info"
-        showIcon
-        style={{ marginBottom: '24px' }}
-      />
+      {/* Bộ lọc tìm kiếm */}
+      <Form form={searchForm} layout="inline" style={{ marginBottom: '24px' }}>
+        <Form.Item name="keyword" label="Từ khóa">
+          <Input placeholder="Nhập từ khóa tìm kiếm" />
+        </Form.Item>
+        <Form.Item>
+          <Button type="primary" icon={<SearchOutlined />} onClick={() => handleSearch({ keyword: searchForm.getFieldValue('keyword') })}>
+            Tìm kiếm
+          </Button>
+          <Button icon={<FilterOutlined />} onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}>
+            {showAdvancedFilters ? 'Ẩn' : 'Hiện'} Bộ lọc nâng cao
+          </Button>
+          <Button icon={<ReloadOutlined />} onClick={handleResetFilters}>
+            Đặt lại
+          </Button>
+        </Form.Item>
+      </Form>
 
-      {/* Transactions Table */}
+      {/* Bộ lọc nâng cao */}
+      {showAdvancedFilters && (
+        <Form form={searchForm} layout="inline" style={{ marginBottom: '24px' }}>
+          <Form.Item name="type" label="Loại giao dịch">
+            <Select placeholder="Chọn loại giao dịch">
+              <Option value="">Tất cả</Option>
+              <Option value="TRANSFER">Chuyển nhượng</Option>
+              <Option value="SPLIT">Tách thửa</Option>
+              <Option value="MERGE">Hợp thửa</Option>
+              <Option value="CHANGE_PURPOSE">Thay đổi mục đích sử dụng</Option>
+              <Option value="REISSUE">Cấp lại GCN</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="status" label="Trạng thái">
+            <Select placeholder="Chọn trạng thái">
+              <Option value="">Tất cả</Option>
+              <Option value="PENDING">Chờ xử lý</Option>
+              <Option value="CONFIRMED">Đã xác nhận</Option>
+              <Option value="FORWARDED">Đã chuyển tiếp</Option>
+              <Option value="VERIFIED">Đã xác thực</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="startDate" label="Từ ngày">
+            <DatePicker />
+          </Form.Item>
+          <Form.Item name="endDate" label="Đến ngày">
+            <DatePicker />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" icon={<FilterOutlined />} onClick={() => handleAdvancedSearch(searchForm.getFieldsValue())}>
+              Áp dụng bộ lọc
+            </Button>
+            <Button onClick={handleResetFilters}>Đặt lại</Button>
+          </Form.Item>
+        </Form>
+      )}
+
+      {/* Bảng danh sách giao dịch */}
       <Card>
         <Table
           columns={columns}
           dataSource={transactions}
-          rowKey="txID"
           loading={loading}
+          rowKey="txID"
           pagination={{
             pageSize: 10,
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} transactions`
+              `${range[0]}-${range[1]} trong ${total} giao dịch`
           }}
           scroll={{ x: 1200 }}
         />
       </Card>
 
-      {/* Transaction Details/Action Modal */}
+      {/* Chi tiết giao dịch Modal */}
       <Modal
-        title={
-          actionType === 'view' ? 'Transaction Details' :
-          actionType === 'process' ? 'Process Transaction' :
-          'Forward Transaction'
-        }
+        title="Chi tiết Giao dịch"
         open={modalVisible}
-        onOk={handleModalOk}
         onCancel={() => setModalVisible(false)}
         width={800}
-        okText={
-          actionType === 'view' ? 'Close' :
-          actionType === 'process' ? 'Process' :
-          'Forward'
-        }
-        confirmLoading={loading}
+        footer={[
+          <Button key="close" onClick={() => setModalVisible(false)}>
+            Đóng
+          </Button>
+        ]}
       >
-        {renderTransactionDetails()}
-        
-        {actionType !== 'view' && (
-          <Form form={form} layout="vertical" style={{ marginTop: '24px' }}>
-            {actionType === 'process' && (
+        {selectedTransaction && (
+          <Descriptions bordered column={2} size="small">
+            <Descriptions.Item label="Mã giao dịch" span={2}>
+              <Text code>{selectedTransaction.txID}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Loại giao dịch">
+              <Tag color="blue">{getTransactionTypeText(selectedTransaction.type)}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Trạng thái">
+              <Tag color={getStatusColor(selectedTransaction.status)}>
+                {getStatusText(selectedTransaction.status)}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Thửa đất">
+              <Text code>{selectedTransaction.landParcelID}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Người thực hiện">
+              <Text code>{selectedTransaction.userID}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Hành động">
+              <Tag>{getActionText(selectedTransaction.action)}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Ngày tạo">
+              {selectedTransaction.createdAt ? new Date(selectedTransaction.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Chi tiết" span={2}>
+              {selectedTransaction.details || 'Không có chi tiết'}
+            </Descriptions.Item>
+            {selectedTransaction.fromOwnerID && (
+              <Descriptions.Item label="Người chuyển nhượng">
+                <Text code>{selectedTransaction.fromOwnerID}</Text>
+              </Descriptions.Item>
+            )}
+            {selectedTransaction.toOwnerID && (
+              <Descriptions.Item label="Người nhận chuyển nhượng">
+                <Text code>{selectedTransaction.toOwnerID}</Text>
+              </Descriptions.Item>
+            )}
+            {selectedTransaction.parcelIDs && selectedTransaction.parcelIDs.length > 0 && (
+              <Descriptions.Item label="Danh sách thửa đất" span={2}>
+                {selectedTransaction.parcelIDs.map((id, index) => (
+                  <Tag key={index} color="blue" style={{ marginBottom: 4 }}>
+                    {id}
+                  </Tag>
+                ))}
+              </Descriptions.Item>
+            )}
+          </Descriptions>
+        )}
+      </Modal>
+
+      {/* Xử lý/Chuyển tiếp giao dịch Modal */}
+      <Modal
+        title="Xử lý Giao dịch"
+        open={processingModalVisible}
+        onCancel={() => {
+          setProcessingModalVisible(false);
+          setProcessingTransaction(null);
+          processingForm.resetFields();
+        }}
+        footer={null}
+        width={600}
+      >
+        {processingTransaction && (
+          <div>
+            <Alert
+              message="Thông tin giao dịch cần xử lý"
+              description={
+                <div>
+                  <p><strong>Mã giao dịch:</strong> {processingTransaction.txID}</p>
+                  <p><strong>Loại:</strong> {getTransactionTypeText(processingTransaction.type)}</p>
+                  <p><strong>Thửa đất:</strong> {processingTransaction.landParcelID}</p>
+                  <p><strong>Trạng thái hiện tại:</strong> <Tag color={getStatusColor(processingTransaction.status)}>{getStatusText(processingTransaction.status)}</Tag></p>
+                </div>
+              }
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+
+            <Form
+              form={processingForm}
+              layout="vertical"
+              onFinish={handleProcessTransaction}
+            >
               <Form.Item
-                name="nextStep"
-                label="Next Step"
-                rules={[{ required: true, message: 'Please select next step' }]}
+                name="action"
+                label="Hành động"
+                rules={[{ required: true, message: 'Vui lòng chọn hành động!' }]}
               >
-                <Select placeholder="Select next step">
-                  <Select.Option value="approve">Recommend for Approval</Select.Option>
-                  <Select.Option value="review">Requires Further Review</Select.Option>
-                  <Select.Option value="documentation">Additional Documentation Needed</Select.Option>
+                <Select placeholder="Chọn hành động">
+                  {canProcessTransaction(processingTransaction) && (
+                    <Option value="PROCESS">
+                      <Space>
+                        <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                        Xử lý giao dịch
+                      </Space>
+                    </Option>
+                  )}
+                  {canForwardTransaction(processingTransaction) && (
+                    <Option value="FORWARD">
+                      <Space>
+                        <ForwardOutlined style={{ color: '#1890ff' }} />
+                        Chuyển tiếp lên cơ quan quản lý
+                      </Space>
+                    </Option>
+                  )}
                 </Select>
               </Form.Item>
-            )}
-            
-            {actionType === 'forward' && (
-              <>
-                <Form.Item
-                  name="forwardTo"
-                  label="Forward To"
-                  rules={[{ required: true, message: 'Please select destination' }]}
-                >
-                  <Select placeholder="Select destination">
-                    <Select.Option value="Org1">Land Registry Authority (Org1)</Select.Option>
-                    <Select.Option value="legal">Legal Department</Select.Option>
-                    <Select.Option value="technical">Technical Review</Select.Option>
-                  </Select>
-                </Form.Item>
-                <Form.Item
-                  name="reason"
-                  label="Forward Reason"
-                  rules={[{ required: true, message: 'Please provide forward reason' }]}
-                >
-                  <Select placeholder="Select reason">
-                    <Select.Option value="approval">Requires Final Approval</Select.Option>
-                    <Select.Option value="legal_review">Legal Review Required</Select.Option>
-                    <Select.Option value="technical_review">Technical Review Required</Select.Option>
-                    <Select.Option value="documentation">Missing Documentation</Select.Option>
-                  </Select>
-                </Form.Item>
-              </>
-            )}
-            
-            <Form.Item
-              name="notes"
-              label={actionType === 'process' ? 'Processing Notes' : 'Forward Notes'}
-            >
-              <TextArea
-                rows={4}
-                placeholder={`Enter ${actionType === 'process' ? 'processing' : 'forward'} notes...`}
-              />
-            </Form.Item>
-          </Form>
+
+              <Form.Item
+                name="comments"
+                label="Bình luận xử lý"
+                rules={[{ required: true, message: 'Vui lòng nhập bình luận!' }]}
+              >
+                <TextArea 
+                  rows={4} 
+                  placeholder="Nhập bình luận về việc xử lý hoặc chuyển tiếp giao dịch"
+                />
+              </Form.Item>
+
+              <Form.Item>
+                <Space>
+                  <Button type="primary" htmlType="submit" loading={loading}>
+                    Xác nhận
+                  </Button>
+                  <Button onClick={() => {
+                    setProcessingModalVisible(false);
+                    setProcessingTransaction(null);
+                    processingForm.resetFields();
+                  }}>
+                    Hủy
+                  </Button>
+                </Space>
+              </Form.Item>
+            </Form>
+          </div>
         )}
       </Modal>
     </div>
