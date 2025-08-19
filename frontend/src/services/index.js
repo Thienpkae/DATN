@@ -80,7 +80,6 @@ export const ORGANIZATIONS = {
 export const ROLES = {
   ADMIN: 'admin',
   USER: 'user',
-  SUPER_ADMIN: 'super_admin'
 };
 
 // Export transaction types - EXACTLY match chaincode

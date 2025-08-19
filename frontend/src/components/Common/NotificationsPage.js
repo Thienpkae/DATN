@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   List,
@@ -65,21 +65,14 @@ const NotificationsPage = () => {
     low: 0
   });
 
-  useEffect(() => {
-    if (user?.cccd) {
-      fetchNotifications();
-      fetchStats();
-    }
-  }, [user?.cccd, pagination.current, pagination.pageSize, filters]);
-
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await notificationService.getUserNotifications(
-        pagination.pageSize,
-        filters.status,
-        pagination.current
-      );
+      const response = await notificationService.getUserNotifications({
+        limit: pagination.pageSize,
+        status: filters.status,
+        page: pagination.current
+      });
       
       if (response.success) {
         setNotifications(response.data.notifications || []);
@@ -94,12 +87,12 @@ const NotificationsPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination, filters]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const unreadCount = await notificationService.getUnreadCount();
-      const allNotifications = await notificationService.getUserNotifications(1000);
+      const allNotifications = await notificationService.getUserNotifications({ limit: 1000 });
       
       if (allNotifications.success) {
         const allNotifs = allNotifications.data.notifications || [];
@@ -114,7 +107,14 @@ const NotificationsPage = () => {
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (user?.cccd) {
+      fetchNotifications();
+      fetchStats();
+    }
+  }, [user?.cccd, fetchNotifications, fetchStats]);
 
   const handleMarkAsRead = async (notificationId) => {
     try {

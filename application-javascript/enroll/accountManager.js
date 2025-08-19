@@ -125,14 +125,18 @@ async function lockUnlockAccount(authorityCccd, targetCccd, lock) {
         const sanitizedAuthorityCccd = sanitizeInput(authorityCccd);
         const sanitizedTargetCccd = sanitizeInput(targetCccd);
 
-        const authority = await User.findOne({ cccd: sanitizedAuthorityCccd, org: 'Org1' });
-        if (!authority) {
-            throw new Error('Only Org1 users can lock/unlock accounts');
+        const authority = await User.findOne({ cccd: sanitizedAuthorityCccd });
+        if (!authority || authority.role !== 'admin') {
+            throw new Error('Only admin can lock/unlock accounts');
         }
+        const adminOrg = authority.org;
 
         const user = await User.findOne({ cccd: sanitizedTargetCccd });
         if (!user) {
             throw new Error('Target user not found');
+        }
+        if (user.org !== adminOrg) {
+            throw new Error(`Admin can only manage users in their own organization (${adminOrg})`);
         }
 
         user.isLocked = lock;

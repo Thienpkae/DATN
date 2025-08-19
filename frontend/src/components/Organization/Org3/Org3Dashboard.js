@@ -14,12 +14,11 @@ import {
   LogoutOutlined,
   AppstoreOutlined,
   FileTextOutlined,
-  BellOutlined
 } from '@ant-design/icons';
 import LandManagementPage from './LandManagementPage';
 import DocumentManagementPage from './DocumentManagementPage';
 import TransactionManagementPage from './TransactionManagementPage';
-import NotificationManagementPage from './NotificationManagementPage';
+import NotificationCenter from '../../Common/NotificationCenter';
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
@@ -74,6 +73,7 @@ const Org3Dashboard = ({ user, onLogout }) => {
           </Title>
         </div>
         <Space size="large">
+          <NotificationCenter />
           <Dropdown overlay={userMenu} trigger={['click']} placement="bottomRight">
             <Avatar
               style={{ 
@@ -134,19 +134,6 @@ const Org3Dashboard = ({ user, onLogout }) => {
                 children: (
                   <Card bordered={false} style={{ padding: 0 }}>
                     <TransactionManagementPage />
-                  </Card>
-                )
-              },
-              {
-                key: 'notification',
-                label: (
-                  <span>
-                    <BellOutlined /> Thông báo của tôi
-                  </span>
-                ),
-                children: (
-                  <Card bordered={false} style={{ padding: 0 }}>
-                    <NotificationManagementPage />
                   </Card>
                 )
               }

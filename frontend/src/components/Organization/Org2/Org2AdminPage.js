@@ -1,7 +1,7 @@
 import React from 'react';
-import { Layout, Typography, Tabs, Space, Button } from 'antd';
-import { SafetyCertificateOutlined, TeamOutlined, ToolOutlined, FileSearchOutlined, ArrowLeftOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { Layout, Typography, Tabs, Space, Dropdown, Avatar } from 'antd';
+import { SafetyCertificateOutlined, TeamOutlined, ToolOutlined, FileSearchOutlined, UserOutlined } from '@ant-design/icons';
+import authService from '../../../services/auth';
 
 import AdminAccountPage from '../../Admin/AdminAccountPage';
 import SystemConfigPage from '../../Admin/SystemConfigPage';
@@ -10,8 +10,8 @@ import LogsPage from '../../Admin/LogsPage';
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 
-const Org2AdminPage = () => {
-  const navigate = useNavigate();
+const Org2AdminPage = ({ onLogout }) => {
+  const currentUser = authService.getCurrentUser();
 
   const items = [
     {
@@ -64,9 +64,29 @@ const Org2AdminPage = () => {
             Admin - Văn phòng Công chứng
           </Title>
         </div>
-        <Space>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/')}>Về Dashboard</Button>
-        </Space>
+        <Dropdown
+          menu={{
+            items: [
+              { key: 'profile-header', disabled: true, label: (
+                <div style={{ padding: '4px 8px' }}>
+                  <div style={{ fontWeight: 600, color: '#1f1f1f' }}>{currentUser?.name || 'Admin'}</div>
+                  <div style={{ fontSize: 12, color: '#595959' }}>Org: {currentUser?.org}</div>
+                </div>
+              ) },
+              { type: 'divider' },
+              { key: 'profile', label: 'Quản lý hồ sơ' },
+              { key: 'logout', label: 'Đăng xuất' }
+            ],
+            onClick: ({ key }) => {
+              if (key === 'profile') window.location.assign('/profile');
+              if (key === 'logout') { try { onLogout?.(); } catch (_) {} window.location.assign('/login'); }
+            }
+          }}
+          trigger={['click']}
+          placement="bottomRight"
+        >
+          <Avatar style={{ backgroundColor: '#722ed1', cursor: 'pointer', color: '#fff' }} icon={<UserOutlined />} />
+        </Dropdown>
       </Header>
 
       <Content style={{ margin: 24 }}>
@@ -74,7 +94,7 @@ const Org2AdminPage = () => {
           <div style={{ marginBottom: 12 }}>
             <Text type="secondary">Quản trị hệ thống cho tổ chức Org2</Text>
           </div>
-          <Tabs items={items} destroyInactiveTabPane />
+          <Tabs items={items} destroyOnHide />
         </div>
       </Content>
     </Layout>

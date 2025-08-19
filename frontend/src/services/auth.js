@@ -196,7 +196,7 @@ const authService = {
   // Check if user has admin role
   isAdmin() {
     const user = this.getCurrentUser();
-    return user && (user.role === 'admin' || user.role === 'super_admin');
+    return user && (user.role === 'admin');
   },
 
   // Check if user belongs to specific organization

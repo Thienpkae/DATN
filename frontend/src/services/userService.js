@@ -28,8 +28,19 @@ const userService = {
 
   async updateByCccd(cccd, payload) {
     const url = API_ENDPOINTS.USER.UPDATE_BY_CCCD.replace(':cccd', encodeURIComponent(cccd));
-    const response = await apiClient.put(url, payload);
-    return response.data;
+    try {
+      const response = await apiClient.put(url, payload);
+      return response.data;
+    } catch (error) {
+      // Surface specific duplicate phone error
+      const msg = error?.response?.data?.error;
+      if (msg && /điện thoại|phone/i.test(msg) && /tồn tại|exists/i.test(msg)) {
+        const err = new Error('Số điện thoại đã tồn tại');
+        err.response = error.response;
+        throw err;
+      }
+      throw error;
+    }
   },
 
   // Admin actions

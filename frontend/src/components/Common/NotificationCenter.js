@@ -12,6 +12,7 @@ import {
   message,
   Tooltip
 } from 'antd';
+import { theme } from 'antd';
 import {
   BellOutlined,
   CheckOutlined,
@@ -30,6 +31,7 @@ const { Text, Title } = Typography;
  */
 const NotificationCenter = () => {
   const { user } = useAuth();
+  const { token } = theme.useToken();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -80,15 +82,21 @@ const NotificationCenter = () => {
   };
 
   const handleWebSocketMessage = useCallback((data) => {
-    if (data.type === 'notification') {
-      // Add new notification to the top
-      setNotifications(prev => [data.notification, ...prev]);
+    const type = (data?.type || '').toUpperCase();
+    if (type === 'CONNECTION_ESTABLISHED') {
+      setWsConnected(true);
+      return;
+    }
+    if (type === 'NOTIFICATION' && data.data) {
+      const notif = data.data;
+      setNotifications(prev => [notif, ...prev]);
       setUnreadCount(prev => prev + 1);
-      
-      // Show toast notification
-      message.info(data.notification.message);
-    } else if (data.type === 'unreadCount') {
+      message.info(notif.message);
+      return;
+    }
+    if (type === 'UNREADCOUNT' && typeof data.count === 'number') {
       setUnreadCount(data.count);
+      return;
     }
   }, []);
 
@@ -234,26 +242,44 @@ const NotificationCenter = () => {
   };
 
   const notificationMenu = (
-    <div style={{ width: 400, maxHeight: 500, overflow: 'auto' }}>
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
+    <div
+      style={{
+        width: 400,
+        maxHeight: 500,
+        overflow: 'auto',
+        background: token.colorBgElevated,
+        color: token.colorText,
+        borderRadius: token.borderRadiusLG,
+        boxShadow: token.boxShadowSecondary
+      }}
+    >
+      <div
+        style={{
+          padding: '12px 16px',
+          borderBottom: `1px solid ${token.colorBorderSecondary}`,
+          background: token.colorBgElevated
+        }}
+      >
         <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-          <Title level={5} style={{ margin: 0 }}>
-            <BellOutlined /> Thông báo
+          <Title level={5} style={{ margin: 0, color: token.colorTextHeading }}>
+            <BellOutlined style={{ color: token.colorPrimary }} /> Thông báo
           </Title>
           <Space>
             {unreadCount > 0 && (
-              <Button 
-                type="link" 
+              <Button
+                type="link"
                 size="small"
                 onClick={handleMarkAllAsRead}
+                style={{ color: token.colorTextSecondary }}
               >
                 Đánh dấu tất cả đã đọc
               </Button>
             )}
-            <Button 
-              type="link" 
+            <Button
+              type="link"
               size="small"
               onClick={() => window.location.href = '/notifications'}
+              style={{ color: token.colorPrimary }}
             >
               Xem tất cả
             </Button>
@@ -261,25 +287,25 @@ const NotificationCenter = () => {
         </Space>
       </div>
 
-      <div style={{ padding: '8px 0' }}>
+      <div style={{ padding: '8px 0', background: token.colorBgElevated }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: '20px' }}>
             <Spin />
           </div>
         ) : notifications.length === 0 ? (
-          <Empty 
+          <Empty
             description="Không có thông báo nào"
-            style={{ padding: '20px' }}
+            style={{ padding: '20px', background: 'transparent' }}
           />
         ) : (
           <List
-            dataSource={notifications.slice(0, 10)} // Show only first 10
+            dataSource={notifications.slice(0, 10)}
             renderItem={(notification) => (
               <List.Item
                 style={{
                   padding: '12px 16px',
-                  backgroundColor: notification.read ? 'transparent' : '#f6ffed',
-                  borderBottom: '1px solid #f0f0f0'
+                  backgroundColor: notification.read ? 'transparent' : token.colorPrimaryBg,
+                  borderBottom: `1px solid ${token.colorBorderSecondary}`
                 }}
                 actions={[
                   !notification.read && (
@@ -289,6 +315,7 @@ const NotificationCenter = () => {
                         size="small"
                         icon={<CheckOutlined />}
                         onClick={() => handleMarkAsRead(notification._id)}
+                        style={{ color: token.colorTextSecondary }}
                       />
                     </Tooltip>
                   )
@@ -298,7 +325,7 @@ const NotificationCenter = () => {
                   avatar={getNotificationIcon(notification.type)}
                   title={
                     <Space>
-                      <Text strong style={{ fontSize: '14px' }}>
+                      <Text strong style={{ fontSize: '14px', color: token.colorText }}>
                         {notification.title}
                       </Text>
                       {getNotificationPriority(notification.priority)}
@@ -327,10 +354,18 @@ const NotificationCenter = () => {
       </div>
 
       {notifications.length > 10 && (
-        <div style={{ padding: '12px 16px', borderTop: '1px solid #f0f0f0', textAlign: 'center' }}>
-          <Button 
-            type="link" 
+        <div
+          style={{
+            padding: '12px 16px',
+            borderTop: `1px solid ${token.colorBorderSecondary}`,
+            textAlign: 'center',
+            background: token.colorBgElevated
+          }}
+        >
+          <Button
+            type="link"
             onClick={() => window.location.href = '/notifications'}
+            style={{ color: token.colorPrimary }}
           >
             Xem thêm {notifications.length - 10} thông báo khác
           </Button>
@@ -350,9 +385,9 @@ const NotificationCenter = () => {
         <Button
           type="text"
           icon={<BellOutlined />}
-          style={{ 
+          style={{
             fontSize: '18px',
-            color: wsConnected ? '#52c41a' : '#8c8c8c'
+            color: wsConnected ? token.colorPrimary : token.colorTextTertiary
           }}
           title={wsConnected ? 'Thông báo (Đã kết nối)' : 'Thông báo (Đang kết nối...)'}
         />

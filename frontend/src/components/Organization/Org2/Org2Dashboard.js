@@ -15,12 +15,12 @@ import {
   SafetyCertificateOutlined,
   AppstoreOutlined,
   FileTextOutlined,
-  BellOutlined
 } from '@ant-design/icons';
 import LandManagementPage from './LandManagementPage';
 import DocumentManagementPage from './DocumentManagementPage';
 import TransactionManagementPage from './TransactionManagementPage';
-import NotificationManagementPage from './NotificationManagementPage';
+// Removed org-specific NotificationManagementPage; using global notifications via header bell
+import NotificationCenter from '../../Common/NotificationCenter';
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
@@ -75,6 +75,7 @@ const Org2Dashboard = ({ user, onLogout }) => {
           </Title>
         </div>
         <Space size="large">
+          <NotificationCenter />
           <Dropdown overlay={userMenu} trigger={['click']} placement="bottomRight">
             <Avatar
               style={{ 
@@ -135,19 +136,6 @@ const Org2Dashboard = ({ user, onLogout }) => {
                 children: (
                   <Card bordered={false} style={{ padding: 0 }}>
                     <TransactionManagementPage />
-                  </Card>
-                )
-              },
-              {
-                key: 'notification',
-                label: (
-                  <span>
-                    <BellOutlined /> Quản lý thông báo
-                  </span>
-                ),
-                children: (
-                  <Card bordered={false} style={{ padding: 0 }}>
-                    <NotificationManagementPage />
                   </Card>
                 )
               }

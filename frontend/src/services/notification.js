@@ -11,7 +11,11 @@ const notificationService = {
   // Initialize WebSocket connection
   initializeWebSocket(userId, onMessage, onError, onClose) {
     try {
-      const wsUrl = process.env.REACT_APP_WS_URL || 'ws://localhost:3000/ws/notifications';
+      const baseHttp = apiClient.defaults.baseURL || '';
+      const wsBase = (process.env.REACT_APP_WS_URL) 
+        ? process.env.REACT_APP_WS_URL
+        : baseHttp.replace(/^http/, 'ws');
+      const wsUrl = `${wsBase}${API_ENDPOINTS.WS.NOTIFICATIONS}`;
       const token = localStorage.getItem('jwt_token');
       
       if (!token) {
@@ -142,7 +146,9 @@ const notificationService = {
   // Mark notification as read
   async markAsRead(notificationId) {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.NOTIFICATIONS.MARK_READ, { notificationId });
+      const response = await apiClient.put(
+        `${API_ENDPOINTS.NOTIFICATIONS.LIST}/${encodeURIComponent(notificationId)}/read`
+      );
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -152,7 +158,21 @@ const notificationService = {
   // Mark all notifications as read
   async markAllAsRead() {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ);
+      const response = await apiClient.put(
+        `${API_ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ}`
+      );
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  // Archive notification
+  async archiveNotification(notificationId) {
+    try {
+      const response = await apiClient.put(
+        `${API_ENDPOINTS.NOTIFICATIONS.LIST}/${encodeURIComponent(notificationId)}/archive`
+      );
       return response.data;
     } catch (error) {
       throw handleApiError(error);

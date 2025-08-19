@@ -113,6 +113,9 @@ export const API_ENDPOINTS = {
   LOGS: {
     SEARCH: '/logs/:txID',
   },
+  WS: {
+    NOTIFICATIONS: '/ws/notifications',
+  },
 };
 
 // Create axios instance

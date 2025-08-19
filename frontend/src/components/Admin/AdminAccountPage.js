@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+// import { useNavigate } from 'react-router-dom';
 import {
   Card,
   Table,
@@ -15,11 +15,7 @@ import {
   Row,
   Col,
   Statistic,
-  Upload,
-  DatePicker,
-  Tooltip,
-  Dropdown,
-  Menu
+  Tooltip
 } from 'antd';
 import {
   PlusOutlined,
@@ -27,16 +23,11 @@ import {
   DeleteOutlined,
   UserOutlined,
   TeamOutlined,
-  UploadOutlined,
   SearchOutlined,
-  FilterOutlined,
   ReloadOutlined,
-  ExportOutlined,
-  UserAddOutlined,
   LockOutlined,
   UnlockOutlined
 } from '@ant-design/icons';
-import moment from 'moment';
 import userService from '../../services/userService';
 import authService from '../../services/auth';
 
@@ -44,33 +35,31 @@ const { Option } = Select;
 const { Search } = Input;
 
 const AdminAccountPage = () => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const [users, setUsers] = useState([]);
-  const [organizations, setOrganizations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [form] = Form.useForm();
   const [searchText, setSearchText] = useState('');
-  const [filterOrg, setFilterOrg] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [stats, setStats] = useState({});
 
   useEffect(() => {
     fetchUsers();
-    fetchOrganizations();
     fetchStats();
   }, []);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const data = await userService.listUsers();
+      const currentAdmin = authService.getCurrentUser();
+      const adminOrg = currentAdmin?.org;
+      const data = await userService.listUsers({ org: adminOrg });
       const mapped = (data.users || []).map(u => ({
         id: u._id || u.cccd,
         userId: u.cccd,
         name: u.fullName,
-        email: u.email || '',
         phone: u.phone,
         org: u.org,
         role: u.role,
@@ -91,31 +80,25 @@ const AdminAccountPage = () => {
     }
   };
 
-  const fetchOrganizations = async () => {
-    try {
-      // Organization management requires additional backend endpoints
-      setOrganizations([
-        { id: 'Org1', name: 'Land Registry Authority' },
-        { id: 'Org2', name: 'Government Office' },
-        { id: 'Org3', name: 'Citizens' }
-      ]);
-    } catch (error) {
-      message.error('Failed to fetch organizations');
-    }
-  };
-
   const fetchStats = async () => {
     try {
       // System stats would require additional backend endpoints
       setStats({
         totalUsers: 0,
         activeUsers: 0,
-        totalOrganizations: 3,
+        
         systemHealth: 'Good'
       });
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     }
+  };
+
+  // Frontend validator to mirror backend Vietnamese phone regex
+  const isValidVietnamPhone = (value) => {
+    const v = String(value || '');
+    // Only allow format starting with 0 and valid carrier prefixes, total 10 digits
+    return /^0(3[2-9]|5[689]|7[06-9]|8[1-9]|9\d)\d{7}$/.test(v);
   };
 
   const handleCreateUser = () => {
@@ -124,15 +107,12 @@ const AdminAccountPage = () => {
     setModalVisible(true);
   };
 
-  const handleNavigateToRegister = () => {
-    navigate('/register', { state: { isAdminRegistration: true } });
-  };
+  // Navigation actions for admin registration removed per new policy
 
   const handleEditUser = (user) => {
     setEditingUser(user);
     form.setFieldsValue({
-      ...user,
-      dateOfBirth: user.dateOfBirth ? moment(user.dateOfBirth) : null
+      ...user
     });
     setModalVisible(true);
   };
@@ -140,11 +120,11 @@ const AdminAccountPage = () => {
   const handleDeleteUser = async (userId) => {
     try {
       await userService.deleteAccount(userId);
-      message.success('User deleted successfully');
+      message.success('Xóa người dùng thành công');
       fetchUsers();
       fetchStats();
     } catch (error) {
-      message.error('Failed to delete user');
+      message.error(error?.response?.data?.error || error.message || 'Xóa người dùng thất bại');
     }
   };
 
@@ -152,15 +132,15 @@ const AdminAccountPage = () => {
     try {
       if (isActive) {
         await userService.lockUnlockAccount(userId, true);
-        message.success('User deactivated successfully');
+        message.success('Đã vô hiệu hóa tài khoản');
       } else {
         await userService.lockUnlockAccount(userId, false);
-        message.success('User activated successfully');
+        message.success('Đã kích hoạt tài khoản');
       }
       fetchUsers();
       fetchStats();
     } catch (error) {
-      message.error(`Failed to ${isActive ? 'deactivate' : 'activate'} user`);
+      message.error(error?.response?.data?.error || error.message || `Không thể ${isActive ? 'vô hiệu hóa' : 'kích hoạt'} tài khoản`);
     }
   };
 
@@ -169,50 +149,80 @@ const AdminAccountPage = () => {
       const values = await form.validateFields();
       setLoading(true);
 
+      const currentAdmin = authService.getCurrentUser();
+      // Normalize inputs
+      const normalizedCccd = String(values.userId || '').replace(/\D/g, '');
+      const normalizedPhone = String(values.phone || '').replace(/\D/g, '');
+      const trimmedName = String(values.name || '').trim();
+
+      // Client-side duplicate checks to give fast feedback (create only)
+      if (!editingUser) {
+        const existingCccd = users.find(u => String(u.userId) === normalizedCccd);
+        if (existingCccd) {
+          message.error('CCCD đã tồn tại trong hệ thống');
+          return;
+        }
+        const existingPhone = users.find(u => String(u.phone) === normalizedPhone);
+        if (existingPhone) {
+          message.error('Số điện thoại đã tồn tại trong hệ thống');
+          return;
+        }
+      }
+
       const userData = {
-        ...values,
-        dateOfBirth: values.dateOfBirth ? values.dateOfBirth.format('YYYY-MM-DD') : null
+        org: currentAdmin?.org,
+        cccd: normalizedCccd,
+        phone: normalizedPhone,
+        fullName: trimmedName,
+        password: values.password,
+        role: values.role || 'user'
       };
 
       if (editingUser) {
-        // User update functionality requires additional backend endpoints
-        message.info('User update functionality requires additional backend endpoints');
+        // Update allowed fields except CCCD
+        const payload = { fullName: trimmedName, phone: normalizedPhone, role: values.role || 'user' };
+        try {
+          await userService.updateByCccd(editingUser.userId, payload);
+          message.success('Cập nhật người dùng thành công');
+        } catch (err) {
+          message.error(err?.message || err?.response?.data?.error || 'Cập nhật người dùng thất bại');
+          return;
+        }
       } else {
-        // User creation uses the register endpoint
-        await authService.register(userData);
-        message.success('User created successfully');
+        // User creation (backend now activates immediately and returns success)
+        const result = await authService.register(userData);
+        message.success(result?.message || 'Tạo tài khoản và kích hoạt thành công. Mật khẩu đã được gửi tới SĐT.');
       }
 
       setModalVisible(false);
       fetchUsers();
       fetchStats();
     } catch (error) {
-      message.error(`Failed to ${editingUser ? 'update' : 'create'} user`);
+      if (error && error.errorFields) {
+        message.warning('Vui lòng kiểm tra và điền đầy đủ thông tin hợp lệ');
+      } else {
+        // Surface specific backend messages for duplicates and policy checks
+        const apiMsg = error?.response?.data?.error || error.message;
+        if (apiMsg) {
+          if (/CCCD/i.test(apiMsg) && /tồn tại|exists/i.test(apiMsg)) {
+            message.error('CCCD đã tồn tại');
+          } else if (/điện thoại|phone/i.test(apiMsg) && /tồn tại|exists/i.test(apiMsg)) {
+            message.error('Số điện thoại đã tồn tại');
+          } else if (/Admin can only register users in their own organization/i.test(apiMsg)) {
+            message.error('Admin chỉ được tạo tài khoản trong tổ chức của mình');
+          } else {
+            message.error(apiMsg);
+          }
+        } else {
+          message.error(`Không thể ${editingUser ? 'cập nhật' : 'tạo'} người dùng`);
+        }
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleExportUsers = async () => {
-    try {
-      // Export functionality requires additional backend endpoints
-      message.info('User export functionality requires additional backend endpoints');
-    } catch (error) {
-      message.error('Failed to export users');
-    }
-  };
-
-  const handleImportUsers = async (file) => {
-    try {
-      // Import functionality requires additional backend endpoints
-      message.info('User import functionality requires additional backend endpoints');
-      fetchUsers();
-      fetchStats();
-    } catch (error) {
-      message.error('Failed to import users');
-    }
-    return false; // Prevent default upload behavior
-  };
+  // Import/Export actions removed from toolbar
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -243,9 +253,10 @@ const AdminAccountPage = () => {
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-                         user.email?.toLowerCase().includes(searchText.toLowerCase()) ||
                          user.userId?.toLowerCase().includes(searchText.toLowerCase());
-    const matchesOrg = !filterOrg || user.org === filterOrg;
+    const currentAdmin = authService.getCurrentUser();
+    const adminOrg = currentAdmin?.org;
+    const matchesOrg = !adminOrg || user.org === adminOrg;
     const matchesStatus = !filterStatus || user.status === filterStatus;
     
     return matchesSearch && matchesOrg && matchesStatus;
@@ -253,128 +264,116 @@ const AdminAccountPage = () => {
 
   const columns = [
     {
-      title: 'User ID',
+      title: 'CCCD',
       dataIndex: 'userId',
       key: 'userId',
       sorter: (a, b) => a.userId.localeCompare(b.userId),
     },
     {
-      title: 'Name',
+      title: 'Họ và tên',
       dataIndex: 'name',
       key: 'name',
       sorter: (a, b) => a.name.localeCompare(b.name),
     },
+    // Email removed; backend has no email field
     {
-      title: 'Email',
-      dataIndex: 'email',
-      key: 'email',
-    },
-    {
-      title: 'Organization',
+      title: 'Tổ chức',
       dataIndex: 'org',
       key: 'org',
       render: (org) => (
         <Tag color={getOrgColor(org)}>
           {getOrgName(org)}
         </Tag>
-      ),
-      filters: [
-        { text: 'Land Authority', value: 'Org1' },
-        { text: 'Notary Office', value: 'Org2' },
-        { text: 'Citizens', value: 'Org3' },
-      ],
+      )
     },
     {
-      title: 'Role',
+      title: 'Vai trò',
       dataIndex: 'role',
       key: 'role',
-      render: (role) => <Tag>{role}</Tag>,
+      render: (role) => <Tag>{role === 'admin' ? 'Quản trị viên' : 'Người dùng'}</Tag>,
     },
     {
-      title: 'Status',
+      title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
       render: (status) => (
         <Tag color={getStatusColor(status)}>
-          {status?.toUpperCase()}
+          {status === 'active' ? 'Hoạt động' : status === 'inactive' ? 'Đã khóa' : 'Chờ duyệt'}
         </Tag>
       ),
       filters: [
-        { text: 'Active', value: 'active' },
-        { text: 'Inactive', value: 'inactive' },
-        { text: 'Pending', value: 'pending' },
+        { text: 'Hoạt động', value: 'active' },
+        { text: 'Đã khóa', value: 'inactive' },
+        { text: 'Chờ duyệt', value: 'pending' },
       ],
     },
     {
-      title: 'Created Date',
+      title: 'Ngày tạo',
       dataIndex: 'createdAt',
       key: 'createdAt',
       render: (date) => new Date(date).toLocaleDateString(),
       sorter: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
     },
     {
-      title: 'Actions',
+      title: 'Thao tác',
       key: 'actions',
       render: (_, record) => (
         <Space>
-          <Tooltip title="Edit User">
+          <Tooltip title="Chỉnh sửa">
             <Button
               type="link"
               icon={<EditOutlined />}
               onClick={() => handleEditUser(record)}
             />
           </Tooltip>
-          <Tooltip title={record.status === 'active' ? 'Deactivate' : 'Activate'}>
-            <Button
-              type="link"
-              icon={record.status === 'active' ? <LockOutlined /> : <UnlockOutlined />}
-              onClick={() => handleToggleUserStatus(record.id, record.status === 'active')}
-            />
-          </Tooltip>
-          <Popconfirm
-            title="Are you sure you want to delete this user?"
-            onConfirm={() => handleDeleteUser(record.id)}
-            okText="Yes"
-            cancelText="No"
-          >
-            <Tooltip title="Delete User">
-              <Button
-                type="link"
-                danger
-                icon={<DeleteOutlined />}
-              />
-            </Tooltip>
-          </Popconfirm>
+          {(() => {
+            const isAdminAccount = String(record.role).toLowerCase() === 'admin';
+            const current = authService.getCurrentUser();
+            const isSelf = current && String(current.userId) === String(record.userId);
+            const lockDisabled = isAdminAccount || isSelf; // do not allow deactivating admin or yourself
+            const deleteDisabled = isAdminAccount || isSelf; // do not allow deleting admin or yourself
+            return (
+              <>
+                <Tooltip title={lockDisabled ? 'Không thể vô hiệu hóa tài khoản admin hoặc tài khoản của chính bạn' : (record.status === 'active' ? 'Vô hiệu hóa' : 'Kích hoạt')}>
+                  <Button
+                    type="link"
+                    icon={record.status === 'active' ? <LockOutlined /> : <UnlockOutlined />}
+                    disabled={lockDisabled}
+                    onClick={() => !lockDisabled && handleToggleUserStatus(record.userId, record.status === 'active')}
+                  />
+                </Tooltip>
+                {deleteDisabled ? (
+                  <Tooltip title="Không thể xóa tài khoản admin hoặc tài khoản của chính bạn">
+                    <Button type="link" danger icon={<DeleteOutlined />} disabled />
+                  </Tooltip>
+                ) : (
+                  <Popconfirm
+                    title="Bạn có chắc muốn xóa người dùng này?"
+                    onConfirm={() => handleDeleteUser(record.userId)}
+                    okText="Xóa"
+                    cancelText="Hủy"
+                  >
+                    <Tooltip title="Xóa người dùng">
+                      <Button type="link" danger icon={<DeleteOutlined />} />
+                    </Tooltip>
+                  </Popconfirm>
+                )}
+              </>
+            );
+          })()}
         </Space>
       ),
     },
   ];
 
-  const actionMenu = (
-    <Menu>
-      <Menu.Item key="export" icon={<ExportOutlined />} onClick={handleExportUsers}>
-        Export Users
-      </Menu.Item>
-      <Menu.Item key="import" icon={<UploadOutlined />}>
-        <Upload
-          accept=".csv,.xlsx"
-          showUploadList={false}
-          beforeUpload={handleImportUsers}
-        >
-          Import Users
-        </Upload>
-      </Menu.Item>
-    </Menu>
-  );
-
   return (
     <div className="admin-account-page">
-      {/* Statistics Cards */}
+      {/* Thống kê nhanh */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={6}>
           <Card>
             <Statistic
-              title="Total Users"
+              title="Tổng số người dùng"
               value={stats.totalUsers || 0}
               prefix={<UserOutlined />}
             />
@@ -383,7 +382,7 @@ const AdminAccountPage = () => {
         <Col span={6}>
           <Card>
             <Statistic
-              title="Active Users"
+              title="Đang hoạt động"
               value={stats.activeUsers || 0}
               prefix={<TeamOutlined />}
               valueStyle={{ color: '#3f8600' }}
@@ -393,16 +392,7 @@ const AdminAccountPage = () => {
         <Col span={6}>
           <Card>
             <Statistic
-              title="Organizations"
-              value={organizations.length}
-              prefix={<TeamOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="Pending Approvals"
+              title="Chờ duyệt"
               value={stats.pendingUsers || 0}
               prefix={<UserOutlined />}
               valueStyle={{ color: '#cf1322' }}
@@ -413,59 +403,41 @@ const AdminAccountPage = () => {
 
       {/* Main Content */}
       <Card
-        title="User Account Management"
+        title="Quản lý tài khoản"
         extra={
           <Space>
             <Search
-              placeholder="Search users..."
+              placeholder="Tìm kiếm người dùng..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               style={{ width: 200 }}
               prefix={<SearchOutlined />}
             />
             <Select
-              placeholder="Filter by Organization"
+              placeholder="Lọc theo trạng thái"
               style={{ width: 180 }}
-              value={filterOrg}
-              onChange={setFilterOrg}
-              allowClear
-            >
-              <Option value="org1">Land Authority</Option>
-              <Option value="org2">Government Officers</Option>
-              <Option value="org3">Citizens</Option>
-            </Select>
-            <Select
-              placeholder="Filter by Status"
-              style={{ width: 150 }}
               value={filterStatus}
               onChange={setFilterStatus}
               allowClear
+              options={[
+                { label: 'Hoạt động', value: 'active' },
+                { label: 'Đã khóa', value: 'inactive' },
+                { label: 'Chờ duyệt', value: 'pending' },
+              ]}
             >
-              <Option value="active">Active</Option>
-              <Option value="inactive">Inactive</Option>
-              <Option value="pending">Pending</Option>
+              <Option value="active">Hoạt động</Option>
+              <Option value="inactive">Đã khóa</Option>
+              <Option value="pending">Chờ duyệt</Option>
             </Select>
             <Button icon={<ReloadOutlined />} onClick={fetchUsers}>
-              Refresh
+              Tải lại
             </Button>
-            <Dropdown overlay={actionMenu} trigger={['click']}>
-              <Button icon={<FilterOutlined />}>
-                Actions
-              </Button>
-            </Dropdown>
             <Button
               type="primary"
               icon={<PlusOutlined />}
               onClick={handleCreateUser}
             >
-              Create User
-            </Button>
-            <Button
-              type="default"
-              icon={<UserAddOutlined />}
-              onClick={handleNavigateToRegister}
-            >
-              Register Admin Account
+              Tạo người dùng
             </Button>
           </Space>
         }
@@ -473,14 +445,14 @@ const AdminAccountPage = () => {
         <Table
           columns={columns}
           dataSource={filteredUsers}
-          rowKey="id"
+          rowKey="userId"
           loading={loading}
           pagination={{
             pageSize: 10,
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} users`,
+              `${range[0]}-${range[1]} trong ${total} người dùng`,
           }}
           scroll={{ x: 1200 }}
         />
@@ -488,7 +460,7 @@ const AdminAccountPage = () => {
 
       {/* Create/Edit User Modal */}
       <Modal
-        title={editingUser ? 'Edit User' : 'Create New User'}
+        title={editingUser ? 'Chỉnh sửa người dùng' : 'Tạo người dùng mới'}
         visible={modalVisible}
         onOk={handleModalOk}
         onCancel={() => setModalVisible(false)}
@@ -499,143 +471,127 @@ const AdminAccountPage = () => {
           form={form}
           layout="vertical"
           initialValues={{
-            status: 'active',
-            organization: 'org3'
+            role: 'user'
           }}
         >
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
                 name="userId"
-                label="User ID"
-                rules={[{ required: true, message: 'Please enter user ID' }]}
+                label="CCCD"
+                rules={[
+                  { required: true, message: 'Vui lòng nhập CCCD' },
+                  { validator: (_, v) => (/^\d{12}$/.test(v || '') ? Promise.resolve() : Promise.reject(new Error('CCCD phải gồm 12 chữ số'))) }
+                ]}
               >
-                <Input placeholder="Enter user ID" />
+                <Input
+                  placeholder="Nhập CCCD"
+                  maxLength={12}
+                  disabled={!!editingUser}
+                  onKeyPress={(e) => {
+                    if (!/\d/.test(e.key)) e.preventDefault();
+                  }}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, '').slice(0, 12);
+                    form.setFieldsValue({ userId: digits });
+                  }}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item
                 name="name"
-                label="Full Name"
-                rules={[{ required: true, message: 'Please enter full name' }]}
+                label="Họ và tên"
+                rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]}
               >
-                <Input placeholder="Enter full name" />
+                <Input placeholder="Nhập họ và tên" />
               </Form.Item>
             </Col>
           </Row>
 
           <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="email"
-                label="Email"
-                rules={[
-                  { required: true, message: 'Please enter email' },
-                  { type: 'email', message: 'Please enter valid email' }
-                ]}
-              >
-                <Input placeholder="Enter email address" />
-              </Form.Item>
-            </Col>
             <Col span={12}>
               <Form.Item
                 name="phone"
-                label="Phone Number"
-                rules={[{ required: true, message: 'Please enter phone number' }]}
+                label="Số điện thoại"
+                rules={[
+                  { required: true, message: 'Vui lòng nhập số điện thoại' },
+                  {
+                    validator: (_, v) =>
+                      isValidVietnamPhone(v)
+                        ? Promise.resolve()
+                        : Promise.reject(new Error('Số điện thoại Việt Nam không hợp lệ (vd: 03x/05x/07x/08x/09x + 7 số)'))
+                  }
+                ]}
               >
-                <Input placeholder="Enter phone number" />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="organization"
-                label="Organization"
-                rules={[{ required: true, message: 'Please select organization' }]}
-              >
-                <Select placeholder="Select organization">
-                  <Option value="org1">Land Authority</Option>
-                  <Option value="org2">Government Officers</Option>
-                  <Option value="org3">Citizens</Option>
-                </Select>
+                <Input
+                  placeholder="Nhập số điện thoại"
+                  maxLength={10}
+                  onKeyPress={(e) => {
+                    if (!/\d/.test(e.key)) e.preventDefault();
+                  }}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    form.setFieldsValue({ phone: digits });
+                  }}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item
                 name="role"
-                label="Role"
-                rules={[{ required: true, message: 'Please enter role' }]}
+                label="Vai trò"
+                rules={[{ required: true, message: 'Vui lòng chọn vai trò' }]}
               >
-                <Input placeholder="Enter role" />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="status"
-                label="Status"
-                rules={[{ required: true, message: 'Please select status' }]}
-              >
-                <Select placeholder="Select status">
-                  <Option value="active">Active</Option>
-                  <Option value="inactive">Inactive</Option>
-                  <Option value="pending">Pending</Option>
+                <Select placeholder="Chọn vai trò">
+                  <Option value="user">Người dùng</Option>
+                  <Option value="admin">Quản trị viên</Option>
                 </Select>
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item
-                name="dateOfBirth"
-                label="Date of Birth"
-              >
-                <DatePicker style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
           </Row>
 
-          <Form.Item
-            name="address"
-            label="Address"
-          >
-            <Input.TextArea rows={3} placeholder="Enter address" />
-          </Form.Item>
+          {/* Organization is auto-assigned to current admin's organization on submit */}
 
           {!editingUser && (
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item
                   name="password"
-                  label="Password"
+                  label="Mật khẩu"
                   rules={[
-                    { required: true, message: 'Please enter password' },
-                    { min: 8, message: 'Password must be at least 8 characters' }
+                    { required: true, message: 'Vui lòng nhập mật khẩu' },
+                    {
+                      validator: (_, v) => {
+                        const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+                        return regex.test(v || '')
+                          ? Promise.resolve()
+                          : Promise.reject(new Error('Mật khẩu tối thiểu 8 ký tự và bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt'));
+                      }
+                    }
                   ]}
                 >
-                  <Input.Password placeholder="Enter password" />
+                  <Input.Password placeholder="Nhập mật khẩu" />
                 </Form.Item>
               </Col>
               <Col span={12}>
                 <Form.Item
                   name="confirmPassword"
-                  label="Confirm Password"
+                  label="Xác nhận mật khẩu"
                   dependencies={['password']}
                   rules={[
-                    { required: true, message: 'Please confirm password' },
+                    { required: true, message: 'Vui lòng xác nhận mật khẩu' },
                     ({ getFieldValue }) => ({
                       validator(_, value) {
                         if (!value || getFieldValue('password') === value) {
                           return Promise.resolve();
                         }
-                        return Promise.reject(new Error('Passwords do not match'));
+                        return Promise.reject(new Error('Mật khẩu không khớp'));
                       },
                     }),
                   ]}
                 >
-                  <Input.Password placeholder="Confirm password" />
+                  <Input.Password placeholder="Nhập lại mật khẩu" />
                 </Form.Item>
               </Col>
             </Row>

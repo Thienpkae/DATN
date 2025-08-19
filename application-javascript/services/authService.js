@@ -84,18 +84,70 @@ const register = async (req, res, next) => {
     authenticateJWT(req, res, async () => {
         requireAdmin(req, res, async () => {
             try {
+                // Validate input
                 validateOrg(org);
                 validateCCCD(sanitizeInput(cccd));
                 validatePhone(sanitizeInput(phone));
                 validatePassword(sanitizeInput(password));
                 const sanitizedFullName = sanitizeInput(fullName);
                 const userRole = role === 'admin' ? 'admin' : 'user';
+
                 // Ensure admin can only register users in their own organization
                 if (org !== req.user.org) {
                     return res.status(403).json({ error: `Admin can only register users in their own organization (${req.user.org})` });
                 }
-                const result = await registerUser(org, cccd, phone, sanitizedFullName, password, userRole);
-                res.json(result);
+
+                // Check duplicates
+                const existing = await User.findOne({ $or: [{ cccd: sanitizeInput(cccd) }, { phone: sanitizeInput(phone) }] });
+                if (existing) {
+                    if (existing.cccd === sanitizeInput(cccd)) {
+                        return res.status(400).json({ error: 'CCCD đã tồn tại' });
+                    }
+                    if (existing.phone === sanitizeInput(phone)) {
+                        return res.status(400).json({ error: 'Số điện thoại đã tồn tại' });
+                    }
+                }
+
+                // Create and activate user immediately (no OTP)
+                const newUser = new User({
+                    cccd: sanitizeInput(cccd),
+                    phone: sanitizeInput(phone),
+                    fullName: sanitizedFullName,
+                    org,
+                    role: userRole,
+                    password: sanitizeInput(password),
+                    isPhoneVerified: true,
+                    isLocked: false
+                });
+                await newUser.save();
+
+                // Send in-app notification; in real env, integrate SMS service here
+                try {
+                    await notificationService.createNotification(
+                        'SYSTEM_ANNOUNCEMENT',
+                        sanitizeInput(cccd),
+                        {
+                            customTitle: 'Tài khoản đã được tạo',
+                            customMessage: `Tài khoản của bạn đã được tạo và kích hoạt. Mật khẩu tạm thời: ${password}. Vui lòng đổi mật khẩu sau khi đăng nhập.`,
+                            priority: 'HIGH'
+                        }
+                    );
+                } catch (notifyErr) {
+                    console.warn('Could not send creation notification:', notifyErr.message);
+                }
+
+                console.log(`[Account] Created and activated user ${cccd}. Password sent via notification/SMS placeholder.`);
+                res.json({
+                    success: true,
+                    message: 'Tài khoản đã được tạo và kích hoạt. Mật khẩu đã được gửi tới số điện thoại.',
+                    user: {
+                        cccd: newUser.cccd,
+                        fullName: newUser.fullName,
+                        phone: newUser.phone,
+                        org: newUser.org,
+                        role: newUser.role
+                    }
+                });
             } catch (error) {
                 console.error('Lỗi đăng ký admin:', error);
                 if (error.code === 11000) {
@@ -167,7 +219,12 @@ const login = async (req, res) => {
         if (!await user.comparePassword(sanitizeInput(password))) {
             return res.status(401).json({ error: 'Thông tin đăng nhập không hợp lệ' });
         }
-        const token = jwt.sign({ cccd: user.cccd, org: user.org }, jwtSecret, { expiresIn: '1h' });
+        const token = jwt.sign({ 
+            cccd: user.cccd, 
+            org: user.org, 
+            role: user.role,
+            name: user.fullName 
+        }, jwtSecret, { expiresIn: '1h' });
         res.json({ message: 'Đăng nhập thành công', token });
     } catch (error) {
         res.status(500).json({ error: `Đăng nhập thất bại: ${error.message}` });

@@ -20,6 +20,8 @@ import LogsPage from './components/Admin/LogsPage';
 import Org1Dashboard from './components/Organization/Org1/Org1Dashboard';
 import Org2Dashboard from './components/Organization/Org2/Org2Dashboard';
 import Org3Dashboard from './components/Organization/Org3/Org3Dashboard';
+import NotificationsPage from './components/Common/NotificationsPage';
+import ProfilePage from './components/Common/ProfilePage';
 
 // Services
 import authService from './services/auth';
@@ -211,7 +213,7 @@ function App() {
   }
 
   const isAdmin = () => {
-    return user && (user.role === 'admin' || user.role === 'super_admin');
+    return user && (user.role === 'admin');
   };
 
   return (
@@ -230,6 +232,22 @@ function App() {
             <Layout className="full-height">
               <Content>
                 <Routes>
+                  <Route
+                    path="/notifications" 
+                    element={
+                      user ? (
+                        <NotificationsPage />
+                      ) : (
+                        <Navigate to="/login" replace />
+                      )
+                    } 
+                  />
+                  <Route 
+                    path="/profile"
+                    element={
+                      user ? <ProfilePage /> : <Navigate to="/login" replace />
+                    }
+                  />
                   <Route
                     path="/login"
                     element={
@@ -262,9 +280,9 @@ function App() {
                     path="/admin" 
                     element={
                       user && isAdmin() ? (
-                        user.org === 'Org1' ? <Org1AdminPage /> :
-                        user.org === 'Org2' ? <Org2AdminPage /> :
-                        <Org3AdminPage />
+                        user.org === 'Org1' ? <Org1AdminPage onLogout={handleLogout} /> :
+                        user.org === 'Org2' ? <Org2AdminPage onLogout={handleLogout} /> :
+                        <Org3AdminPage onLogout={handleLogout} />
                       ) : (
                         <Navigate to={user ? "/" : "/login"} replace />
                       )
@@ -294,10 +312,14 @@ function App() {
                     path="/" 
                     element={
                       user ? (
-                        user.org === 'Org1' ? <Org1Dashboard user={user} onLogout={handleLogout} /> :
-                        user.org === 'Org2' ? <Org2Dashboard user={user} onLogout={handleLogout} /> :
-                        user.org === 'Org3' ? <Org3Dashboard user={user} onLogout={handleLogout} /> :
-                        <Navigate to="/login" replace />
+                        isAdmin() ? (
+                          <Navigate to="/admin" replace />
+                        ) : (
+                          user.org === 'Org1' ? <Org1Dashboard user={user} onLogout={handleLogout} /> :
+                          user.org === 'Org2' ? <Org2Dashboard user={user} onLogout={handleLogout} /> :
+                          user.org === 'Org3' ? <Org3Dashboard user={user} onLogout={handleLogout} /> :
+                          <Navigate to="/login" replace />
+                        )
                       ) : <Navigate to="/login" replace />
                     } 
                   />
