@@ -10,7 +10,16 @@ import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import VerifyOTP from './components/Auth/VerifyOTP';
 import AdminAccountPage from './components/Admin/AdminAccountPage';
-import DashboardRouter from './components/Dashboard/DashboardRouter';
+import Org1AdminPage from './components/Organization/Org1/Org1AdminPage';
+import Org2AdminPage from './components/Organization/Org2/Org2AdminPage';
+import Org3AdminPage from './components/Organization/Org3/Org3AdminPage';
+import SystemConfigPage from './components/Admin/SystemConfigPage';
+import LogsPage from './components/Admin/LogsPage';
+
+// Organization Dashboards
+import Org1Dashboard from './components/Organization/Org1/Org1Dashboard';
+import Org2Dashboard from './components/Organization/Org2/Org2Dashboard';
+import Org3Dashboard from './components/Organization/Org3/Org3Dashboard';
 
 // Services
 import authService from './services/auth';
@@ -250,9 +259,46 @@ function App() {
                     } 
                   />
                   <Route 
+                    path="/admin" 
+                    element={
+                      user && isAdmin() ? (
+                        user.org === 'Org1' ? <Org1AdminPage /> :
+                        user.org === 'Org2' ? <Org2AdminPage /> :
+                        <Org3AdminPage />
+                      ) : (
+                        <Navigate to={user ? "/" : "/login"} replace />
+                      )
+                    }
+                  />
+                  <Route 
+                    path="/admin/system-configs" 
+                    element={
+                      user && isAdmin() ? (
+                        <SystemConfigPage />
+                      ) : (
+                        <Navigate to={user ? "/" : "/login"} replace />
+                      )
+                    }
+                  />
+                  <Route 
+                    path="/admin/logs" 
+                    element={
+                      user && isAdmin() && user.org !== 'Org3' ? (
+                        <LogsPage />
+                      ) : (
+                        <Navigate to={user ? "/" : "/login"} replace />
+                      )
+                    }
+                  />
+                  <Route 
                     path="/" 
                     element={
-                      user ? <DashboardRouter user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />
+                      user ? (
+                        user.org === 'Org1' ? <Org1Dashboard user={user} onLogout={handleLogout} /> :
+                        user.org === 'Org2' ? <Org2Dashboard user={user} onLogout={handleLogout} /> :
+                        user.org === 'Org3' ? <Org3Dashboard user={user} onLogout={handleLogout} /> :
+                        <Navigate to="/login" replace />
+                      ) : <Navigate to="/login" replace />
                     } 
                   />
                   <Route 

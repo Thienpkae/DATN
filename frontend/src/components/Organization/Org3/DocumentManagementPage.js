@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, LinkOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, LinkOutlined } from '@ant-design/icons';
 import documentService from '../../../services/documentService';
+import authService from '../../../services/auth';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -12,7 +13,6 @@ const DocumentManagementPage = () => {
   const [filters, setFilters] = useState({
     keyword: '',
     docType: undefined,
-    status: undefined,
     fileType: undefined
   });
   const [createOpen, setCreateOpen] = useState(false);
@@ -20,27 +20,31 @@ const DocumentManagementPage = () => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [analysis, setAnalysis] = useState(null);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [linkForm] = Form.useForm();
 
-  const loadList = useCallback(async () => {
+  const loadMyDocuments = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await documentService.getAllDocuments();
+      const user = authService.getCurrentUser();
+      if (!user?.userId) {
+        message.error('Không xác định được người dùng');
+        return;
+      }
+      const res = await documentService.getDocumentsByUploader(user.userId);
       const data = Array.isArray(res) ? res : (res?.data ?? []);
       setDocuments(data);
     } catch (e) {
-      message.error(e.message || 'Không tải được danh sách tài liệu');
+      message.error(e.message || 'Không tải được tài liệu của tôi');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadList();
-  }, [loadList]);
+    loadMyDocuments();
+  }, [loadMyDocuments]);
 
   const onSearch = async () => {
     try {
@@ -82,7 +86,7 @@ const DocumentManagementPage = () => {
       message.success('Tạo tài liệu thành công');
       setCreateOpen(false);
       form.resetFields();
-      loadList();
+      loadMyDocuments();
     } catch (e) {
       message.error(e.message || 'Tạo tài liệu thất bại');
     } finally {
@@ -102,7 +106,7 @@ const DocumentManagementPage = () => {
       });
       message.success('Cập nhật tài liệu thành công');
       setEditOpen(false);
-      loadList();
+      loadMyDocuments();
     } catch (e) {
       message.error(e.message || 'Cập nhật thất bại');
     } finally {
@@ -114,11 +118,11 @@ const DocumentManagementPage = () => {
     try {
       await documentService.deleteDocument(docID);
       message.success('Xóa tài liệu thành công');
-      loadList();
+      loadMyDocuments();
     } catch (e) {
       message.error(e.message || 'Xóa thất bại');
     }
-  }, [loadList]);
+  }, [loadMyDocuments]);
 
   const onLink = async () => {
     try {
@@ -137,7 +141,7 @@ const DocumentManagementPage = () => {
       }
       message.success('Liên kết tài liệu thành công');
       setLinkOpen(false);
-      loadList();
+      loadMyDocuments();
     } catch (e) {
       message.error(e.message || 'Liên kết thất bại');
     } finally {
@@ -145,13 +149,13 @@ const DocumentManagementPage = () => {
     }
   };
 
-  const onAnalyze = async (docID) => {
-    try {
-      const res = await documentService.analyzeDocument(docID);
-      setAnalysis(res);
-      setDetailOpen(true);
-    } catch (e) {
-      message.error(e.message || 'Phân tích thất bại');
+  const getStatusTag = (verified) => {
+    if (verified === true) {
+      return <Tag color="green">Đã xác thực</Tag>;
+    } else if (verified === false) {
+      return <Tag color="red">Bị từ chối</Tag>;
+    } else {
+      return <Tag color="orange">Chờ xác thực</Tag>;
     }
   };
 
@@ -159,10 +163,10 @@ const DocumentManagementPage = () => {
     { title: 'Mã tài liệu', dataIndex: 'docID', key: 'docID' },
     { title: 'Tiêu đề', dataIndex: 'title', key: 'title' },
     { title: 'Loại', dataIndex: 'docType', key: 'docType', render: v => <Tag>{v}</Tag> },
-    { title: 'Trạng thái', dataIndex: 'verified', key: 'verified', render: v => <Tag color={v ? 'green' : 'orange'}>{v ? 'Đã xác thực' : 'Chờ xác thực'}</Tag> },
+    { title: 'Trạng thái', dataIndex: 'verified', key: 'verified', render: v => getStatusTag(v) },
     { title: 'Loại file', dataIndex: 'fileType', key: 'fileType' },
     { title: 'Kích thước', dataIndex: 'fileSize', key: 'fileSize', render: v => v ? `${(v / 1024).toFixed(2)} KB` : 'N/A' },
-    { title: 'Người upload', dataIndex: 'uploadedBy', key: 'uploadedBy' },
+    { title: 'Ngày tạo', dataIndex: 'createdAt', key: 'createdAt', render: v => v ? new Date(v).toLocaleDateString('vi-VN') : 'N/A' },
     {
       title: 'Thao tác', key: 'actions', fixed: 'right', render: (_, record) => (
         <Space>
@@ -171,9 +175,6 @@ const DocumentManagementPage = () => {
               setSelected(record);
               setDetailOpen(true);
             }} />
-          </Tooltip>
-          <Tooltip title="Phân tích">
-            <Button icon={<FileTextOutlined />} onClick={() => onAnalyze(record.docID)} />
           </Tooltip>
           <Tooltip title="Liên kết">
             <Button icon={<LinkOutlined />} onClick={() => {
@@ -204,7 +205,7 @@ const DocumentManagementPage = () => {
 
   return (
     <Card
-      title="Quản lý tài liệu (Org1)"
+      title="Tài liệu của tôi (Org3)"
       extra={
         <Space>
           <Input
@@ -219,18 +220,13 @@ const DocumentManagementPage = () => {
               <Option key={type} value={type}>{type}</Option>
             ))}
           </Select>
-          <Select placeholder="Trạng thái" allowClear style={{ width: 150 }} value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })}>
-            {documentService.getDocumentStatuses().map(status => (
-              <Option key={status} value={status}>{status}</Option>
-            ))}
-          </Select>
           <Select placeholder="Loại file" allowClear style={{ width: 150 }} value={filters.fileType} onChange={(v) => setFilters({ ...filters, fileType: v })}>
             {documentService.getFileTypes().map(type => (
               <Option key={type} value={type}>{type}</Option>
             ))}
           </Select>
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
-          <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
+          <Button icon={<ReloadOutlined />} onClick={loadMyDocuments}>Tải lại</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>Tạo tài liệu</Button>
         </Space>
       }
@@ -344,7 +340,7 @@ const DocumentManagementPage = () => {
         </Form>
       </Modal>
 
-      {/* Detail + Analysis */}
+      {/* Detail */}
       <Drawer title="Chi tiết tài liệu" width={720} open={detailOpen} onClose={() => setDetailOpen(false)}>
         {selected && (
           <div>
@@ -354,7 +350,7 @@ const DocumentManagementPage = () => {
             </Row>
             <Row gutter={16} style={{ marginTop: 12 }}>
               <Col span={12}><strong>Tiêu đề:</strong> {selected.title}</Col>
-              <Col span={12}><strong>Trạng thái:</strong> {selected.verified ? 'Đã xác thực' : 'Chờ xác thực'}</Col>
+              <Col span={12}><strong>Trạng thái:</strong> {getStatusTag(selected.verified)}</Col>
             </Row>
             <Row gutter={16} style={{ marginTop: 12 }}>
               <Col span={12}><strong>Loại file:</strong> {selected.fileType}</Col>
@@ -370,12 +366,14 @@ const DocumentManagementPage = () => {
             <div style={{ marginTop: 12 }}>
               <strong>Hash IPFS:</strong> {selected.ipfsHash || '-'}
             </div>
-            {analysis && (
-              <div style={{ marginTop: 16 }}>
-                <strong>Kết quả phân tích:</strong>
-                <pre style={{ background: '#f5f5f5', padding: 12, borderRadius: 4, marginTop: 8 }}>
-                  {JSON.stringify(analysis, null, 2)}
-                </pre>
+            {selected.verifiedBy && (
+              <div style={{ marginTop: 12 }}>
+                <strong>Người xác minh:</strong> {selected.verifiedBy}
+              </div>
+            )}
+            {selected.verifiedAt && (
+              <div style={{ marginTop: 12 }}>
+                <strong>Thời gian xác minh:</strong> {new Date(selected.verifiedAt).toLocaleDateString('vi-VN')}
               </div>
             )}
           </div>

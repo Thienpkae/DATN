@@ -1,37 +1,71 @@
-import apiClient from './api';
-import { API_ENDPOINTS } from './api';
+import apiClient, { API_ENDPOINTS, handleApiError } from './api';
 
-// Land Management Service
+// Land Management Service - Tích hợp trực tiếp với backend APIs
 const landService = {
   // Create new land parcel
   async createLandParcel(landData) {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.LAND.CREATE, landData);
+      const response = await apiClient.post(API_ENDPOINTS.LAND.CREATE, {
+        id: landData.id,
+        ownerID: landData.ownerID, 
+        location: landData.location,
+        landUsePurpose: landData.landUsePurpose,
+        legalStatus: landData.legalStatus,
+        area: landData.area,
+        certificateID: landData.certificateID || '',
+        legalInfo: landData.legalInfo || ''
+      });
       return response.data;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Lỗi khi tạo thửa đất');
+      throw handleApiError(error);
     }
   },
 
   // Update existing land parcel
   async updateLandParcel(id, updateData) {
     try {
-      const url = API_ENDPOINTS.LAND.UPDATE.replace(':id', id);
-      const response = await apiClient.put(url, updateData);
-      return response.data;
+      const response = await fetch(`/api/land-parcels/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`
+        },
+        body: JSON.stringify({
+          area: updateData.area,
+          location: updateData.location,
+          landUsePurpose: updateData.landUsePurpose,
+          legalStatus: updateData.legalStatus,
+          certificateId: updateData.certificateID || '',
+          legalInfo: updateData.legalInfo || ''
+        })
+      });
+      
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.message || 'Lỗi khi cập nhật thửa đất');
+      }
+      return result;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Lỗi khi cập nhật thửa đất');
+      throw new Error(error.message || 'Lỗi khi cập nhật thửa đất');
     }
   },
 
   // Get land parcel by ID
   async getLandParcel(id) {
     try {
-      const url = API_ENDPOINTS.LAND.GET_BY_ID.replace(':id', id);
-      const response = await apiClient.get(url);
-      return response.data;
+      const response = await fetch(`/api/land-parcels/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`
+        }
+      });
+      
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.message || 'Lỗi khi lấy thông tin thửa đất');
+      }
+      return result.data;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Lỗi khi lấy thông tin thửa đất');
+      throw new Error(error.message || 'Lỗi khi lấy thông tin thửa đất');
     }
   },
 
@@ -41,51 +75,87 @@ const landService = {
       const response = await apiClient.get(API_ENDPOINTS.LAND.GET_ALL);
       return response.data;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Lỗi khi lấy danh sách thửa đất');
+      throw handleApiError(error);
     }
   },
 
   // Search land parcels by keyword and filters
   async searchLandParcels(searchParams) {
     try {
-      const response = await apiClient.get(API_ENDPOINTS.LAND.SEARCH, {
-        params: searchParams
+      const queryParams = new URLSearchParams(searchParams);
+      const response = await fetch(`/api/land-parcels/search?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`
+        }
       });
-      return response.data;
+      
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.message || 'Lỗi khi tìm kiếm');
+      }
+      return result.data;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Lỗi khi tìm kiếm');
+      throw new Error(error.message || 'Lỗi khi tìm kiếm');
     }
   },
 
   // Get land parcels by owner
   async getLandParcelsByOwner(ownerID) {
     try {
-      const url = API_ENDPOINTS.LAND.GET_BY_OWNER.replace(':ownerID', ownerID);
-      const response = await apiClient.get(url);
-      return response.data;
+      const response = await fetch(`/api/land-parcels/owner/${ownerID}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`
+        }
+      });
+      
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.message || 'Lỗi khi lấy thửa đất theo chủ sở hữu');
+      }
+      return result.data;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Lỗi khi lấy thửa đất theo chủ sở hữu');
+      throw new Error(error.message || 'Lỗi khi lấy thửa đất theo chủ sở hữu');
     }
   },
 
   // Get land parcel history
   async getLandParcelHistory(id) {
     try {
-      const url = API_ENDPOINTS.LAND.GET_HISTORY.replace(':id', id);
-      const response = await apiClient.get(url);
-      return response.data;
+      const response = await fetch(`/api/land-parcels/${id}/history`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`
+        }
+      });
+      
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.message || 'Lỗi khi lấy lịch sử thửa đất');
+      }
+      return result.data;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Lỗi khi lấy lịch sử thửa đất');
+      throw new Error(error.message || 'Lỗi khi lấy lịch sử thửa đất');
     }
   },
 
   // Issue land certificate
   async issueLandCertificate(certificateData) {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.LAND.ISSUE_CERTIFICATE, certificateData);
-      return response.data;
+      const response = await fetch('/api/land-parcels/issue-certificate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`
+        },
+        body: JSON.stringify(certificateData)
+      });
+      
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.message || 'Lỗi khi cấp giấy chứng nhận');
+      }
+      return result;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Lỗi khi cấp giấy chứng nhận');
+      throw new Error(error.message || 'Lỗi khi cấp giấy chứng nhận');
     }
   },
 

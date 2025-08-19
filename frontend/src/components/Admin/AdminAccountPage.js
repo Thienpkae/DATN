@@ -37,7 +37,8 @@ import {
   UnlockOutlined
 } from '@ant-design/icons';
 import moment from 'moment';
-import apiService from '../../services/api';
+import userService from '../../services/userService';
+import authService from '../../services/auth';
 
 const { Option } = Select;
 const { Search } = Input;
@@ -64,11 +65,27 @@ const AdminAccountPage = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      // Admin user management requires additional backend endpoints
-      setUsers([]);
-      message.info('Admin user management functionality requires additional backend endpoints');
+      const data = await userService.listUsers();
+      const mapped = (data.users || []).map(u => ({
+        id: u._id || u.cccd,
+        userId: u.cccd,
+        name: u.fullName,
+        email: u.email || '',
+        phone: u.phone,
+        org: u.org,
+        role: u.role,
+        status: u.isLocked ? 'inactive' : 'active',
+        createdAt: u.createdAt
+      }));
+      setUsers(mapped);
+      setStats({
+        totalUsers: data.total || mapped.length,
+        activeUsers: mapped.filter(x => x.status === 'active').length,
+        pendingUsers: 0,
+        totalOrganizations: 3
+      });
     } catch (error) {
-      message.error('Failed to fetch users');
+      message.error(error.message || 'Failed to fetch users');
     } finally {
       setLoading(false);
     }
@@ -122,7 +139,7 @@ const AdminAccountPage = () => {
 
   const handleDeleteUser = async (userId) => {
     try {
-      await apiService.deleteAccount(userId);
+      await userService.deleteAccount(userId);
       message.success('User deleted successfully');
       fetchUsers();
       fetchStats();
@@ -134,10 +151,10 @@ const AdminAccountPage = () => {
   const handleToggleUserStatus = async (userId, isActive) => {
     try {
       if (isActive) {
-        await apiService.lockUnlockAccount(userId, true);
+        await userService.lockUnlockAccount(userId, true);
         message.success('User deactivated successfully');
       } else {
-        await apiService.lockUnlockAccount(userId, false);
+        await userService.lockUnlockAccount(userId, false);
         message.success('User activated successfully');
       }
       fetchUsers();
@@ -162,7 +179,7 @@ const AdminAccountPage = () => {
         message.info('User update functionality requires additional backend endpoints');
       } else {
         // User creation uses the register endpoint
-        await apiService.register(userData);
+        await authService.register(userData);
         message.success('User created successfully');
       }
 
@@ -208,18 +225,18 @@ const AdminAccountPage = () => {
 
   const getOrgColor = (org) => {
     switch (org) {
-      case 'org1': return 'blue';
-      case 'org2': return 'purple';
-      case 'org3': return 'cyan';
+      case 'Org1': return 'blue';
+      case 'Org2': return 'purple';
+      case 'Org3': return 'cyan';
       default: return 'default';
     }
   };
 
   const getOrgName = (org) => {
     switch (org) {
-      case 'org1': return 'Land Authority';
-      case 'org2': return 'Government Officers';
-      case 'org3': return 'Citizens';
+      case 'Org1': return 'Land Authority';
+      case 'Org2': return 'Notary Office';
+      case 'Org3': return 'Citizens';
       default: return org;
     }
   };
@@ -228,7 +245,7 @@ const AdminAccountPage = () => {
     const matchesSearch = user.name?.toLowerCase().includes(searchText.toLowerCase()) ||
                          user.email?.toLowerCase().includes(searchText.toLowerCase()) ||
                          user.userId?.toLowerCase().includes(searchText.toLowerCase());
-    const matchesOrg = !filterOrg || user.organization === filterOrg;
+    const matchesOrg = !filterOrg || user.org === filterOrg;
     const matchesStatus = !filterStatus || user.status === filterStatus;
     
     return matchesSearch && matchesOrg && matchesStatus;
@@ -254,17 +271,17 @@ const AdminAccountPage = () => {
     },
     {
       title: 'Organization',
-      dataIndex: 'organization',
-      key: 'organization',
+      dataIndex: 'org',
+      key: 'org',
       render: (org) => (
         <Tag color={getOrgColor(org)}>
           {getOrgName(org)}
         </Tag>
       ),
       filters: [
-        { text: 'Land Authority', value: 'org1' },
-        { text: 'Government Officers', value: 'org2' },
-        { text: 'Citizens', value: 'org3' },
+        { text: 'Land Authority', value: 'Org1' },
+        { text: 'Notary Office', value: 'Org2' },
+        { text: 'Citizens', value: 'Org3' },
       ],
     },
     {

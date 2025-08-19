@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Divider } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined, CheckCircleOutlined, CloseCircleOutlined, HistoryOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, CheckCircleOutlined, ForwardOutlined, HistoryOutlined } from '@ant-design/icons';
 import transactionService from '../../../services/transactionService';
 
 const { Option } = Select;
-const { TextArea } = Input;
+
 
 const TransactionManagementPage = () => {
   const [loading, setLoading] = useState(false);
@@ -15,12 +15,11 @@ const TransactionManagementPage = () => {
     status: undefined
   });
   const [detailOpen, setDetailOpen] = useState(false);
-  const [approveOpen, setApproveOpen] = useState(false);
-  const [rejectOpen, setRejectOpen] = useState(false);
+  const [processOpen, setProcessOpen] = useState(false);
+  const [forwardOpen, setForwardOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [history, setHistory] = useState([]);
-  const [approveForm] = Form.useForm();
-  const [rejectForm] = Form.useForm();
+  const [forwardForm] = Form.useForm();
 
   const loadList = async () => {
     try {
@@ -52,51 +51,30 @@ const TransactionManagementPage = () => {
     }
   };
 
-  const onApprove = async () => {
+  const onProcess = async () => {
     try {
-      const values = await approveForm.validateFields();
       setLoading(true);
-      
-      switch (selected.type) {
-        case 'TRANSFER':
-          await transactionService.approveTransferTransaction(selected.txID);
-          break;
-        case 'SPLIT':
-          await transactionService.approveSplitTransaction(selected.txID);
-          break;
-        case 'MERGE':
-          await transactionService.approveMergeTransaction(selected.txID);
-          break;
-        case 'CHANGE_PURPOSE':
-          await transactionService.approveChangePurposeTransaction(selected.txID);
-          break;
-        case 'REISSUE':
-          await transactionService.approveReissueTransaction(selected.txID, values.newCertificateID);
-          break;
-        default:
-          throw new Error('Loại giao dịch không được hỗ trợ');
-      }
-      
-      message.success('Phê duyệt giao dịch thành công');
-      setApproveOpen(false);
+      await transactionService.processTransaction(selected.txID);
+      message.success('Xử lý giao dịch thành công');
+      setProcessOpen(false);
       loadList();
     } catch (e) {
-      message.error(e.message || 'Phê duyệt thất bại');
+      message.error(e.message || 'Xử lý thất bại');
     } finally {
       setLoading(false);
     }
   };
 
-  const onReject = async () => {
+  const onForward = async () => {
     try {
-      const values = await rejectForm.validateFields();
+      await forwardForm.validateFields();
       setLoading(true);
-      await transactionService.rejectTransaction(selected.txID, values.reason);
-      message.success('Từ chối giao dịch thành công');
-      setRejectOpen(false);
+      await transactionService.forwardTransaction(selected.txID);
+      message.success('Chuyển tiếp giao dịch thành công');
+      setForwardOpen(false);
       loadList();
     } catch (e) {
-      message.error(e.message || 'Từ chối thất bại');
+      message.error(e.message || 'Chuyển tiếp thất bại');
     } finally {
       setLoading(false);
     }
@@ -129,12 +107,12 @@ const TransactionManagementPage = () => {
     return <Tag color="blue">{transactionService.getTransactionTypeText(type)}</Tag>;
   };
 
-  const canApprove = (transaction) => {
-    return transaction.status === 'FORWARDED' || transaction.status === 'VERIFIED';
+  const canProcess = (transaction) => {
+    return transaction.status === 'PENDING';
   };
 
-  const canReject = (transaction) => {
-    return ['PENDING', 'VERIFIED', 'FORWARDED'].includes(transaction.status);
+  const canForward = (transaction) => {
+    return transaction.status === 'VERIFIED';
   };
 
   const columns = useMemo(() => ([
@@ -157,44 +135,42 @@ const TransactionManagementPage = () => {
           <Tooltip title="Lịch sử">
             <Button icon={<HistoryOutlined />} onClick={() => onViewHistory(record.txID)} />
           </Tooltip>
-          {canApprove(record) && (
-            <Tooltip title="Phê duyệt">
+          {canProcess(record) && (
+            <Tooltip title="Xử lý">
               <Button 
                 type="primary" 
                 icon={<CheckCircleOutlined />} 
                 onClick={() => {
                   setSelected(record);
-                  approveForm.setFieldsValue({ txID: record.txID });
-                  setApproveOpen(true);
+                  setProcessOpen(true);
                 }}
               >
-                Phê duyệt
+                Xử lý
               </Button>
             </Tooltip>
           )}
-          {canReject(record) && (
-            <Tooltip title="Từ chối">
+          {canForward(record) && (
+            <Tooltip title="Chuyển tiếp">
               <Button 
-                danger 
-                icon={<CloseCircleOutlined />} 
+                type="default" 
+                icon={<ForwardOutlined />} 
                 onClick={() => {
                   setSelected(record);
-                  rejectForm.setFieldsValue({ txID: record.txID });
-                  setRejectOpen(true);
+                  setForwardOpen(true);
                 }}
               >
-                Từ chối
+                Chuyển tiếp
               </Button>
             </Tooltip>
           )}
         </Space>
       )
     }
-  ]), [approveForm, rejectForm]);
+  ]), []);
 
   return (
     <Card
-      title="Quản lý giao dịch (Org1)"
+      title="Xử lý giao dịch (Org2)"
       extra={
         <Space>
           <Input
@@ -234,38 +210,41 @@ const TransactionManagementPage = () => {
         pagination={{ pageSize: 10, showSizeChanger: true }}
       />
 
-      {/* Approve Transaction */}
-      <Modal title="Phê duyệt giao dịch" open={approveOpen} onOk={onApprove} onCancel={() => setApproveOpen(false)} confirmLoading={loading} width={640}>
-        <Form layout="vertical" form={approveForm}>
-          <Form.Item name="txID" label="Mã giao dịch">
-            <Input disabled />
-          </Form.Item>
-          {selected?.type === 'REISSUE' && (
-            <Form.Item name="newCertificateID" label="Mã GCN mới" rules={[{ required: true, message: 'Bắt buộc' }]}>
-              <Input placeholder="Nhập mã giấy chứng nhận mới" />
-            </Form.Item>
-          )}
-          <div style={{ marginTop: 16 }}>
+      {/* Process Transaction */}
+      <Modal title="Xử lý giao dịch" open={processOpen} onOk={onProcess} onCancel={() => setProcessOpen(false)} confirmLoading={loading} width={640}>
+        <div>
+          <div style={{ marginBottom: 16 }}>
             <strong>Thông tin giao dịch:</strong>
             <div style={{ marginTop: 8, padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
+              <div><strong>Mã giao dịch:</strong> {selected?.txID}</div>
               <div><strong>Loại:</strong> {selected ? transactionService.getTransactionTypeText(selected.type) : ''}</div>
               <div><strong>Thửa đất:</strong> {selected?.landParcelId}</div>
               <div><strong>Người gửi:</strong> {selected?.fromOwnerId}</div>
               {selected?.toOwnerId && <div><strong>Người nhận:</strong> {selected.toOwnerId}</div>}
             </div>
           </div>
-        </Form>
+          <div style={{ color: '#666', fontSize: '14px' }}>
+            Bạn có chắc chắn muốn xử lý giao dịch này? Hành động này sẽ chuyển trạng thái giao dịch từ "Chờ xử lý" sang "Đã thẩm định".
+          </div>
+        </div>
       </Modal>
 
-      {/* Reject Transaction */}
-      <Modal title="Từ chối giao dịch" open={rejectOpen} onOk={onReject} onCancel={() => setRejectOpen(false)} confirmLoading={loading} width={640}>
-        <Form layout="vertical" form={rejectForm}>
-          <Form.Item name="txID" label="Mã giao dịch">
-            <Input disabled />
-          </Form.Item>
-          <Form.Item name="reason" label="Lý do từ chối" rules={[{ required: true, message: 'Bắt buộc' }]}>
-            <TextArea rows={3} placeholder="Nhập lý do từ chối giao dịch" />
-          </Form.Item>
+      {/* Forward Transaction */}
+      <Modal title="Chuyển tiếp giao dịch" open={forwardOpen} onOk={onForward} onCancel={() => setForwardOpen(false)} confirmLoading={loading} width={640}>
+        <Form layout="vertical" form={forwardForm}>
+          <div style={{ marginBottom: 16 }}>
+            <strong>Thông tin giao dịch:</strong>
+            <div style={{ marginTop: 8, padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
+              <div><strong>Mã giao dịch:</strong> {selected?.txID}</div>
+              <div><strong>Loại:</strong> {selected ? transactionService.getTransactionTypeText(selected.type) : ''}</div>
+              <div><strong>Thửa đất:</strong> {selected?.landParcelId}</div>
+              <div><strong>Người gửi:</strong> {selected?.fromOwnerId}</div>
+              {selected?.toOwnerId && <div><strong>Người nhận:</strong> {selected.toOwnerId}</div>}
+            </div>
+          </div>
+          <div style={{ color: '#666', fontSize: '14px' }}>
+            Bạn có chắc chắn muốn chuyển tiếp giao dịch này lên cấp trên (Sở TN&MT) để phê duyệt? Hành động này sẽ chuyển trạng thái giao dịch từ "Đã thẩm định" sang "Đã chuyển tiếp".
+          </div>
         </Form>
       </Modal>
 
@@ -312,7 +291,7 @@ const TransactionManagementPage = () => {
                       marginBottom: 8, 
                       background: '#f5f5f5', 
                       borderRadius: 4,
-                      borderLeft: '4px solid #1890ff'
+                      borderLeft: '4px solid #722ed1'
                     }}>
                       <div><strong>Trạng thái:</strong> {getStatusTag(item.status)}</div>
                       <div><strong>Thời gian:</strong> {item.timestamp ? new Date(item.timestamp).toLocaleString('vi-VN') : 'N/A'}</div>

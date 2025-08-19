@@ -274,7 +274,7 @@ export const ORGANIZATION_PERMISSIONS = {
     canView: ['all'] // Can view all data
   },
   ORG2: {
-    name: 'Văn phòng công chứng',
+    name: 'Đơn vị hành chính cấp xã',
     permissions: [
       'land_view_all', 'transaction_process', 'transaction_forward',
       'document_verify', 'document_reject', 'document_view_all'
