@@ -1,4 +1,5 @@
 import apiClient, { API_ENDPOINTS, handleApiError } from './api';
+import { normalizeVietnameseName } from '../utils/text';
 
 // Auth Service - Handles all authentication operations
 const authService = {
@@ -16,76 +17,38 @@ const authService = {
   async login(credentials) {
     try {
       const response = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, credentials);
-      
       if (response.data.token) {
-        // Store token
         localStorage.setItem('jwt_token', response.data.token);
-        
-        // Get user info from backend
-        try {
-          // Wait a bit for token to be properly set
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          const userResponse = await apiClient.get(API_ENDPOINTS.USER.PROFILE, {
-            headers: { Authorization: `Bearer ${response.data.token}` }
-          });
-          
-          console.log('User profile response:', userResponse.data);
-          
-          if (userResponse.data.user) {
-            const user = {
-              userId: userResponse.data.user.cccd,
-              cccd: userResponse.data.user.cccd,
-              org: userResponse.data.user.org,
-              role: userResponse.data.user.role,
-              name: userResponse.data.user.fullName,
-              phone: userResponse.data.user.phone
-            };
-            
-            console.log('Setting user in localStorage:', user);
-            localStorage.setItem('user', JSON.stringify(user));
-          } else {
-            throw new Error('No user data in response');
-          }
-        } catch (userError) {
-          console.warn('Could not fetch user details, using JWT payload:', userError);
-          // Fallback to JWT payload if user fetch fails
+        // Prefer user object from login response; fallback to JWT payload
+        if (response.data.user) {
+          const u = response.data.user;
+          const user = {
+            userId: u.cccd,
+            cccd: u.cccd,
+            org: u.org,
+            role: u.role,
+            name: normalizeVietnameseName(u.fullName),
+            phone: u.phone || ''
+          };
+          localStorage.setItem('user', JSON.stringify(user));
+        } else {
           try {
             const payload = JSON.parse(atob(response.data.token.split('.')[1]));
-            console.log('JWT payload:', payload);
-            
-            if (!payload.cccd || !payload.org) {
-              throw new Error('JWT payload missing required fields');
-            }
-            
             const user = {
               userId: payload.cccd,
               cccd: payload.cccd,
               org: payload.org,
               role: payload.role || 'user',
-              name: payload.name || 'User'
+              name: normalizeVietnameseName(payload.name || 'User'),
+              phone: payload.phone || ''
             };
-            
-            console.log('Setting user from JWT in localStorage:', user);
             localStorage.setItem('user', JSON.stringify(user));
           } catch (jwtError) {
             console.error('Failed to parse JWT payload:', jwtError);
-            // Try to create minimal user data
-            const user = {
-              userId: 'unknown',
-              cccd: 'unknown',
-              org: 'Org3',
-              role: 'user',
-              name: 'User'
-            };
-            console.log('Setting minimal user in localStorage:', user);
-            localStorage.setItem('user', JSON.stringify(user));
           }
         }
-        
         localStorage.setItem('refresh_token', response.data.refreshToken || '');
       }
-      
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -182,7 +145,26 @@ const authService = {
   getCurrentUser() {
     try {
       const userStr = localStorage.getItem('user');
-      return userStr ? JSON.parse(userStr) : null;
+      if (!userStr) return null;
+      const parsed = JSON.parse(userStr);
+      if (parsed && parsed.name) {
+        parsed.name = normalizeVietnameseName(parsed.name);
+      }
+      // Backfill phone from JWT payload if missing
+      if (!parsed?.phone) {
+        try {
+          const token = localStorage.getItem('jwt_token');
+          if (token) {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            if (payload?.phone) {
+              parsed.phone = payload.phone;
+              // persist back to storage so subsequent reads include phone
+              localStorage.setItem('user', JSON.stringify(parsed));
+            }
+          }
+        } catch (_) { /* ignore */ }
+      }
+      return parsed;
     } catch (error) {
       return null;
     }
@@ -243,9 +225,11 @@ const authService = {
         const updatedUser = {
           ...currentUser,
           ...response.data.user,
+          ...response.data.phone,
           userId: response.data.user.cccd,
           cccd: response.data.user.cccd,
-          name: response.data.user.fullName
+          name: normalizeVietnameseName(response.data.user.fullName),
+          phone: response.data.phone
         };
         
         localStorage.setItem('user', JSON.stringify(updatedUser));

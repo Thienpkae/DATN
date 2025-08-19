@@ -11,6 +11,7 @@ const VerifyOTP = () => {
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [otpExpiry, setOtpExpiry] = useState(300); // 5 minutes TTL
   const location = useLocation();
   const navigate = useNavigate();
   const message = useMessage();
@@ -26,10 +27,27 @@ const VerifyOTP = () => {
     }
   }, [countdown]);
 
+  useEffect(() => {
+    if (otpExpiry > 0) {
+      const t = setTimeout(() => setOtpExpiry((s) => s - 1), 1000);
+      return () => clearTimeout(t);
+    }
+  }, [otpExpiry]);
+
+  const formatTime = (total) => {
+    const m = Math.floor(total / 60).toString().padStart(2, '0');
+    const s = Math.floor(total % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
   const onFinish = async (values) => {
     if (!cccd) {
       message.error('Không tìm thấy CCCD. Vui lòng đăng ký lại.');
       navigate('/register');
+      return;
+    }
+    if (otpExpiry <= 0) {
+      message.warning('Mã OTP đã hết hạn. Vui lòng bấm "Gửi lại OTP" để nhận mã mới.');
       return;
     }
 
@@ -56,7 +74,8 @@ const VerifyOTP = () => {
     try {
       await authService.resendOTP(cccd);
       message.success('OTP đã được gửi lại thành công!');
-      setCountdown(60); // 60 seconds countdown
+      setCountdown(60); // 60 seconds countdown for resend throttle
+      setOtpExpiry(300); // reset OTP TTL to 5 minutes
     } catch (error) {
       message.error(error.response?.data?.error || 'Không thể gửi lại OTP');
     } finally {
@@ -208,12 +227,29 @@ const VerifyOTP = () => {
                   padding: '12px 16px',
                   fontSize: '18px',
                   textAlign: 'center',
-                  letterSpacing: '0.5em'
+                  fontFamily: 'inherit'
                 }}
                 maxLength={6}
                 autoFocus
               />
             </Form.Item>
+
+            {/* OTP Expiry Countdown */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: '-8px',
+              marginBottom: '12px'
+            }}>
+              <ClockCircleOutlined style={{
+                color: otpExpiry <= 30 ? '#ff4d4f' : '#8c8c8c',
+                marginRight: 8
+              }} />
+              <Text type={otpExpiry <= 30 ? 'danger' : 'secondary'} style={{ fontSize: 14 }}>
+                {otpExpiry > 0 ? `Mã OTP sẽ hết hạn trong: ${formatTime(otpExpiry)}` : 'Mã OTP đã hết hạn. Vui lòng gửi lại OTP.'}
+              </Text>
+            </div>
 
             <Form.Item style={{ marginBottom: '1rem' }}>
               <Button 
@@ -231,6 +267,7 @@ const VerifyOTP = () => {
                   border: 'none',
                   boxShadow: '0 4px 12px rgba(82, 196, 26, 0.3)'
                 }}
+                disabled={otpExpiry <= 0}
               >
                 {loading ? 'Đang xác thực...' : 'Xác thực OTP'}
               </Button>

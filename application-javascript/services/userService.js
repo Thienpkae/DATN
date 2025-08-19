@@ -141,5 +141,6 @@ module.exports = {
     getProfile,
     updateProfile,
     getUserByCCCD,
+    getSelfByCCCD,
     updateUser
 };

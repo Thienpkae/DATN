@@ -155,7 +155,16 @@ async function verifyUser(cccd, otp) {
         const attributes = [
             { name: 'cccd', value: user.cccd, ecert: true }
         ];
-        await registerAndEnrollUser(caClient, wallet, msp, user.cccd, affiliation, attributes);
+        const enrolled = await registerAndEnrollUser(caClient, wallet, msp, user.cccd, affiliation, attributes);
+        if (!enrolled) {
+            throw new Error('User was not enrolled by CA');
+        }
+
+        // Double-check identity exists in wallet before marking verified
+        const checkIdentity = await wallet.get(user.cccd);
+        if (!checkIdentity) {
+            throw new Error('Identity not found in wallet after enrollment');
+        }
 
         user.isPhoneVerified = true;
         user.otp = undefined;
@@ -171,7 +180,7 @@ async function verifyUser(cccd, otp) {
         await log.save();
 
         console.log(`Successfully registered user with CCCD ${cccd} for ${user.org}`);
-        return { message: 'User registered successfully' };
+        return { message: 'User registered successfully', cccd: user.cccd, phone: user.phone };
     } catch (error) {
         console.error(`Error in verifying user: ${error}`);
         throw error;

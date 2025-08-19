@@ -24,6 +24,7 @@ export const API_ENDPOINTS = {
     LIST_ALL: '/users',
     GET_BY_CCCD: '/users/:cccd',
     UPDATE_BY_CCCD: '/users/:cccd',
+    GET_SELF_BY_CCCD: '/users/self/:cccd',
   },
   LAND: {
     CREATE: '/land-parcels',

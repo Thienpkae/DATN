@@ -20,6 +20,7 @@ import LandManagementPage from './LandManagementPage';
 import DocumentManagementPage from './DocumentManagementPage';
 import TransactionManagementPage from './TransactionManagementPage';
 import NotificationCenter from '../../Common/NotificationCenter';
+import { normalizeVietnameseName } from '../../../utils/text';
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
@@ -32,11 +33,26 @@ const Org1Dashboard = ({ user, onLogout }) => {
   const userMenu = (
     <div style={{ padding: '8px 0', minWidth: '200px' }}>
       <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', backgroundColor: '#fafafa' }}>
-        <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{user.name}</div>
+        <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{normalizeVietnameseName(user.name)}</div>
         <div style={{ fontSize: '12px', color: '#666', display: 'flex', alignItems: 'center', marginTop: '4px' }}>
           <BankOutlined style={{ marginRight: '8px' }} />
           Sở Tài nguyên & Môi trường
         </div>
+      </div>
+      <div
+        style={{
+          padding: '12px 16px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          backgroundColor: '#ffffff',
+          transition: 'background-color 0.2s'
+        }}
+        onClick={() => { window.location.href = '/profile'; }}
+        onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
+        onMouseLeave={(e) => e.target.style.backgroundColor = '#ffffff'}
+      >
+        Quản lý hồ sơ
       </div>
       <div
         style={{
@@ -90,7 +106,7 @@ const Org1Dashboard = ({ user, onLogout }) => {
       <Content style={{ margin: '24px', background: '#f0f2f5' }}>
         <div style={{ padding: '24px', background: '#fff', borderRadius: '8px' }}>
           <Alert
-            message={`Chào mừng ${user.name}!`}
+            message={`Chào mừng ${normalizeVietnameseName(user.name)}!`}
             description="Bạn đang truy cập hệ thống với quyền Sở Tài nguyên & Môi trường."
             type="info"
             showIcon

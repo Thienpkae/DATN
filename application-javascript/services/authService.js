@@ -219,13 +219,25 @@ const login = async (req, res) => {
         if (!await user.comparePassword(sanitizeInput(password))) {
             return res.status(401).json({ error: 'Thông tin đăng nhập không hợp lệ' });
         }
-        const token = jwt.sign({ 
-            cccd: user.cccd, 
-            org: user.org, 
+        const tokenPayload = {
+            cccd: user.cccd,
+            org: user.org,
             role: user.role,
-            name: user.fullName 
-        }, jwtSecret, { expiresIn: '1h' });
-        res.json({ message: 'Đăng nhập thành công', token });
+            name: user.fullName,
+            phone: user.phone
+        };
+        const token = jwt.sign(tokenPayload, jwtSecret, { expiresIn: '1h' });
+        res.json({ 
+            message: 'Đăng nhập thành công', 
+            token,
+            user: {
+                cccd: user.cccd,
+                fullName: user.fullName,
+                phone: user.phone,
+                org: user.org,
+                role: user.role
+            }
+        });
     } catch (error) {
         res.status(500).json({ error: `Đăng nhập thất bại: ${error.message}` });
     }

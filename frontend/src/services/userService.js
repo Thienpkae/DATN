@@ -12,18 +12,26 @@ const userService = {
 
   async getProfile() {
     const response = await apiClient.get(API_ENDPOINTS.USER.PROFILE);
-    return response.data;
+    // Normalize shape to return raw user object consistently
+    return response.data?.user || response.data;
   },
 
   async updateProfile(payload) {
     const response = await apiClient.put(API_ENDPOINTS.USER.UPDATE_PROFILE, payload);
-    return response.data;
+    // Return user object for simpler consumers
+    return response.data?.user || response.data;
   },
 
   async getByCccd(cccd) {
     const url = API_ENDPOINTS.USER.GET_BY_CCCD.replace(':cccd', encodeURIComponent(cccd));
     const response = await apiClient.get(url);
-    return response.data;
+    return response.data?.user || response.data;
+  },
+
+  async getSelfByCccd(cccd) {
+    const url = API_ENDPOINTS.USER.GET_SELF_BY_CCCD.replace(':cccd', encodeURIComponent(cccd));
+    const response = await apiClient.get(url);
+    return response.data?.user || response.data;
   },
 
   async updateByCccd(cccd, payload) {

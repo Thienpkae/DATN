@@ -69,6 +69,8 @@ app.put('/api/users/:cccd', authenticateJWT, requireAdmin, userService.updateUse
 // User Routes (Profile Management - No Admin Required)
 app.get('/api/users/profile', authenticateJWT, userService.getProfile);
 app.put('/api/users/profile', authenticateJWT, userService.updateProfile);
+// New: Any authenticated user can fetch their own record by CCCD
+app.get('/api/users/self/:cccd', authenticateJWT, userService.getSelfByCCCD);
 
 // Land Parcel Routes
 app.post('/api/land-parcels', authenticateJWT, checkOrg(['Org1']), landService.createLandParcel);

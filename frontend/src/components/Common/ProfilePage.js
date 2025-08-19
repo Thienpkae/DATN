@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, Form, Input, Button, Space, Typography, App } from 'antd';
 import userService from '../../services/userService';
 import authService from '../../services/auth';
+import { normalizeVietnameseName } from '../../utils/text';
 
 const { Title, Text } = Typography;
 
@@ -14,55 +15,49 @@ const ProfilePage = () => {
     const load = async () => {
       try {
         setLoading(true);
-        // Fetch profile first (primary source)
-        const resp = await userService.getProfile();
-        const user = resp?.user || resp?.data || resp; // backend variants
-        if (user) {
+        // 1) Start from local auth user (same as Admin flow)
+        const current = authService.getCurrentUser();
+        if (current) {
           form.setFieldsValue({
-            cccd: user.cccd,
-            fullName: user.fullName,
-            phone: user.phone ? String(user.phone) : ''
+            cccd: current.cccd || current.userId,
+            fullName: normalizeVietnameseName(current.name),
+            phone: current.phone ? String(current.phone) : ''
           });
-          // Only if phone is missing, fall back to admin list API (secondary source)
-          if (!user.phone) {
+
+          // Backfill phone from JWT if still missing
+          const currentPhone = current.phone ? String(current.phone) : '';
+          if (!currentPhone) {
             try {
-              const current = authService.getCurrentUser();
-              if (current?.role === 'admin' && current?.org) {
-                const listRes = await userService.listUsers({ org: current.org });
-                const list = listRes?.users || listRes?.data?.users || [];
-                const me = list.find(u => String(u.cccd) === String(user.cccd));
-                if (me?.phone) form.setFieldsValue({ phone: String(me.phone) });
+              const token = localStorage.getItem('jwt_token');
+              if (token) {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                if (payload?.phone) {
+                  form.setFieldsValue({ phone: String(payload.phone) });
+                  const cached = authService.getCurrentUser() || {};
+                  localStorage.setItem('user', JSON.stringify({ ...cached, phone: String(payload.phone) }));
+                }
               }
-            } catch (_) { /* ignore secondary failure */ }
-          }
-        } else {
-          const stored = authService.getCurrentUser();
-          if (stored) {
-            form.setFieldsValue({
-              cccd: stored.cccd || stored.userId,
-              fullName: stored.name,
-              phone: stored.phone ? String(stored.phone) : ''
-            });
-          }
-        }
-      } catch (e) {
-        const stored = authService.getCurrentUser();
-        if (stored) {
-          form.setFieldsValue({
-            cccd: stored.cccd || stored.userId,
-            fullName: stored.name,
-            phone: stored.phone ? String(stored.phone) : ''
-          });
-          // Only fallback for 404 from profile
-          if (e?.response?.status === 404 && stored.role === 'admin' && stored.org) {
-            try {
-              const listRes = await userService.listUsers({ org: stored.org });
-              const list = listRes?.users || listRes?.data?.users || [];
-              const me = list.find(u => String(u.cccd) === String(stored.cccd || stored.userId));
-              if (me?.phone) form.setFieldsValue({ phone: String(me.phone) });
             } catch (_) { /* ignore */ }
           }
         }
+        // 2) Call non-admin self endpoint to ensure latest phone
+        try {
+          const targetCccd = (current?.cccd || current?.userId);
+          if (targetCccd) {
+            const me = await userService.getSelfByCccd(targetCccd);
+            if (me) {
+              form.setFieldsValue({
+                cccd: me.cccd,
+                fullName: normalizeVietnameseName(me.fullName || current?.name || ''),
+                phone: me.phone ? String(me.phone) : form.getFieldValue('phone') || ''
+              });
+              if (me.phone) {
+                localStorage.setItem('user', JSON.stringify({ ...current, phone: String(me.phone) }));
+              }
+            }
+          }
+        } catch (_) {}
+
       } finally {
         setLoading(false);
       }

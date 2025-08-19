@@ -70,14 +70,32 @@ const Register = () => {
         navigate('/login');
       }
     } catch (error) {
-      console.error('Chi tiết lỗi đăng ký:', error);
-      console.error('Phản hồi lỗi:', error.response?.data);
-      
-      const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          'Đăng ký thất bại';
-      message.error(errorMessage);
+      // Extract backend message regardless of our api error wrapper
+      const backendMsg = error?.originalError?.response?.data?.error
+        || error?.response?.data?.error
+        || error?.response?.data?.message
+        || error?.message
+        || 'Đăng ký thất bại';
+
+      // Map common backend errors to field-level messages
+      const msg = String(backendMsg || '').toLowerCase();
+      if (msg.includes('cccd') && (msg.includes('exist') || msg.includes('tồn tại'))) {
+        form.setFields([{ name: 'cccd', errors: ['CCCD đã tồn tại'] }]);
+        message.error('CCCD đã tồn tại');
+      } else if ((msg.includes('phone') || msg.includes('điện thoại')) && (msg.includes('exist') || msg.includes('tồn tại'))) {
+        form.setFields([{ name: 'phone', errors: ['Số điện thoại đã tồn tại'] }]);
+        message.error('Số điện thoại đã tồn tại');
+      } else if (msg.includes('công dân chỉ có thể đăng ký') || msg.includes('org3')) {
+        message.error('Người dân chỉ được phép đăng ký vào tổ chức Org3');
+      } else if (msg.includes('cccd must be') || msg.includes('cccd phải')) {
+        form.setFields([{ name: 'cccd', errors: ['CCCD phải có đúng 12 chữ số'] }]);
+        message.error('CCCD phải có đúng 12 chữ số');
+      } else if (msg.includes('invalid vietnamese phone')) {
+        form.setFields([{ name: 'phone', errors: ['Số điện thoại Việt Nam không hợp lệ'] }]);
+        message.error('Số điện thoại Việt Nam không hợp lệ');
+      } else {
+        message.error(backendMsg);
+      }
     } finally {
       setLoading(false);
     }

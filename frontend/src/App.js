@@ -60,6 +60,7 @@ function App() {
               const org = payload.org || payload.organization;
               const role = payload.role || 'user';
               const name = payload.name || payload.username || 'User';
+              const phone = payload.phone || '';
               
               if (userId && org) {
                 setUser({
@@ -67,6 +68,7 @@ function App() {
                   org: String(org),
                   role: String(role),
                   name: String(name),
+                  phone: String(phone),
                   token: token
                 });
               } else {

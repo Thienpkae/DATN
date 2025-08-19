@@ -29,6 +29,7 @@ import {
   UnlockOutlined
 } from '@ant-design/icons';
 import userService from '../../services/userService';
+import { normalizeVietnameseName } from '../../utils/text';
 import authService from '../../services/auth';
 
 const { Option } = Select;
@@ -59,7 +60,7 @@ const AdminAccountPage = () => {
       const mapped = (data.users || []).map(u => ({
         id: u._id || u.cccd,
         userId: u.cccd,
-        name: u.fullName,
+        name: normalizeVietnameseName(u.fullName),
         phone: u.phone,
         org: u.org,
         role: u.role,
