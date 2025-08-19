@@ -1,9 +1,9 @@
 // Export all services
-export { default as apiClient, API_ENDPOINTS, handleApiError, retryRequest, createApiCall, createBlockchainCall } from './api';
+export { default as apiClient, API_ENDPOINTS, handleApiError, retryRequest, createApiCall } from './api';
 export { default as authService } from './auth';
-export { default as landService } from './land';
-export { default as documentService } from './document';
-export { default as transactionService } from './transaction';
+export { default as landService } from './landService';
+export { default as documentService } from './documentService';
+export { default as transactionService } from './transactionService';
 export { default as dashboardService } from './dashboard';
 export { default as notificationService } from './notification';
 
@@ -112,19 +112,21 @@ export const DOCUMENT_TYPES = {
 
 // Export land use purposes - EXACTLY match chaincode
 export const LAND_USE_PURPOSES = {
-  RESIDENTIAL: 'Đất ở',
-  AGRICULTURAL: 'Đất nông nghiệp',
-  COMMERCIAL: 'Đất thương mại',
-  INDUSTRIAL: 'Đất công nghiệp',
-  NON_AGRICULTURAL: 'Đất phi nông nghiệp'
+  BHK: 'Đất bằng trồng cây hàng năm khác',
+  DTL: 'Đất thủy lợi',
+  LUC: 'Đất chuyên trồng lúa nước',
+  DGT: 'Đất giao thông',
+  LNQ: 'Đất trồng cây lâu năm khác',
+  ONT: 'Đất ở tại nông thôn',
+  SKC: 'Đất khu công nghiệp'
 };
 
 // Export legal statuses - EXACTLY match chaincode
 export const LEGAL_STATUSES = {
-  HAS_CERTIFICATE: 'Có giấy chứng nhận',
-  NO_CERTIFICATE: 'Chưa có GCN',
-  DISPUTED: 'Đang tranh chấp',
-  MORTGAGED: 'Đang thế chấp'
+  HNK: 'Đất trồng cây hàng năm khác',
+  LUA: 'Đất lúa nước còn lại',
+  'ONT*': 'Đất ở tại nông thôn',
+  CLN: 'Đất trồng cây lâu năm'
 };
 
 // Export notification types

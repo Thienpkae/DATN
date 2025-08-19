@@ -13,18 +13,20 @@ import (
 )
 
 var validLandUsePurposes = map[string]bool{
-	"Đất ở":               true,
-	"Đất nông nghiệp":     true,
-	"Đất thương mại":      true,
-	"Đất công nghiệp":     true,
-	"Đất phi nông nghiệp": true,
+	"BHK": true, // Đất bằng trồng cây hàng năm khác
+	"DTL": true, // Đất thủy lợi
+	"LUC": true, // Đất chuyên trồng lúa nước
+	"DGT": true, // Đất giao thông
+	"LNQ": true, // Đất trồng cây lâu năm khác
+	"ONT": true, // Đất ở tại nông thôn
+	"SKC": true, // Đất khu công nghiệp
 }
 
 var validLegalStatuses = map[string]bool{
-	"Có giấy chứng nhận": true,
-	"Chưa có GCN":        true,
-	"Đang tranh chấp":    true,
-	"Đang thế chấp":      true,
+	"HNK":  true, // Đất trồng cây hàng năm khác
+	"LUA":  true, // Đất lúa nước còn lại
+	"ONT*": true, // Đất ở tại nông thôn
+	"CLN":  true, // Đất trồng cây lâu năm
 }
 
 var requiredDocuments = map[string][]string{

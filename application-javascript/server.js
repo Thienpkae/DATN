@@ -3,7 +3,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-const User = require('./models/User');
 const {
     authenticateJWT,
     requireAdmin,
@@ -27,6 +26,7 @@ const userService = require('./services/userService');
 const dashboardService = require('./services/dashboardService');
 const logService = require('./services/logService');
 const systemService = require('./services/systemService');
+const { initializeAdminAccounts, initializeUserAccounts } = require('./services/initializationService');
 const notificationRoutes = require('./routes/notificationRoutes');
 require('dotenv').config({ path: path.resolve(__dirname, './.env') });
 
@@ -69,8 +69,6 @@ app.put('/api/users/:cccd', authenticateJWT, requireAdmin, userService.updateUse
 // User Routes (Profile Management - No Admin Required)
 app.get('/api/users/profile', authenticateJWT, userService.getProfile);
 app.put('/api/users/profile', authenticateJWT, userService.updateProfile);
-// New: Any authenticated user can fetch their own record by CCCD
-app.get('/api/users/self/:cccd', authenticateJWT, userService.getSelfByCCCD);
 
 // Land Parcel Routes
 app.post('/api/land-parcels', authenticateJWT, checkOrg(['Org1']), landService.createLandParcel);
@@ -147,62 +145,7 @@ app.post('/api/system/configs/initialize', authenticateJWT, requireAdmin, system
 // Notification Routes
 app.use('/api/notifications', notificationRoutes);
 
-// Initialize admin accounts for each organization
-async function initializeAdminAccounts() {
-    try {
-        console.log('Checking for admin accounts...');
 
-        const adminAccounts = [
-            {
-                cccd: '000000000001',
-                phone: '0900000001',
-                fullName: 'Admin Organization 1',
-                org: 'Org1',
-                role: 'admin',
-                password: 'Admin123!',
-                isPhoneVerified: true,
-                isLocked: false
-            },
-            {
-                cccd: '000000000002',
-                phone: '0900000002',
-                fullName: 'Admin Organization 2',
-                org: 'Org2',
-                role: 'admin',
-                password: 'Admin123!',
-                isPhoneVerified: true,
-                isLocked: false
-            },
-            {
-                cccd: '000000000003',
-                phone: '0900000003',
-                fullName: 'Admin Organization 3',
-                org: 'Org3',
-                role: 'admin',
-                password: 'Admin123!',
-                isPhoneVerified: true,
-                isLocked: false
-            }
-        ];
-
-        for (const adminData of adminAccounts) {
-            const existingAdmin = await User.findOne({ cccd: adminData.cccd });
-
-            if (!existingAdmin) {
-                // Create admin in MongoDB
-                const admin = new User(adminData);
-                await admin.save();
-                console.log(`✅ Created admin account for ${adminData.org}: ${adminData.cccd}`);
-            } else {
-                console.log(`ℹ️  Admin account already exists for ${adminData.org}: ${adminData.cccd}`);
-            }
-        }
-
-        console.log('✅ Admin accounts initialization completed');
-    } catch (error) {
-        console.error(`❌ Failed to initialize admin accounts: ${error.message}`);
-    }
-}
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
@@ -218,6 +161,9 @@ async function startServer() {
         // Initialize admin accounts
         await initializeAdminAccounts();
 
+        // Initialize user accounts
+        await initializeUserAccounts();
+
         // Start the server
         const server = app.listen(port, () => {
             console.log(`🚀 Server is running on port ${port}`);
@@ -226,6 +172,10 @@ async function startServer() {
             console.log('   Org1 Admin - CCCD: 000000000001, Password: Admin123!');
             console.log('   Org2 Admin - CCCD: 000000000002, Password: Admin123!');
             console.log('   Org3 Admin - CCCD: 000000000003, Password: Admin123!');
+            console.log('\n👥 Land Registry User Accounts:');
+            console.log('   Default Password: User123!');
+            console.log('   UBND xã users → Org2');
+            console.log('   Other users → Org3');
         });
 
         // Initialize WebSocket for notifications

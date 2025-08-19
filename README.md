@@ -16,7 +16,7 @@ cd addOrg3
 
 cd ..
 
-./network.sh deployCC -ccn land-cc -ccp ../land-chaincode/ -ccl go 
+./network.sh deployCC -ccn land-cc -ccp ../land-chaincode/ -ccl go -cci "Init"
 ```
 
 <h3> Deploy Backend </h3>
