@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Divider } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined, CheckCircleOutlined, CloseCircleOutlined, HistoryOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Divider, List } from 'antd';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, CheckCircleOutlined, CloseCircleOutlined, LinkOutlined, FileTextOutlined } from '@ant-design/icons';
 import transactionService from '../../../services/transactionService';
+import { DocumentLinker, DocumentViewer } from '../../Common';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -21,6 +22,12 @@ const TransactionManagementPage = () => {
   const [history, setHistory] = useState([]);
   const [approveForm] = Form.useForm();
   const [rejectForm] = Form.useForm();
+  
+  // Document linking states
+  const [documentLinkerOpen, setDocumentLinkerOpen] = useState(false);
+  const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [linkedDocuments, setLinkedDocuments] = useState([]);
 
   const loadList = async () => {
     try {
@@ -102,230 +109,316 @@ const TransactionManagementPage = () => {
     }
   };
 
-  const onViewHistory = async (txID) => {
+  const openDetail = async (record) => {
     try {
-      const res = await transactionService.getTransactionHistory(txID);
-      setHistory(Array.isArray(res) ? res : (res?.data ?? []));
+      setSelected(record);
       setDetailOpen(true);
+      
+      // Load transaction history
+      const res = await transactionService.getTransactionHistory(record.txID);
+      setHistory(Array.isArray(res) ? res : (res?.data ?? []));
+      
+      // Load linked documents
+      if (record.documentIDs && record.documentIDs.length > 0) {
+        setLinkedDocuments(record.documentIDs);
+      } else {
+        setLinkedDocuments([]);
+      }
     } catch (e) {
-      message.error(e.message || 'Không tải được lịch sử');
+      setHistory([]);
+      setLinkedDocuments([]);
     }
   };
 
-  const getStatusTag = (status) => {
+  const openDocumentLinker = () => {
+    setDocumentLinkerOpen(true);
+  };
+
+  const openDocumentViewer = (document) => {
+    setSelectedDocument(document);
+    setDocumentViewerOpen(true);
+  };
+
+  const handleDocumentLinkSuccess = () => {
+    // Reload transaction details to get updated document list
+    if (selected) {
+      openDetail(selected);
+    }
+  };
+
+  const getTransactionTypeLabel = (type) => {
+    const typeLabels = {
+      'TRANSFER': 'Chuyển nhượng',
+      'SPLIT': 'Tách thửa',
+      'MERGE': 'Hợp thửa',
+      'CHANGE_PURPOSE': 'Thay đổi mục đích',
+      'REISSUE': 'Cấp lại GCN'
+    };
+    return typeLabels[type] || type;
+  };
+
+  const getStatusColor = (status) => {
     const statusColors = {
       'PENDING': 'orange',
-      'VERIFIED': 'blue',
+      'CONFIRMED': 'blue',
       'FORWARDED': 'cyan',
+      'VERIFIED': 'green',
+      'SUPPLEMENT_REQUESTED': 'purple',
       'APPROVED': 'green',
-      'REJECTED': 'red',
-      'CONFIRMED': 'green',
-      'SUPPLEMENT_REQUESTED': 'gold'
+      'REJECTED': 'red'
     };
-    return <Tag color={statusColors[status] || 'default'}>{transactionService.getTransactionStatusText(status)}</Tag>;
-  };
-
-  const getTypeTag = (type) => {
-    return <Tag color="blue">{transactionService.getTransactionTypeText(type)}</Tag>;
-  };
-
-  const canApprove = (transaction) => {
-    return transaction.status === 'FORWARDED' || transaction.status === 'VERIFIED';
-  };
-
-  const canReject = (transaction) => {
-    return ['PENDING', 'VERIFIED', 'FORWARDED'].includes(transaction.status);
+    return statusColors[status] || 'default';
   };
 
   const columns = useMemo(() => ([
-    { title: 'Mã giao dịch', dataIndex: 'txID', key: 'txID' },
-    { title: 'Loại', dataIndex: 'type', key: 'type', render: v => getTypeTag(v) },
-    { title: 'Thửa đất', dataIndex: 'landParcelId', key: 'landParcelId' },
-    { title: 'Người gửi', dataIndex: 'fromOwnerId', key: 'fromOwnerId' },
-    { title: 'Người nhận', dataIndex: 'toOwnerId', key: 'toOwnerId', render: v => v || '-' },
-    { title: 'Trạng thái', dataIndex: 'status', key: 'status', render: v => getStatusTag(v) },
+    { title: 'Mã giao dịch', dataIndex: 'txID', key: 'txID', render: v => <code>{v}</code> },
+    { title: 'Loại giao dịch', dataIndex: 'type', key: 'type', render: v => <Tag color="blue">{getTransactionTypeLabel(v)}</Tag> },
+    { title: 'Thửa đất chính', dataIndex: 'landParcelID', key: 'landParcelID' },
+    { title: 'Người thực hiện', dataIndex: 'userID', key: 'userID' },
+    { title: 'Trạng thái', dataIndex: 'status', key: 'status', render: v => <Tag color={getStatusColor(v)}>{v}</Tag> },
     { title: 'Ngày tạo', dataIndex: 'createdAt', key: 'createdAt', render: v => v ? new Date(v).toLocaleDateString('vi-VN') : 'N/A' },
     {
       title: 'Thao tác', key: 'actions', fixed: 'right', render: (_, record) => (
         <Space>
           <Tooltip title="Xem chi tiết">
-            <Button icon={<EyeOutlined />} onClick={() => {
-              setSelected(record);
-              setDetailOpen(true);
-            }} />
+            <Button icon={<EyeOutlined />} onClick={() => openDetail(record)} />
           </Tooltip>
-          <Tooltip title="Lịch sử">
-            <Button icon={<HistoryOutlined />} onClick={() => onViewHistory(record.txID)} />
-          </Tooltip>
-          {canApprove(record) && (
+          {record.status === 'VERIFIED' && (
             <Tooltip title="Phê duyệt">
               <Button 
                 type="primary" 
                 icon={<CheckCircleOutlined />} 
                 onClick={() => {
                   setSelected(record);
-                  approveForm.setFieldsValue({ txID: record.txID });
                   setApproveOpen(true);
                 }}
-              >
-                Phê duyệt
-              </Button>
+              />
             </Tooltip>
           )}
-          {canReject(record) && (
+          {record.status === 'VERIFIED' && (
             <Tooltip title="Từ chối">
               <Button 
                 danger 
                 icon={<CloseCircleOutlined />} 
                 onClick={() => {
                   setSelected(record);
-                  rejectForm.setFieldsValue({ txID: record.txID });
                   setRejectOpen(true);
                 }}
-              >
-                Từ chối
-              </Button>
+              />
             </Tooltip>
           )}
         </Space>
       )
     }
-  ]), [approveForm, rejectForm]);
+  ]), []);
 
   return (
-    <Card
-      title="Quản lý giao dịch (Org1)"
-      extra={
-        <Space>
-          <Input
-            placeholder="Từ khóa"
-            allowClear
-            style={{ width: 200 }}
-            value={filters.keyword}
-            onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
-          />
-          <Select placeholder="Loại giao dịch" allowClear style={{ width: 180 }} value={filters.type} onChange={(v) => setFilters({ ...filters, type: v })}>
-            <Option value="TRANSFER">Chuyển nhượng</Option>
-            <Option value="SPLIT">Tách thửa</Option>
-            <Option value="MERGE">Gộp thửa</Option>
-            <Option value="CHANGE_PURPOSE">Đổi mục đích</Option>
-            <Option value="REISSUE">Cấp lại GCN</Option>
-          </Select>
-          <Select placeholder="Trạng thái" allowClear style={{ width: 150 }} value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })}>
-            <Option value="PENDING">Chờ xử lý</Option>
-            <Option value="VERIFIED">Đã thẩm định</Option>
-            <Option value="FORWARDED">Đã chuyển tiếp</Option>
-            <Option value="APPROVED">Đã phê duyệt</Option>
-            <Option value="REJECTED">Bị từ chối</Option>
-            <Option value="CONFIRMED">Đã xác nhận</Option>
-            <Option value="SUPPLEMENT_REQUESTED">Yêu cầu bổ sung</Option>
-          </Select>
-          <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
-          <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
-        </Space>
-      }
-    >
-      <Table
-        rowKey={(r) => r.txID}
-        loading={loading}
-        dataSource={transactions}
-        columns={columns}
-        scroll={{ x: 1400 }}
-        pagination={{ pageSize: 10, showSizeChanger: true }}
-      />
+    <div>
+      <Card
+        title="Quản lý giao dịch (Org1)"
+        extra={
+          <Space>
+            <Input
+              placeholder="Từ khóa"
+              allowClear
+              style={{ width: 200 }}
+              value={filters.keyword}
+              onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+            />
+            <Select placeholder="Loại giao dịch" allowClear style={{ width: 150 }} value={filters.type} onChange={(v) => setFilters({ ...filters, type: v })}>
+              <Option value="TRANSFER">Chuyển nhượng</Option>
+              <Option value="SPLIT">Tách thửa</Option>
+              <Option value="MERGE">Hợp thửa</Option>
+              <Option value="CHANGE_PURPOSE">Thay đổi mục đích</Option>
+              <Option value="REISSUE">Cấp lại GCN</Option>
+            </Select>
+            <Select placeholder="Trạng thái" allowClear style={{ width: 150 }} value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })}>
+              <Option value="PENDING">Chờ xử lý</Option>
+              <Option value="CONFIRMED">Đã xác nhận</Option>
+              <Option value="FORWARDED">Đã chuyển tiếp</Option>
+              <Option value="VERIFIED">Đã xác thực</Option>
+              <Option value="SUPPLEMENT_REQUESTED">Yêu cầu bổ sung</Option>
+              <Option value="APPROVED">Đã phê duyệt</Option>
+              <Option value="REJECTED">Bị từ chối</Option>
+            </Select>
+            <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
+            <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
+          </Space>
+        }
+      >
+        <Table
+          rowKey={(r) => r.txID}
+          loading={loading}
+          dataSource={transactions}
+          columns={columns}
+          scroll={{ x: 1200 }}
+          pagination={{ pageSize: 10, showSizeChanger: true }}
+        />
 
-      {/* Approve Transaction */}
-      <Modal title="Phê duyệt giao dịch" open={approveOpen} onOk={onApprove} onCancel={() => setApproveOpen(false)} confirmLoading={loading} width={640}>
-        <Form layout="vertical" form={approveForm}>
-          <Form.Item name="txID" label="Mã giao dịch">
-            <Input disabled />
-          </Form.Item>
-          {selected?.type === 'REISSUE' && (
-            <Form.Item name="newCertificateID" label="Mã GCN mới" rules={[{ required: true, message: 'Bắt buộc' }]}>
-              <Input placeholder="Nhập mã giấy chứng nhận mới" />
-            </Form.Item>
-          )}
-          <div style={{ marginTop: 16 }}>
-            <strong>Thông tin giao dịch:</strong>
-            <div style={{ marginTop: 8, padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
-              <div><strong>Loại:</strong> {selected ? transactionService.getTransactionTypeText(selected.type) : ''}</div>
-              <div><strong>Thửa đất:</strong> {selected?.landParcelId}</div>
-              <div><strong>Người gửi:</strong> {selected?.fromOwnerId}</div>
-              {selected?.toOwnerId && <div><strong>Người nhận:</strong> {selected.toOwnerId}</div>}
+        {/* Approve Transaction Modal */}
+        <Modal title="Phê duyệt giao dịch" open={approveOpen} onOk={onApprove} onCancel={() => setApproveOpen(false)} confirmLoading={loading} width={640}>
+          <Form layout="vertical" form={approveForm}>
+            {selected?.type === 'REISSUE' && (
+              <Form.Item name="newCertificateID" label="Mã GCN mới" rules={[{ required: true, message: 'Bắt buộc' }]}>
+                <Input placeholder="Nhập mã giấy chứng nhận mới" />
+              </Form.Item>
+            )}
+            <div style={{ marginTop: 16 }}>
+              <strong>Thông tin giao dịch:</strong>
+              <div>Mã: {selected?.txID}</div>
+              <div>Loại: {selected?.type}</div>
+              <div>Thửa đất: {selected?.landParcelID}</div>
             </div>
-          </div>
-        </Form>
-      </Modal>
+          </Form>
+        </Modal>
 
-      {/* Reject Transaction */}
-      <Modal title="Từ chối giao dịch" open={rejectOpen} onOk={onReject} onCancel={() => setRejectOpen(false)} confirmLoading={loading} width={640}>
-        <Form layout="vertical" form={rejectForm}>
-          <Form.Item name="txID" label="Mã giao dịch">
-            <Input disabled />
-          </Form.Item>
-          <Form.Item name="reason" label="Lý do từ chối" rules={[{ required: true, message: 'Bắt buộc' }]}>
-            <TextArea rows={3} placeholder="Nhập lý do từ chối giao dịch" />
-          </Form.Item>
-        </Form>
-      </Modal>
+        {/* Reject Transaction Modal */}
+        <Modal title="Từ chối giao dịch" open={rejectOpen} onOk={onReject} onCancel={() => setRejectOpen(false)} confirmLoading={loading} width={640}>
+          <Form layout="vertical" form={rejectForm}>
+            <Form.Item name="reason" label="Lý do từ chối" rules={[{ required: true, message: 'Bắt buộc' }]}>
+              <TextArea rows={4} placeholder="Nhập lý do từ chối giao dịch" />
+            </Form.Item>
+            <div style={{ marginTop: 16 }}>
+              <strong>Thông tin giao dịch:</strong>
+              <div>Mã: {selected?.txID}</div>
+              <div>Loại: {selected?.type}</div>
+              <div>Thửa đất: {selected?.landParcelID}</div>
+            </div>
+          </Form>
+        </Modal>
 
-      {/* Detail + History */}
-      <Drawer title="Chi tiết giao dịch" width={800} open={detailOpen} onClose={() => setDetailOpen(false)}>
-        {selected && (
-          <div>
-            <Row gutter={16}>
-              <Col span={12}><strong>Mã giao dịch:</strong> {selected.txID}</Col>
-              <Col span={12}><strong>Loại:</strong> {getTypeTag(selected.type)}</Col>
-            </Row>
-            <Row gutter={16} style={{ marginTop: 12 }}>
-              <Col span={12}><strong>Thửa đất:</strong> {selected.landParcelId}</Col>
-              <Col span={12}><strong>Trạng thái:</strong> {getStatusTag(selected.status)}</Col>
-            </Row>
-            <Row gutter={16} style={{ marginTop: 12 }}>
-              <Col span={12}><strong>Người gửi:</strong> {selected.fromOwnerId}</Col>
-              <Col span={12}><strong>Người nhận:</strong> {selected.toOwnerId || '-'}</Col>
-            </Row>
-            <Row gutter={16} style={{ marginTop: 12 }}>
-              <Col span={12}><strong>Ngày tạo:</strong> {selected.createdAt ? new Date(selected.createdAt).toLocaleDateString('vi-VN') : 'N/A'}</Col>
-              <Col span={12}><strong>Ngày cập nhật:</strong> {selected.updatedAt ? new Date(selected.updatedAt).toLocaleDateString('vi-VN') : 'N/A'}</Col>
-            </Row>
-            
-            {selected.description && (
-              <div style={{ marginTop: 12 }}>
-                <strong>Mô tả:</strong> {selected.description}
-              </div>
-            )}
-            
-            {selected.notes && (
-              <div style={{ marginTop: 12 }}>
-                <strong>Ghi chú:</strong> {selected.notes}
-              </div>
-            )}
+        {/* Transaction Detail Drawer */}
+        <Drawer title={`Chi tiết giao dịch: ${selected?.txID}`} width={800} open={detailOpen} onClose={() => setDetailOpen(false)}>
+          {selected && (
+            <div>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <strong>Mã giao dịch:</strong>
+                  <br />
+                  <code>{selected.txID}</code>
+                </Col>
+                <Col span={12}>
+                  <strong>Loại giao dịch:</strong>
+                  <br />
+                  <Tag color="blue">{getTransactionTypeLabel(selected.type)}</Tag>
+                </Col>
+                <Col span={12}>
+                  <strong>Thửa đất chính:</strong>
+                  <br />
+                  {selected.landParcelID}
+                </Col>
+                <Col span={12}>
+                  <strong>Trạng thái:</strong>
+                  <br />
+                  <Tag color={getStatusColor(selected.status)}>{selected.status}</Tag>
+                </Col>
+                <Col span={12}>
+                  <strong>Người thực hiện:</strong>
+                  <br />
+                  {selected.userID}
+                </Col>
+                <Col span={12}>
+                  <strong>Ngày tạo:</strong>
+                  <br />
+                  {selected.createdAt ? new Date(selected.createdAt).toLocaleString('vi-VN') : 'N/A'}
+                </Col>
+                <Col span={24}>
+                  <strong>Chi tiết:</strong>
+                  <br />
+                  {selected.details || 'Không có'}
+                </Col>
+              </Row>
 
-            {history.length > 0 && (
-              <div style={{ marginTop: 24 }}>
-                <Divider>Lịch sử giao dịch</Divider>
-                <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                  {history.map((item, index) => (
-                    <div key={index} style={{ 
-                      padding: 12, 
-                      marginBottom: 8, 
-                      background: '#f5f5f5', 
-                      borderRadius: 4,
-                      borderLeft: '4px solid #1890ff'
-                    }}>
-                      <div><strong>Trạng thái:</strong> {getStatusTag(item.status)}</div>
-                      <div><strong>Thời gian:</strong> {item.timestamp ? new Date(item.timestamp).toLocaleString('vi-VN') : 'N/A'}</div>
-                      {item.notes && <div><strong>Ghi chú:</strong> {item.notes}</div>}
-                    </div>
-                  ))}
-                </div>
+              <Divider>Tài liệu liên quan</Divider>
+              
+              <div style={{ marginBottom: 16 }}>
+                <Button
+                  type="primary"
+                  icon={<LinkOutlined />}
+                  onClick={openDocumentLinker}
+                >
+                  Liên kết tài liệu
+                </Button>
               </div>
-            )}
-          </div>
-        )}
-      </Drawer>
-    </Card>
+              
+              <List
+                header={<div><strong>Danh sách tài liệu ({linkedDocuments.length})</strong></div>}
+                bordered
+                dataSource={linkedDocuments}
+                renderItem={(docId, index) => (
+                  <List.Item
+                    actions={[
+                      <Button
+                        size="small"
+                        icon={<EyeOutlined />}
+                        onClick={() => {
+                          // Tìm tài liệu và mở viewer
+                          const doc = linkedDocuments.find(d => d.docID === docId);
+                          if (doc) {
+                            openDocumentViewer(doc);
+                          } else {
+                            message.info('Không thể tìm thấy thông tin tài liệu');
+                          }
+                        }}
+                      >
+                        Xem
+                      </Button>
+                    ]}
+                  >
+                    <List.Item.Meta
+                      avatar={<FileTextOutlined />}
+                      title={`Tài liệu ${index + 1}`}
+                      description={`ID: ${docId}`}
+                    />
+                  </List.Item>
+                )}
+                locale={{ emptyText: 'Chưa có tài liệu nào được liên kết' }}
+              />
+
+              <Divider>Lịch sử giao dịch</Divider>
+              
+              <List
+                header={<div><strong>Lịch sử thay đổi ({history.length})</strong></div>}
+                bordered
+                dataSource={history}
+                renderItem={(item, index) => (
+                  <List.Item>
+                    <List.Item.Meta
+                      title={`Thay đổi ${index + 1}`}
+                      description={
+                        <div>
+                          <div><strong>Transaction ID:</strong> {item.txId || 'N/A'}</div>
+                          <div><strong>Thời gian:</strong> {item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleString('vi-VN') : 'N/A'}</div>
+                          <div><strong>Trạng thái:</strong> {item.isDelete ? 'Vô hiệu' : 'Hiệu lực'}</div>
+                        </div>
+                      }
+                    />
+                  </List.Item>
+                )}
+                locale={{ emptyText: 'Chưa có lịch sử thay đổi' }}
+              />
+            </div>
+          )}
+        </Drawer>
+
+        {/* Document Linker Modal */}
+        <DocumentLinker
+          visible={documentLinkerOpen}
+          onCancel={() => setDocumentLinkerOpen(false)}
+          onSuccess={handleDocumentLinkSuccess}
+          targetType="transaction"
+          targetID={selected?.txID}
+          linkedDocuments={linkedDocuments}
+        />
+
+        {/* Document Viewer Modal */}
+        <DocumentViewer
+          visible={documentViewerOpen}
+          onCancel={() => setDocumentViewerOpen(false)}
+          documentData={selectedDocument}
+        />
+      </Card>
+    </div>
   );
 };
 

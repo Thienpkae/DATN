@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Badge } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined, FileTextOutlined, CheckCircleOutlined, CloseCircleOutlined, LinkOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, FileTextOutlined, CheckCircleOutlined, CloseCircleOutlined, LinkOutlined, DownloadOutlined } from '@ant-design/icons';
 import documentService from '../../../services/documentService';
+import ipfsService from '../../../services/ipfs';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -28,7 +29,7 @@ const DocumentManagementPage = () => {
   const loadList = async () => {
     try {
       setLoading(true);
-      const res = await documentService.getAllDocuments();
+      const res = await documentService.getAllDocumentsWithMetadata();
       const data = Array.isArray(res) ? res : (res?.data ?? []);
       setDocuments(data);
     } catch (e) {
@@ -130,27 +131,48 @@ const DocumentManagementPage = () => {
     }
   };
 
-  const getStatusBadge = (verified) => {
-    if (verified === true) {
-      return <Badge status="success" text="Đã xác thực" />;
-    } else if (verified === false) {
-      return <Badge status="error" text="Bị từ chối" />;
-    } else {
-      return <Badge status="processing" text="Chờ xác thực" />;
+  const handleDownload = useCallback(async (record) => {
+    try {
+      if (!record.ipfsHash) {
+        message.error('Không có hash IPFS để tải file');
+        return;
+      }
+      
+      await ipfsService.downloadFileFromIPFS(record.ipfsHash, record.title || record.docID);
+      message.success('Tải file thành công');
+    } catch (e) {
+      message.error(e.message || 'Tải file thất bại');
     }
-  };
+  }, []);
 
   const columns = useMemo(() => ([
     { title: 'Mã tài liệu', dataIndex: 'docID', key: 'docID' },
     { title: 'Tiêu đề', dataIndex: 'title', key: 'title' },
     { title: 'Loại', dataIndex: 'docType', key: 'docType', render: v => <Tag>{v}</Tag> },
-    { title: 'Trạng thái', dataIndex: 'verified', key: 'verified', render: v => getStatusBadge(v) },
+    { 
+      title: 'Trạng thái', 
+      dataIndex: 'verified', 
+      key: 'verified', 
+      render: v => (
+        <Badge 
+          status={v ? 'success' : 'processing'} 
+          text={v ? 'Đã xác thực' : 'Chờ xác thực'} 
+        />
+      )
+    },
     { title: 'Loại file', dataIndex: 'fileType', key: 'fileType' },
     { title: 'Kích thước', dataIndex: 'fileSize', key: 'fileSize', render: v => v ? `${(v / 1024).toFixed(2)} KB` : 'N/A' },
     { title: 'Người upload', dataIndex: 'uploadedBy', key: 'uploadedBy' },
     {
       title: 'Thao tác', key: 'actions', fixed: 'right', render: (_, record) => (
         <Space>
+          <Tooltip title="Tải file">
+            <Button 
+              icon={<DownloadOutlined />} 
+              onClick={() => handleDownload(record)}
+              disabled={!record.ipfsHash}
+            />
+          </Tooltip>
           <Tooltip title="Xem chi tiết">
             <Button icon={<EyeOutlined />} onClick={() => {
               setSelected(record);
@@ -160,9 +182,15 @@ const DocumentManagementPage = () => {
           <Tooltip title="Phân tích">
             <Button icon={<FileTextOutlined />} onClick={() => onAnalyze(record.docID)} />
           </Tooltip>
+          <Tooltip title="Liên kết">
+            <Button icon={<LinkOutlined />} onClick={() => {
+              linkForm.setFieldsValue({ docID: record.docID });
+              setLinkOpen(true);
+            }} />
+          </Tooltip>
           {!record.verified && (
             <>
-              <Tooltip title="Xác minh">
+              <Tooltip title="Xác thực">
                 <Button 
                   type="primary" 
                   icon={<CheckCircleOutlined />} 
@@ -171,9 +199,7 @@ const DocumentManagementPage = () => {
                     verifyForm.setFieldsValue({ docID: record.docID });
                     setVerifyOpen(true);
                   }}
-                >
-                  Xác minh
-                </Button>
+                />
               </Tooltip>
               <Tooltip title="Từ chối">
                 <Button 
@@ -184,28 +210,18 @@ const DocumentManagementPage = () => {
                     rejectForm.setFieldsValue({ docID: record.docID });
                     setRejectOpen(true);
                   }}
-                >
-                  Từ chối
-                </Button>
+                />
               </Tooltip>
             </>
-          )}
-          {record.verified && (
-            <Tooltip title="Liên kết">
-              <Button icon={<LinkOutlined />} onClick={() => {
-                linkForm.setFieldsValue({ docID: record.docID });
-                setLinkOpen(true);
-              }} />
-            </Tooltip>
           )}
         </Space>
       )
     }
-  ]), [verifyForm, rejectForm, linkForm]);
+  ]), [verifyForm, rejectForm, linkForm, handleDownload]);
 
   return (
     <Card
-      title="Xác minh tài liệu (Org2)"
+      title="Quản lý tài liệu (Org2 - Xác thực)"
       extra={
         <Space>
           <Input
@@ -245,16 +261,16 @@ const DocumentManagementPage = () => {
       />
 
       {/* Verify Document */}
-      <Modal title="Xác minh tài liệu" open={verifyOpen} onOk={onVerify} onCancel={() => setVerifyOpen(false)} confirmLoading={loading} width={640}>
+      <Modal title="Xác thực tài liệu" open={verifyOpen} onOk={onVerify} onCancel={() => setVerifyOpen(false)} confirmLoading={loading} width={640}>
         <Form layout="vertical" form={verifyForm}>
           <Form.Item name="docID" label="Mã tài liệu">
             <Input disabled />
           </Form.Item>
-          <Form.Item name="verifiedBy" label="Người xác minh" rules={[{ required: true, message: 'Bắt buộc' }]}>
-            <Input placeholder="Nhập CCCD người xác minh" />
+          <Form.Item name="verifiedBy" label="Người xác thực" rules={[{ required: true, message: 'Bắt buộc' }]}>
+            <Input placeholder="Nhập CCCD người xác thực" />
           </Form.Item>
           <Form.Item name="notes" label="Ghi chú">
-            <TextArea rows={3} placeholder="Ghi chú về việc xác minh" />
+            <TextArea rows={3} placeholder="Ghi chú về việc xác thực" />
           </Form.Item>
         </Form>
       </Modal>
@@ -302,7 +318,7 @@ const DocumentManagementPage = () => {
             </Row>
             <Row gutter={16} style={{ marginTop: 12 }}>
               <Col span={12}><strong>Tiêu đề:</strong> {selected.title}</Col>
-              <Col span={12}><strong>Trạng thái:</strong> {getStatusBadge(selected.verified)}</Col>
+              <Col span={12}><strong>Trạng thái:</strong> {selected.verified ? 'Đã xác thực' : 'Chờ xác thực'}</Col>
             </Row>
             <Row gutter={16} style={{ marginTop: 12 }}>
               <Col span={12}><strong>Loại file:</strong> {selected.fileType}</Col>
@@ -313,19 +329,35 @@ const DocumentManagementPage = () => {
               <Col span={12}><strong>Ngày tạo:</strong> {selected.createdAt ? new Date(selected.createdAt).toLocaleDateString('vi-VN') : 'N/A'}</Col>
             </Row>
             <div style={{ marginTop: 12 }}>
-              <strong>Mô tả:</strong> {selected.description || '-'}
+              <strong>Mô tả:</strong> {selected.displayDescription || selected.description || '-'}
             </div>
             <div style={{ marginTop: 12 }}>
-              <strong>Hash IPFS:</strong> {selected.ipfsHash || '-'}
+              <strong>Hash IPFS:</strong> 
+              {selected.ipfsHash ? (
+                <div>
+                  <div style={{ fontFamily: 'monospace', fontSize: '12px', background: '#f5f5f5', padding: 8, borderRadius: 4, marginTop: 4 }}>
+                    {selected.ipfsHash}
+                  </div>
+                  <Button 
+                    type="link" 
+                    icon={<DownloadOutlined />} 
+                    onClick={() => handleDownload(selected)}
+                    style={{ padding: 0, marginTop: 4 }}
+                  >
+                    Tải file từ IPFS
+                  </Button>
+                </div>
+              ) : '-'}
             </div>
-            {selected.verifiedBy && (
+            {selected.metadata && selected.metadata.hasMetadata && (
               <div style={{ marginTop: 12 }}>
-                <strong>Người xác minh:</strong> {selected.verifiedBy}
-              </div>
-            )}
-            {selected.verifiedAt && (
-              <div style={{ marginTop: 12 }}>
-                <strong>Thời gian xác minh:</strong> {new Date(selected.verifiedAt).toLocaleDateString('vi-VN')}
+                <strong>Metadata Hash:</strong> 
+                <div style={{ fontFamily: 'monospace', fontSize: '12px', background: '#f5f5f5', padding: 8, borderRadius: 4, marginTop: 4 }}>
+                  {selected.metadata.metadataHash}
+                </div>
+                <div style={{ marginTop: 8, fontSize: '12px', color: '#666' }}>
+                  Upload lúc: {selected.metadata.metadataUploadedAt ? new Date(selected.metadata.metadataUploadedAt).toLocaleString('vi-VN') : 'N/A'}
+                </div>
               </div>
             )}
             {analysis && (

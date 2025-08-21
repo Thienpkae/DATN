@@ -71,9 +71,9 @@ export const PERMISSIONS = {
 
 // Export organization constants - EXACTLY match chaincode
 export const ORGANIZATIONS = {
-  ORG1: 'Org1', // Land Registry Authority (Cơ quan đăng ký đất đai)
-  ORG2: 'Org2', // Notary Office (Văn phòng công chứng)
-  ORG3: 'Org3'  // Citizens/Land Owners (Công dân/Chủ sở hữu đất)
+  ORG1: 'Org1', 
+  ORG2: 'Org2', 
+  ORG3: 'Org3'  
 };
 
 // Export role constants

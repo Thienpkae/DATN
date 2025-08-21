@@ -1,164 +1,241 @@
-import { create } from 'ipfs-http-client';
 
-// IPFS configuration
-const IPFS_CONFIG = {
-  host: 'localhost',
-  port: 5001,
-  protocol: 'http'
-};
+import axios from 'axios';
 
-let ipfsClient = null;
+// Pinata API integration
+const PINATA_API_KEY = 'fb05bcad3dbc32c429cf';
+const PINATA_BASE_URL = 'https://api.pinata.cloud/pinning';
+const PINATA_GATEWAY = 'https://gateway.pinata.cloud/ipfs';
 
-// Initialize IPFS client
-const initIPFS = async () => {
+// Upload a file to IPFS via Pinata with progress tracking
+export async function uploadFileToPinata(file, onProgress) {
   try {
-    if (!ipfsClient) {
-      ipfsClient = create(IPFS_CONFIG);
-      // Test connection
-      await ipfsClient.id();
-      console.log('IPFS client initialized successfully');
-    }
-    return ipfsClient;
+    const url = `${PINATA_BASE_URL}/pinFileToIPFS`;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Add metadata for better organization
+    const metadata = {
+      name: file.name,
+      description: `File uploaded via Land Registry System`,
+      attributes: [
+        {
+          trait_type: "File Type",
+          value: file.type || 'unknown'
+        },
+        {
+          trait_type: "File Size",
+          value: `${(file.size / 1024).toFixed(2)} KB`
+        },
+        {
+          trait_type: "Upload Date",
+          value: new Date().toISOString()
+        }
+      ]
+    };
+    formData.append('pinataMetadata', JSON.stringify(metadata));
+
+    const response = await axios.post(url, formData, {
+      maxContentLength: 'Infinity',
+      maxBodyLength: 'Infinity',
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'pinata_api_key': PINATA_API_KEY,
+      },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percentCompleted);
+        }
+      }
+    });
+
+    return {
+      success: true,
+      data: response.data,
+      ipfsHash: response.data.IpfsHash,
+      pinSize: response.data.PinSize,
+      timestamp: response.data.Timestamp
+    };
   } catch (error) {
-    console.error('Failed to initialize IPFS client:', error);
-    throw new Error('IPFS connection failed. Please ensure IPFS node is running.');
+    console.error('Error uploading file to IPFS:', error);
+    throw new Error(error.response?.data?.error || 'Lỗi khi upload file lên IPFS');
   }
-};
+}
 
-// Upload file to IPFS
-export const uploadToIPFS = async (file) => {
+// Upload JSON metadata to IPFS via Pinata
+export async function uploadJSONToPinata(jsonData, name = 'metadata.json') {
   try {
-    const client = await initIPFS();
+    const url = `${PINATA_BASE_URL}/pinJSONToIPFS`;
     
-    if (file instanceof File) {
-      // Handle File object
-      const buffer = await file.arrayBuffer();
-      const result = await client.add(buffer, {
-        pin: true,
-        wrapWithDirectory: false
-      });
-      
-      return {
-        hash: result.cid.toString(),
-        size: result.size,
-        name: file.name,
-        type: file.type
-      };
-    } else if (typeof file === 'string') {
-      // Handle string content
-      const result = await client.add(file, {
-        pin: true,
-        wrapWithDirectory: false
-      });
-      
-      return {
-        hash: result.cid.toString(),
-        size: result.size
-      };
-    } else {
-      throw new Error('Unsupported file type');
-    }
+    // Add metadata for the JSON
+    const metadata = {
+      name: name,
+      description: 'Document metadata for Land Registry System',
+      attributes: [
+        {
+          trait_type: "Content Type",
+          value: "Metadata"
+        },
+        {
+          trait_type: "Upload Date",
+          value: new Date().toISOString()
+        }
+      ]
+    };
+
+    const payload = {
+      pinataMetadata: metadata,
+      pinataContent: jsonData
+    };
+
+    const response = await axios.post(url, payload, {
+      headers: {
+        'Content-Type': 'application/json',
+        'pinata_api_key': PINATA_API_KEY,
+      },
+    });
+
+    return {
+      success: true,
+      data: response.data,
+      ipfsHash: response.data.IpfsHash,
+      pinSize: response.data.PinSize,
+      timestamp: response.data.Timestamp
+    };
   } catch (error) {
-    console.error('Error uploading to IPFS:', error);
-    throw error;
+    console.error('Error uploading JSON to IPFS:', error);
+    throw new Error(error.response?.data?.error || 'Lỗi khi upload metadata lên IPFS');
   }
-};
+}
+
+// Upload document with file and metadata
+export async function uploadDocumentToIPFS(file, documentMetadata, onProgress) {
+  try {
+    // First upload the file
+    const fileUploadResult = await uploadFileToPinata(file, onProgress);
+    
+    // Create comprehensive metadata
+    const fullMetadata = {
+      ...documentMetadata,
+      fileInfo: {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        uploadedAt: new Date().toISOString()
+      },
+      ipfsHash: fileUploadResult.ipfsHash,
+      systemInfo: {
+        platform: 'Land Registry System',
+        version: '1.0.0',
+        organization: documentMetadata.organization || 'Unknown'
+      }
+    };
+
+    // Upload metadata to IPFS
+    const metadataUploadResult = await uploadJSONToPinata(fullMetadata, `${documentMetadata.docID}_metadata.json`);
+
+    return {
+      success: true,
+      fileHash: fileUploadResult.ipfsHash,
+      metadataHash: metadataUploadResult.ipfsHash,
+      fileSize: file.size,
+      fileType: file.type,
+      fileName: file.name,
+      uploadTimestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Error uploading document to IPFS:', error);
+    throw new Error(`Lỗi khi upload tài liệu lên IPFS: ${error.message}`);
+  }
+}
+
+// Get IPFS file by hash (public Pinata gateway)
+export function getPinataFileUrl(ipfsHash) {
+  return `${PINATA_GATEWAY}/${ipfsHash}`;
+}
+
+// Get IPFS metadata by hash
+export function getPinataMetadataUrl(ipfsHash) {
+  return `${PINATA_GATEWAY}/${ipfsHash}`;
+}
 
 // Download file from IPFS
-export const downloadFromIPFS = async (hash) => {
+export async function downloadFileFromIPFS(ipfsHash, fileName) {
   try {
-    const client = await initIPFS();
-    const chunks = [];
-    
-    for await (const chunk of client.cat(hash)) {
-      chunks.push(chunk);
-    }
-    
-    const data = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.length, 0));
-    let offset = 0;
-    for (const chunk of chunks) {
-      data.set(chunk, offset);
-      offset += chunk.length;
-    }
-    
-    return data;
+    const response = await axios.get(getPinataFileUrl(ipfsHash), {
+      responseType: 'blob'
+    });
+
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName || 'document');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+
+    return { success: true };
   } catch (error) {
-    console.error('Error downloading from IPFS:', error);
-    throw error;
+    console.error('Error downloading file from IPFS:', error);
+    throw new Error('Lỗi khi tải file từ IPFS');
   }
-};
+}
 
 // Get file info from IPFS
-export const getFileInfo = async (hash) => {
+export async function getFileInfoFromIPFS(ipfsHash) {
   try {
-    const client = await initIPFS();
-    const stat = await client.files.stat(`/ipfs/${hash}`);
-    
+    const response = await axios.head(getPinataFileUrl(ipfsHash));
     return {
-      hash,
-      size: stat.size,
-      type: stat.type
+      success: true,
+      contentType: response.headers['content-type'],
+      contentLength: response.headers['content-length'],
+      lastModified: response.headers['last-modified']
     };
   } catch (error) {
     console.error('Error getting file info from IPFS:', error);
-    throw error;
+    throw new Error('Lỗi khi lấy thông tin file từ IPFS');
   }
-};
+}
 
-// Pin file to IPFS
-export const pinToIPFS = async (hash) => {
-  try {
-    const client = await initIPFS();
-    await client.pin.add(hash);
-    return true;
-  } catch (error) {
-    console.error('Error pinning to IPFS:', error);
-    throw error;
-  }
-};
+// Validate IPFS hash format
+export function validateIPFSHash(hash) {
+  if (!hash) return false;
+  // Basic validation for IPFS hash (starts with Qm and is 46 characters)
+  return /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/.test(hash);
+}
 
-// Unpin file from IPFS
-export const unpinFromIPFS = async (hash) => {
+// Check if IPFS hash is accessible
+export async function checkIPFSHashAccessibility(ipfsHash) {
   try {
-    const client = await initIPFS();
-    await client.pin.rm(hash);
-    return true;
+    const response = await axios.head(getPinataFileUrl(ipfsHash), {
+      timeout: 10000 // 10 second timeout
+    });
+    return {
+      accessible: true,
+      status: response.status,
+      headers: response.headers
+    };
   } catch (error) {
-    console.error('Error unpinning from IPFS:', error);
-    throw error;
+    return {
+      accessible: false,
+      error: error.message,
+      status: error.response?.status
+    };
   }
-};
-
-// Get IPFS node info
-export const getIPFSNodeInfo = async () => {
-  try {
-    const client = await initIPFS();
-    const info = await client.id();
-    return info;
-  } catch (error) {
-    console.error('Error getting IPFS node info:', error);
-    throw error;
-  }
-};
-
-// Check if IPFS is available
-export const isIPFSAvailable = async () => {
-  try {
-    await initIPFS();
-    return true;
-  } catch (error) {
-    return false;
-  }
-};
+}
 
 const ipfsService = {
-  uploadToIPFS,
-  downloadFromIPFS,
-  getFileInfo,
-  pinToIPFS,
-  unpinFromIPFS,
-  getIPFSNodeInfo,
-  isIPFSAvailable
+  uploadFileToPinata,
+  uploadJSONToPinata,
+  uploadDocumentToIPFS,
+  getPinataFileUrl,
+  getPinataMetadataUrl,
+  downloadFileFromIPFS,
+  getFileInfoFromIPFS,
+  validateIPFSHash,
+  checkIPFSHashAccessibility
 };
 
 export default ipfsService;

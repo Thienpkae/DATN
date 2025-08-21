@@ -37,17 +37,18 @@ const LandManagementPage = () => {
   useEffect(() => { loadMyLands(); }, []);
 
   const onSearch = async () => {
-    try {
-      setLoading(true);
-      const res = await landService.advancedSearch({ keyword });
-      const data = Array.isArray(res) ? res : (res?.data ?? []);
-      setLands(data);
-    } catch (e) {
-      message.error(e.message || 'Tìm kiếm thất bại');
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    setLoading(true);
+    const filters = {}; // or your actual filters object
+    const res = await landService.advancedSearch({ keyword, filters: JSON.stringify(filters) });
+    const data = Array.isArray(res) ? res : (res?.data ?? []);
+    setLands(data);
+  } catch (e) {
+    message.error(e.message || 'Tìm kiếm thất bại');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const openDetail = async (record) => {
     try {
@@ -97,7 +98,7 @@ const LandManagementPage = () => {
       )
     },
     {
-      title: 'Mục đích SDĐ',
+      title: 'Mục đích sử dụng đất',
       dataIndex: 'landUsePurpose',
       key: 'landUsePurpose',
       width: 130,
@@ -318,11 +319,11 @@ const LandManagementPage = () => {
                         <div>
                           <div><strong>Transaction ID:</strong> {item.txId || 'N/A'}</div>
                           <div><strong>Thời gian:</strong> {item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleString('vi-VN') : 'N/A'}</div>
-                          <div><strong>Trạng thái:</strong> {item.isDelete ? 'Xóa' : 'Cập nhật'}</div>
+                          <div><strong>Trạng thái:</strong> {item.isDelete ? 'Vô hiệu' : 'Hiệu lực'}</div>
                           {item.land && (
                             <div style={{ marginTop: 8 }}>
                               <div><strong>Diện tích:</strong> {item.land.area} m²</div>
-                              <div><strong>Mục đích SDĐ:</strong> {item.land.landUsePurpose}</div>
+                              <div><strong>Mục đích sử dụng đất:</strong> {item.land.landUsePurpose}</div>
                               <div><strong>Pháp lý:</strong> {item.land.legalStatus}</div>
                             </div>
                           )}

@@ -790,10 +790,11 @@ func (s *LandRegistryChaincode) QueryForKeyword(ctx contractapi.TransactionConte
 func buildQueryStringForLands(keyword string, filters map[string]string, userID, mspID string) string {
 	selector := map[string]interface{}{}
 
-	// Thửa đất có các trường id, ownerId, landUsePurpose
+	// Thửa đất có các trường id, ownerId, landUsePurpose. legalStatus
 	selector["id"] = map[string]interface{}{"$exists": true}
 	selector["ownerId"] = map[string]interface{}{"$exists": true}
 	selector["landUsePurpose"] = map[string]interface{}{"$exists": true}
+	selector["legalStatus"] = map[string]interface{}{"$exists": true}
 
 	if keyword != "" {
 		// For numeric searches, try to parse as number for area field
@@ -805,9 +806,10 @@ func buildQueryStringForLands(keyword string, filters map[string]string, userID,
 		// Create search conditions - CouchDB regex is case-sensitive by default
 		searchConditions := []map[string]interface{}{
 			{"id": map[string]interface{}{"$regex": keyword}},
+			{"ownerId": map[string]interface{}{"$regex": keyword}},
 			{"location": map[string]interface{}{"$regex": keyword}},
 			{"landUsePurpose": map[string]interface{}{"$regex": keyword}},
-			{"ownerId": map[string]interface{}{"$regex": keyword}},
+			{"legalStatus": map[string]interface{}{"$regex": keyword}},
 		}
 
 		// Add area conditions if keyword is numeric

@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, LinkOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Badge } from 'antd';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, FileTextOutlined, LinkOutlined, DownloadOutlined } from '@ant-design/icons';
 import documentService from '../../../services/documentService';
-import authService from '../../../services/auth';
+import ipfsService from '../../../services/ipfs';
 
 const { Option } = Select;
-const { TextArea } = Input;
 
 const DocumentManagementPage = () => {
   const [loading, setLoading] = useState(false);
@@ -13,38 +12,31 @@ const DocumentManagementPage = () => {
   const [filters, setFilters] = useState({
     keyword: '',
     docType: undefined,
+    status: undefined,
     fileType: undefined
   });
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [form] = Form.useForm();
-  const [editForm] = Form.useForm();
+  const [analysis, setAnalysis] = useState(null);
   const [linkForm] = Form.useForm();
 
-  const loadMyDocuments = useCallback(async () => {
+  const loadList = async () => {
     try {
       setLoading(true);
-      const user = authService.getCurrentUser();
-      if (!user?.userId) {
-        message.error('Không xác định được người dùng');
-        return;
-      }
-      const res = await documentService.getDocumentsByUploader(user.userId);
+      const res = await documentService.getAllDocumentsWithMetadata();
       const data = Array.isArray(res) ? res : (res?.data ?? []);
       setDocuments(data);
     } catch (e) {
-      message.error(e.message || 'Không tải được tài liệu của tôi');
+      message.error(e.message || 'Không tải được danh sách tài liệu');
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    loadMyDocuments();
-  }, [loadMyDocuments]);
+    loadList();
+  }, []);
 
   const onSearch = async () => {
     try {
@@ -58,71 +50,6 @@ const DocumentManagementPage = () => {
       setLoading(false);
     }
   };
-
-  const onCreate = async () => {
-    try {
-      const values = await form.validateFields();
-      const validation = documentService.validateDocumentData({
-        docID: values.docID,
-        docType: values.docType,
-        title: values.title,
-        ipfsHash: values.ipfsHash,
-        fileType: values.fileType
-      });
-      if (!validation.isValid) {
-        message.warning(validation.errors.join('\n'));
-        return;
-      }
-      setLoading(true);
-      await documentService.createDocument({
-        docID: values.docID,
-        docType: values.docType,
-        title: values.title,
-        description: values.description,
-        ipfsHash: values.ipfsHash,
-        fileType: values.fileType,
-        fileSize: values.fileSize || 0
-      });
-      message.success('Tạo tài liệu thành công');
-      setCreateOpen(false);
-      form.resetFields();
-      loadMyDocuments();
-    } catch (e) {
-      message.error(e.message || 'Tạo tài liệu thất bại');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onEdit = async () => {
-    try {
-      const values = await editForm.validateFields();
-      setLoading(true);
-      await documentService.updateDocument(values.docID, {
-        title: values.title,
-        description: values.description,
-        docType: values.docType,
-        fileType: values.fileType
-      });
-      message.success('Cập nhật tài liệu thành công');
-      setEditOpen(false);
-      loadMyDocuments();
-    } catch (e) {
-      message.error(e.message || 'Cập nhật thất bại');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onDelete = useCallback(async (docID) => {
-    try {
-      await documentService.deleteDocument(docID);
-      message.success('Xóa tài liệu thành công');
-      loadMyDocuments();
-    } catch (e) {
-      message.error(e.message || 'Xóa thất bại');
-    }
-  }, [loadMyDocuments]);
 
   const onLink = async () => {
     try {
@@ -141,7 +68,7 @@ const DocumentManagementPage = () => {
       }
       message.success('Liên kết tài liệu thành công');
       setLinkOpen(false);
-      loadMyDocuments();
+      loadList();
     } catch (e) {
       message.error(e.message || 'Liên kết thất bại');
     } finally {
@@ -149,32 +76,66 @@ const DocumentManagementPage = () => {
     }
   };
 
-  const getStatusTag = (verified) => {
-    if (verified === true) {
-      return <Tag color="green">Đã xác thực</Tag>;
-    } else if (verified === false) {
-      return <Tag color="red">Bị từ chối</Tag>;
-    } else {
-      return <Tag color="orange">Chờ xác thực</Tag>;
+  const onAnalyze = async (docID) => {
+    try {
+      const res = await documentService.analyzeDocument(docID);
+      setAnalysis(res);
+      setDetailOpen(true);
+    } catch (e) {
+      message.error(e.message || 'Phân tích thất bại');
     }
   };
+
+  const handleDownload = useCallback(async (record) => {
+    try {
+      if (!record.ipfsHash) {
+        message.error('Không có hash IPFS để tải file');
+        return;
+      }
+      
+      await ipfsService.downloadFileFromIPFS(record.ipfsHash, record.title || record.docID);
+      message.success('Tải file thành công');
+    } catch (e) {
+      message.error(e.message || 'Tải file thất bại');
+    }
+  }, []);
 
   const columns = useMemo(() => ([
     { title: 'Mã tài liệu', dataIndex: 'docID', key: 'docID' },
     { title: 'Tiêu đề', dataIndex: 'title', key: 'title' },
     { title: 'Loại', dataIndex: 'docType', key: 'docType', render: v => <Tag>{v}</Tag> },
-    { title: 'Trạng thái', dataIndex: 'verified', key: 'verified', render: v => getStatusTag(v) },
+    { 
+      title: 'Trạng thái', 
+      dataIndex: 'verified', 
+      key: 'verified', 
+      render: v => (
+        <Badge 
+          status={v ? 'success' : 'processing'} 
+          text={v ? 'Đã xác thực' : 'Chờ xác thực'} 
+        />
+      )
+    },
     { title: 'Loại file', dataIndex: 'fileType', key: 'fileType' },
     { title: 'Kích thước', dataIndex: 'fileSize', key: 'fileSize', render: v => v ? `${(v / 1024).toFixed(2)} KB` : 'N/A' },
-    { title: 'Ngày tạo', dataIndex: 'createdAt', key: 'createdAt', render: v => v ? new Date(v).toLocaleDateString('vi-VN') : 'N/A' },
+    { title: 'Người upload', dataIndex: 'uploadedBy', key: 'uploadedBy' },
     {
       title: 'Thao tác', key: 'actions', fixed: 'right', render: (_, record) => (
         <Space>
+          <Tooltip title="Tải file">
+            <Button 
+              icon={<DownloadOutlined />} 
+              onClick={() => handleDownload(record)}
+              disabled={!record.ipfsHash}
+            />
+          </Tooltip>
           <Tooltip title="Xem chi tiết">
             <Button icon={<EyeOutlined />} onClick={() => {
               setSelected(record);
               setDetailOpen(true);
             }} />
+          </Tooltip>
+          <Tooltip title="Phân tích">
+            <Button icon={<FileTextOutlined />} onClick={() => onAnalyze(record.docID)} />
           </Tooltip>
           <Tooltip title="Liên kết">
             <Button icon={<LinkOutlined />} onClick={() => {
@@ -182,30 +143,14 @@ const DocumentManagementPage = () => {
               setLinkOpen(true);
             }} />
           </Tooltip>
-          <Tooltip title="Sửa">
-            <Button icon={<EditOutlined />} onClick={() => {
-              setSelected(record);
-              editForm.setFieldsValue({
-                docID: record.docID,
-                title: record.title,
-                description: record.description,
-                docType: record.docType,
-                fileType: record.fileType
-              });
-              setEditOpen(true);
-            }} />
-          </Tooltip>
-          <Tooltip title="Xóa">
-            <Button danger icon={<DeleteOutlined />} onClick={() => onDelete(record.docID)} />
-          </Tooltip>
         </Space>
       )
     }
-  ]), [editForm, linkForm, onDelete]);
+  ]), [linkForm, handleDownload]);
 
   return (
     <Card
-      title="Tài liệu của tôi (Org3)"
+      title="Quản lý tài liệu (Org3 - Xem và liên kết)"
       extra={
         <Space>
           <Input
@@ -220,14 +165,18 @@ const DocumentManagementPage = () => {
               <Option key={type} value={type}>{type}</Option>
             ))}
           </Select>
+          <Select placeholder="Trạng thái" allowClear style={{ width: 150 }} value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })}>
+            {documentService.getDocumentStatuses().map(status => (
+              <Option key={status} value={status}>{status}</Option>
+            ))}
+          </Select>
           <Select placeholder="Loại file" allowClear style={{ width: 150 }} value={filters.fileType} onChange={(v) => setFilters({ ...filters, fileType: v })}>
             {documentService.getFileTypes().map(type => (
               <Option key={type} value={type}>{type}</Option>
             ))}
           </Select>
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
-          <Button icon={<ReloadOutlined />} onClick={loadMyDocuments}>Tải lại</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>Tạo tài liệu</Button>
+          <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
         </Space>
       }
     >
@@ -239,88 +188,6 @@ const DocumentManagementPage = () => {
         scroll={{ x: 1200 }}
         pagination={{ pageSize: 10, showSizeChanger: true }}
       />
-
-      {/* Create Document */}
-      <Modal title="Tạo tài liệu" open={createOpen} onOk={onCreate} onCancel={() => setCreateOpen(false)} confirmLoading={loading} width={720}>
-        <Form layout="vertical" form={form}>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="docID" label="Mã tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="docType" label="Loại tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
-                <Select placeholder="Chọn loại">
-                  {documentService.getDocumentTypes().map(type => (
-                    <Option key={type} value={type}>{type}</Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item name="title" label="Tiêu đề" rules={[{ required: true, message: 'Bắt buộc' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="description" label="Mô tả">
-            <TextArea rows={3} />
-          </Form.Item>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="ipfsHash" label="Hash IPFS" rules={[{ required: true, message: 'Bắt buộc' }]}>
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="fileType" label="Loại file" rules={[{ required: true, message: 'Bắt buộc' }]}>
-                <Select placeholder="Chọn loại">
-                  {documentService.getFileTypes().map(type => (
-                    <Option key={type} value={type}>{type}</Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item name="fileSize" label="Kích thước file (bytes)">
-            <Input type="number" min={0} />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* Edit Document */}
-      <Modal title="Cập nhật tài liệu" open={editOpen} onOk={onEdit} onCancel={() => setEditOpen(false)} confirmLoading={loading} width={720}>
-        <Form layout="vertical" form={editForm}>
-          <Form.Item name="docID" label="Mã tài liệu">
-            <Input disabled />
-          </Form.Item>
-          <Form.Item name="title" label="Tiêu đề" rules={[{ required: true, message: 'Bắt buộc' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="description" label="Mô tả">
-            <TextArea rows={3} />
-          </Form.Item>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="docType" label="Loại tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
-                <Select placeholder="Chọn loại">
-                  {documentService.getDocumentTypes().map(type => (
-                    <Option key={type} value={type}>{type}</Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="fileType" label="Loại file" rules={[{ required: true, message: 'Bắt buộc' }]}>
-                <Select placeholder="Chọn loại">
-                  {documentService.getFileTypes().map(type => (
-                    <Option key={type} value={type}>{type}</Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-        </Form>
-      </Modal>
 
       {/* Link Document */}
       <Modal title="Liên kết tài liệu" open={linkOpen} onOk={onLink} onCancel={() => setLinkOpen(false)} confirmLoading={loading} width={640}>
@@ -340,7 +207,7 @@ const DocumentManagementPage = () => {
         </Form>
       </Modal>
 
-      {/* Detail */}
+      {/* Detail + Analysis */}
       <Drawer title="Chi tiết tài liệu" width={720} open={detailOpen} onClose={() => setDetailOpen(false)}>
         {selected && (
           <div>
@@ -350,7 +217,7 @@ const DocumentManagementPage = () => {
             </Row>
             <Row gutter={16} style={{ marginTop: 12 }}>
               <Col span={12}><strong>Tiêu đề:</strong> {selected.title}</Col>
-              <Col span={12}><strong>Trạng thái:</strong> {getStatusTag(selected.verified)}</Col>
+              <Col span={12}><strong>Trạng thái:</strong> {selected.verified ? 'Đã xác thực' : 'Chờ xác thực'}</Col>
             </Row>
             <Row gutter={16} style={{ marginTop: 12 }}>
               <Col span={12}><strong>Loại file:</strong> {selected.fileType}</Col>
@@ -361,19 +228,43 @@ const DocumentManagementPage = () => {
               <Col span={12}><strong>Ngày tạo:</strong> {selected.createdAt ? new Date(selected.createdAt).toLocaleDateString('vi-VN') : 'N/A'}</Col>
             </Row>
             <div style={{ marginTop: 12 }}>
-              <strong>Mô tả:</strong> {selected.description || '-'}
+              <strong>Mô tả:</strong> {selected.displayDescription || selected.description || '-'}
             </div>
             <div style={{ marginTop: 12 }}>
-              <strong>Hash IPFS:</strong> {selected.ipfsHash || '-'}
+              <strong>Hash IPFS:</strong> 
+              {selected.ipfsHash ? (
+                <div>
+                  <div style={{ fontFamily: 'monospace', fontSize: '12px', background: '#f5f5f5', padding: 8, borderRadius: 4, marginTop: 4 }}>
+                    {selected.ipfsHash}
+                  </div>
+                  <Button 
+                    type="link" 
+                    icon={<DownloadOutlined />} 
+                    onClick={() => handleDownload(selected)}
+                    style={{ padding: 0, marginTop: 4 }}
+                  >
+                    Tải file từ IPFS
+                  </Button>
+                </div>
+              ) : '-'}
             </div>
-            {selected.verifiedBy && (
+            {selected.metadata && selected.metadata.hasMetadata && (
               <div style={{ marginTop: 12 }}>
-                <strong>Người xác minh:</strong> {selected.verifiedBy}
+                <strong>Metadata Hash:</strong> 
+                <div style={{ fontFamily: 'monospace', fontSize: '12px', background: '#f5f5f5', padding: 8, borderRadius: 4, marginTop: 4 }}>
+                  {selected.metadata.metadataHash}
+                </div>
+                <div style={{ marginTop: 8, fontSize: '12px', color: '#666' }}>
+                  Upload lúc: {selected.metadata.metadataUploadedAt ? new Date(selected.metadata.metadataUploadedAt).toLocaleString('vi-VN') : 'N/A'}
+                </div>
               </div>
             )}
-            {selected.verifiedAt && (
-              <div style={{ marginTop: 12 }}>
-                <strong>Thời gian xác minh:</strong> {new Date(selected.verifiedAt).toLocaleDateString('vi-VN')}
+            {analysis && (
+              <div style={{ marginTop: 16 }}>
+                <strong>Kết quả phân tích:</strong>
+                <pre style={{ background: '#f5f5f5', padding: 12, borderRadius: 4, marginTop: 8 }}>
+                  {JSON.stringify(analysis, null, 2)}
+                </pre>
               </div>
             )}
           </div>

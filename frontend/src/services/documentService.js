@@ -227,6 +227,68 @@ const documentService = {
     }
   },
 
+  // Extract metadata from document description
+  extractMetadata(document) {
+    if (!document || !document.description) {
+      return {
+        hasMetadata: false,
+        originalDescription: document?.description || '',
+        metadataHash: null,
+        metadataUploadedAt: null,
+        metadataUploadedBy: null
+      };
+    }
+
+    try {
+      // Try to parse description as JSON metadata
+      const parsed = JSON.parse(document.description);
+      
+      // Check if it's our metadata format
+      if (parsed.metadataHash && parsed.metadataUploadedAt) {
+        return {
+          hasMetadata: true,
+          originalDescription: parsed.originalDescription || '',
+          metadataHash: parsed.metadataHash,
+          metadataUploadedAt: parsed.metadataUploadedAt,
+          metadataUploadedBy: parsed.metadataUploadedBy
+        };
+      }
+    } catch (e) {
+      // If parsing fails, it's just a regular description
+    }
+
+    return {
+      hasMetadata: false,
+      originalDescription: document.description,
+      metadataHash: null,
+      metadataUploadedAt: null,
+      metadataUploadedBy: null
+    };
+  },
+
+  // Get document with parsed metadata
+  getDocumentWithMetadata(document) {
+    const metadata = this.extractMetadata(document);
+    return {
+      ...document,
+      metadata,
+      // For backward compatibility, keep original description accessible
+      originalDescription: metadata.originalDescription,
+      // If there's metadata, use it for display
+      displayDescription: metadata.hasMetadata ? metadata.originalDescription : document.description
+    };
+  },
+
+  // Get all documents with parsed metadata
+  async getAllDocumentsWithMetadata() {
+    try {
+      const documents = await this.getAllDocuments();
+      return documents.map(doc => this.getDocumentWithMetadata(doc));
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Lỗi khi lấy danh sách tài liệu');
+    }
+  },
+
   // Validate document data before submission
   validateDocumentData(documentData) {
     const errors = [];
@@ -259,12 +321,17 @@ const documentService = {
 
   // Format document data for display
   formatDocumentData(documentData) {
+    const metadata = this.extractMetadata(documentData);
+    
     return {
       ...documentData,
+      metadata,
       fileSize: documentData.fileSize ? `${(documentData.fileSize / 1024).toFixed(2)} KB` : 'N/A',
       createdAt: documentData.createdAt ? new Date(documentData.createdAt).toLocaleDateString('vi-VN') : 'N/A',
       updatedAt: documentData.updatedAt ? new Date(documentData.updatedAt).toLocaleDateString('vi-VN') : 'N/A',
-      verifiedAt: documentData.verifiedAt ? new Date(documentData.verifiedAt).toLocaleDateString('vi-VN') : 'N/A'
+      verifiedAt: documentData.verifiedAt ? new Date(documentData.verifiedAt).toLocaleDateString('vi-VN') : 'N/A',
+      // Use metadata description if available
+      displayDescription: metadata.hasMetadata ? metadata.originalDescription : documentData.description
     };
   },
 

@@ -13,6 +13,12 @@ const landService = {
 
             const { contract } = await connectToNetwork(org, userID);
 
+            // Validate and convert area
+            const areaStr = area !== undefined && area !== null ? area.toString() : '';
+            if (!areaStr || isNaN(parseFloat(areaStr)) || parseFloat(areaStr) < 0) {
+            throw new Error('Diện tích không hợp lệ');
+            }
+
             await contract.submitTransaction(
                 'CreateLandParcel',
                 id,
@@ -20,7 +26,7 @@ const landService = {
                 location,
                 landUsePurpose,
                 legalStatus,
-                area.toString(),
+                areaStr,
                 certificateId || '',
                 legalInfo || '',
                 userID
@@ -213,7 +219,14 @@ const landService = {
 
             const { contract } = await connectToNetwork(org, userID);
 
-            const filtersJSON = filters ? JSON.stringify(filters) : '{}';
+            // If filters is a string, use it directly; if object, stringify
+            let filtersJSON = '{}';
+            if (typeof filters === 'string' && filters.trim() !== '') {
+                filtersJSON = filters;
+            } else if (typeof filters === 'object' && filters !== null) {
+                filtersJSON = JSON.stringify(filters);
+            }
+
             const result = await contract.evaluateTransaction(
                 'QueryLandsByKeyword',
                 keyword || '',

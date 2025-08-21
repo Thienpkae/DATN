@@ -61,7 +61,7 @@ const Org2AdminPage = ({ onLogout }) => {
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <SafetyCertificateOutlined style={{ fontSize: 24, color: '#722ed1', marginRight: 12 }} />
           <Title level={3} style={{ margin: 0, color: '#722ed1' }}>
-            Admin - Văn phòng Công chứng
+            Admin - Đơn vị hành chính cấp xã
           </Title>
         </div>
         <Dropdown

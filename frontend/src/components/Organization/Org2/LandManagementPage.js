@@ -103,7 +103,7 @@ const LandManagementPage = () => {
       )
     },
     {
-      title: 'Mục đích SDĐ',
+      title: 'Mục đích sử dụng đất',
       dataIndex: 'landUsePurpose',
       key: 'landUsePurpose',
       width: 130,
@@ -176,7 +176,7 @@ const LandManagementPage = () => {
       extra={
         <Space>
           <Input placeholder="Từ khóa" allowClear style={{ width: 220 }} value={filters.keyword} onChange={(e) => setFilters({ ...filters, keyword: e.target.value })} />
-          <Select placeholder="Mục đích SDĐ" allowClear style={{ width: 200 }} value={filters.landUsePurpose} onChange={(v) => setFilters({ ...filters, landUsePurpose: v })}>
+          <Select placeholder="Mục đích sử dụng đất" allowClear style={{ width: 200 }} value={filters.landUsePurpose} onChange={(v) => setFilters({ ...filters, landUsePurpose: v })}>
             {Object.entries(LAND_USE_PURPOSES).map(([key, value]) => (
               <Option key={key} value={key}>{key} - {value}</Option>
             ))}
@@ -333,11 +333,11 @@ const LandManagementPage = () => {
                         <div>
                           <div><strong>Transaction ID:</strong> {item.txId || 'N/A'}</div>
                           <div><strong>Thời gian:</strong> {item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleString('vi-VN') : 'N/A'}</div>
-                          <div><strong>Trạng thái:</strong> {item.isDelete ? 'Xóa' : 'Cập nhật'}</div>
+                          <div><strong>Trạng thái:</strong> {item.isDelete ? 'Vô hiệu' : 'Hiệu lực'}</div>
                           {item.land && (
                             <div style={{ marginTop: 8 }}>
                               <div><strong>Diện tích:</strong> {item.land.area} m²</div>
-                              <div><strong>Mục đích SDĐ:</strong> {item.land.landUsePurpose}</div>
+                              <div><strong>Mục đích sử dụng đất:</strong> {item.land.landUsePurpose}</div>
                               <div><strong>Pháp lý:</strong> {item.land.legalStatus}</div>
                             </div>
                           )}

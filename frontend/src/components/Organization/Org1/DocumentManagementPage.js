@@ -1,13 +1,18 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, LinkOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Upload, Alert, Progress, Divider } from 'antd';
+import { EditOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined, DownloadOutlined, UploadOutlined, FileTextOutlined, LinkOutlined, CloudUploadOutlined } from '@ant-design/icons';
 import documentService from '../../../services/documentService';
+import ipfsService from '../../../services/ipfs';
+import { useAuth } from '../../../hooks/useAuth';
 
 const { Option } = Select;
 const { TextArea } = Input;
 
 const DocumentManagementPage = () => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [documents, setDocuments] = useState([]);
   const [filters, setFilters] = useState({
     keyword: '',
@@ -24,11 +29,13 @@ const DocumentManagementPage = () => {
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [linkForm] = Form.useForm();
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [fileList, setFileList] = useState([]);
 
   const loadList = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await documentService.getAllDocuments();
+      const res = await documentService.getAllDocumentsWithMetadata();
       const data = Array.isArray(res) ? res : (res?.data ?? []);
       setDocuments(data);
     } catch (e) {
@@ -55,39 +62,77 @@ const DocumentManagementPage = () => {
     }
   };
 
-  const onCreate = async () => {
+  const handleFileUpload = async (file) => {
     try {
+      setUploading(true);
+      setUploadProgress(0);
+      
+      // Validate file
+      if (!file) {
+        message.error('Vui lòng chọn file để upload');
+        return;
+      }
+
+      // Check file size (max 50MB)
+      const maxSize = 50 * 1024 * 1024; // 50MB
+      if (file.size > maxSize) {
+        message.error('File quá lớn. Kích thước tối đa là 50MB');
+        return;
+      }
+
+      // Get form values
       const values = await form.validateFields();
-      const validation = documentService.validateDocumentData({
+      
+      // Create document metadata
+      const documentMetadata = {
         docID: values.docID,
         docType: values.docType,
         title: values.title,
-        ipfsHash: values.ipfsHash,
-        fileType: values.fileType
-      });
-      if (!validation.isValid) {
-        message.warning(validation.errors.join('\n'));
-        return;
-      }
-      setLoading(true);
+        description: values.description,
+        organization: user?.org || 'Org1',
+        uploadedBy: user?.cccd || 'Unknown'
+      };
+
+      // Upload to IPFS
+      const uploadResult = await ipfsService.uploadDocumentToIPFS(
+        file, 
+        documentMetadata, 
+        (progress) => setUploadProgress(progress)
+      );
+
+      // Create document in blockchain
       await documentService.createDocument({
         docID: values.docID,
         docType: values.docType,
         title: values.title,
         description: values.description,
-        ipfsHash: values.ipfsHash,
-        fileType: values.fileType,
-        fileSize: values.fileSize || 0
+        ipfsHash: uploadResult.fileHash,
+        metadataHash: uploadResult.metadataHash,
+        fileType: file.type || file.name.split('.').pop().toUpperCase(),
+        fileSize: file.size
       });
-      message.success('Tạo tài liệu thành công');
+
+      message.success('Tài liệu đã được upload thành công lên IPFS và blockchain');
       setCreateOpen(false);
       form.resetFields();
+      setSelectedFile(null);
+      setFileList([]);
+      setUploadProgress(0);
       loadList();
     } catch (e) {
-      message.error(e.message || 'Tạo tài liệu thất bại');
+      message.error(e.message || 'Upload tài liệu thất bại');
     } finally {
-      setLoading(false);
+      setUploading(false);
+      setUploadProgress(0);
     }
+  };
+
+  const onCreate = async () => {
+    if (!selectedFile) {
+      message.error('Vui lòng chọn file để upload');
+      return;
+    }
+    await handleFileUpload(selectedFile);
   };
 
   const onEdit = async () => {
@@ -155,6 +200,34 @@ const DocumentManagementPage = () => {
     }
   };
 
+  const handleDownload = useCallback(async (record) => {
+    try {
+      if (!record.ipfsHash) {
+        message.error('Không có hash IPFS để tải file');
+        return;
+      }
+      
+      await ipfsService.downloadFileFromIPFS(record.ipfsHash, record.title || record.docID);
+      message.success('Tải file thành công');
+    } catch (e) {
+      message.error(e.message || 'Tải file thất bại');
+    }
+  }, []);
+
+  const handleFileChange = (info) => {
+    if (info.file.status === 'removed') {
+      setSelectedFile(null);
+      setFileList([]);
+      return;
+    }
+    
+    const file = info.file.originFileObj;
+    if (file) {
+      setSelectedFile(file);
+      setFileList([info.file]);
+    }
+  };
+
   const columns = useMemo(() => ([
     { title: 'Mã tài liệu', dataIndex: 'docID', key: 'docID' },
     { title: 'Tiêu đề', dataIndex: 'title', key: 'title' },
@@ -166,6 +239,13 @@ const DocumentManagementPage = () => {
     {
       title: 'Thao tác', key: 'actions', fixed: 'right', render: (_, record) => (
         <Space>
+          <Tooltip title="Tải file">
+            <Button 
+              icon={<DownloadOutlined />} 
+              onClick={() => handleDownload(record)}
+              disabled={!record.ipfsHash}
+            />
+          </Tooltip>
           <Tooltip title="Xem chi tiết">
             <Button icon={<EyeOutlined />} onClick={() => {
               setSelected(record);
@@ -200,7 +280,7 @@ const DocumentManagementPage = () => {
         </Space>
       )
     }
-  ]), [editForm, linkForm, onDelete]);
+  ]), [editForm, linkForm, onDelete, handleDownload]);
 
   return (
     <Card
@@ -231,7 +311,7 @@ const DocumentManagementPage = () => {
           </Select>
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
           <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>Tạo tài liệu</Button>
+          <Button type="primary" icon={<CloudUploadOutlined />} onClick={() => setCreateOpen(true)}>Upload tài liệu</Button>
         </Space>
       }
     >
@@ -244,8 +324,22 @@ const DocumentManagementPage = () => {
         pagination={{ pageSize: 10, showSizeChanger: true }}
       />
 
-      {/* Create Document */}
-      <Modal title="Tạo tài liệu" open={createOpen} onOk={onCreate} onCancel={() => setCreateOpen(false)} confirmLoading={loading} width={720}>
+      {/* Create Document with File Upload */}
+      <Modal 
+        title="Upload tài liệu lên IPFS" 
+        open={createOpen} 
+        onOk={onCreate} 
+        onCancel={() => {
+          setCreateOpen(false);
+          setSelectedFile(null);
+          setFileList([]);
+          setUploadProgress(0);
+        }} 
+        confirmLoading={uploading} 
+        width={720}
+        okText="Upload tài liệu"
+        cancelText="Hủy"
+      >
         <Form layout="vertical" form={form}>
           <Row gutter={16}>
             <Col span={12}>
@@ -269,25 +363,40 @@ const DocumentManagementPage = () => {
           <Form.Item name="description" label="Mô tả">
             <TextArea rows={3} />
           </Form.Item>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="ipfsHash" label="Hash IPFS" rules={[{ required: true, message: 'Bắt buộc' }]}>
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="fileType" label="Loại file" rules={[{ required: true, message: 'Bắt buộc' }]}>
-                <Select placeholder="Chọn loại">
-                  {documentService.getFileTypes().map(type => (
-                    <Option key={type} value={type}>{type}</Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item name="fileSize" label="Kích thước file (bytes)">
-            <Input type="number" min={0} />
+          
+          <Divider>Upload file lên IPFS</Divider>
+          
+          <Form.Item label="Chọn file" required>
+            <Upload
+              fileList={fileList}
+              beforeUpload={() => false}
+              onChange={handleFileChange}
+              maxCount={1}
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.xls,.xlsx"
+            >
+              <Button icon={<UploadOutlined />}>Chọn file</Button>
+            </Upload>
+            <div style={{ marginTop: 8, fontSize: '12px', color: '#666' }}>
+              Hỗ trợ: PDF, DOC, DOCX, JPG, PNG, TXT, XLS, XLSX. Tối đa 50MB
+            </div>
           </Form.Item>
+
+          {selectedFile && (
+            <Alert
+              message={`File đã chọn: ${selectedFile.name}`}
+              description={`Kích thước: ${(selectedFile.size / 1024).toFixed(2)} KB | Loại: ${selectedFile.type || 'Không xác định'}`}
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+          )}
+
+          {uploading && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 8 }}>Đang upload lên IPFS...</div>
+              <Progress percent={uploadProgress} status="active" />
+            </div>
+          )}
         </Form>
       </Modal>
 
@@ -365,11 +474,37 @@ const DocumentManagementPage = () => {
               <Col span={12}><strong>Ngày tạo:</strong> {selected.createdAt ? new Date(selected.createdAt).toLocaleDateString('vi-VN') : 'N/A'}</Col>
             </Row>
             <div style={{ marginTop: 12 }}>
-              <strong>Mô tả:</strong> {selected.description || '-'}
+              <strong>Mô tả:</strong> {selected.displayDescription || selected.description || '-'}
             </div>
             <div style={{ marginTop: 12 }}>
-              <strong>Hash IPFS:</strong> {selected.ipfsHash || '-'}
+              <strong>Hash IPFS:</strong> 
+              {selected.ipfsHash ? (
+                <div>
+                  <div style={{ fontFamily: 'monospace', fontSize: '12px', background: '#f5f5f5', padding: 8, borderRadius: 4, marginTop: 4 }}>
+                    {selected.ipfsHash}
+                  </div>
+                  <Button 
+                    type="link" 
+                    icon={<DownloadOutlined />} 
+                    onClick={() => handleDownload(selected)}
+                    style={{ padding: 0, marginTop: 4 }}
+                  >
+                    Tải file từ IPFS
+                  </Button>
+                </div>
+              ) : '-'}
             </div>
+            {selected.metadata && selected.metadata.hasMetadata && (
+              <div style={{ marginTop: 12 }}>
+                <strong>Metadata Hash:</strong> 
+                <div style={{ fontFamily: 'monospace', fontSize: '12px', background: '#f5f5f5', padding: 8, borderRadius: 4, marginTop: 4 }}>
+                  {selected.metadata.metadataHash}
+                </div>
+                <div style={{ marginTop: 8, fontSize: '12px', color: '#666' }}>
+                  Upload lúc: {selected.metadata.metadataUploadedAt ? new Date(selected.metadata.metadataUploadedAt).toLocaleString('vi-VN') : 'N/A'}
+                </div>
+              </div>
+            )}
             {analysis && (
               <div style={{ marginTop: 16 }}>
                 <strong>Kết quả phân tích:</strong>

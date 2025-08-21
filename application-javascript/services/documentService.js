@@ -8,7 +8,7 @@ const documentService = {
     // Create document
     async createDocument(req, res) {
         try {
-            const { docID, docType, title, description, ipfsHash, fileType, fileSize } = req.body;
+            const { docID, docType, title, description, ipfsHash, metadataHash, fileType, fileSize } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
@@ -22,12 +22,25 @@ const documentService = {
 
             const { contract } = await connectToNetwork(org, userID);
 
+            // Prepare description with metadata if available
+            let finalDescription = description || '';
+            if (metadataHash) {
+                const metadataInfo = {
+                    originalDescription: description || '',
+                    metadataHash: metadataHash,
+                    metadataUploadedAt: new Date().toISOString(),
+                    metadataUploadedBy: userID
+                };
+                finalDescription = JSON.stringify(metadataInfo);
+            }
+
+            // Create document using existing function
             await contract.submitTransaction(
                 'CreateDocument',
                 docID,
                 docType,
                 title,
-                description,
+                finalDescription,
                 ipfsHash,
                 fileType,
                 fileSize || 0

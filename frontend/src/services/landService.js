@@ -7,12 +7,12 @@ const landService = {
     try {
       const response = await apiClient.post(API_ENDPOINTS.LAND.CREATE, {
         id: landData.id,
-        ownerID: landData.ownerID, 
+        ownerId: landData.ownerID, 
         location: landData.location,
         landUsePurpose: landData.landUsePurpose,
         legalStatus: landData.legalStatus,
-        area: landData.area,
-        certificateID: landData.certificateID || '',
+        area: Number(landData.area),
+        certificateId: landData.certificateID || '',
         legalInfo: landData.legalInfo || ''
       });
       return response.data;
@@ -31,7 +31,7 @@ const landService = {
           'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`
         },
         body: JSON.stringify({
-          area: updateData.area,
+          area: Number(updateData.area),
           location: updateData.location,
           landUsePurpose: updateData.landUsePurpose,
           legalStatus: updateData.legalStatus,
@@ -110,11 +110,11 @@ const landService = {
       
       const result = await response.json();
       if (!result.success) {
-        throw new Error(result.message || 'Lỗi khi lấy thửa đất theo chủ sở hữu');
+        throw new Error(result.message || 'Lỗi khi lấy thửa đất theo chủ sử dụng');
       }
       return result.data;
     } catch (error) {
-      throw new Error(error.message || 'Lỗi khi lấy thửa đất theo chủ sở hữu');
+      throw new Error(error.message || 'Lỗi khi lấy thửa đất theo chủ sử dụng');
     }
   },
 
@@ -207,14 +207,14 @@ const landService = {
     }
 
     if (!landData.ownerID || landData.ownerID.trim() === '') {
-      errors.push('CCCD chủ sở hữu là bắt buộc');
+      errors.push('CCCD chủ sử dụng là bắt buộc');
     }
 
     if (!landData.location || landData.location.trim() === '') {
       errors.push('Vị trí là bắt buộc');
     }
 
-    if (!landData.area || landData.area <= 0) {
+    if (landData.area === undefined || landData.area === null || Number(landData.area) <= 0) {
       errors.push('Diện tích phải lớn hơn 0');
     }
 

@@ -245,9 +245,9 @@ const AdminAccountPage = () => {
 
   const getOrgName = (org) => {
     switch (org) {
-      case 'Org1': return 'Land Authority';
-      case 'Org2': return 'Notary Office';
-      case 'Org3': return 'Citizens';
+      case 'Org1': return 'Sở Tài nguyên & Môi trường';
+      case 'Org2': return 'Đơn vị hành chính cấp xã';
+      case 'Org3': return 'Công dân';
       default: return org;
     }
   };

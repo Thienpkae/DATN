@@ -451,5 +451,6 @@ module.exports = {
     forgotUserPassword,
     resetUserPassword,
     lockUnlockUserAccount,
-    deleteUserAccount
+    deleteUserAccount,
+    enrollUserInFabricCA
 };
