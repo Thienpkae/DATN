@@ -238,16 +238,19 @@ const LandManagementPage = () => {
   };
 
   const handleCertificateFileChange = (info) => {
-    if (info.file.status === 'removed') {
+    const { fileList: newFileList } = info;
+    
+    if (newFileList.length === 0) {
+      // File removed
       setCertificateFile(null);
       setCertificateFileList([]);
       return;
     }
     
-    const file = info.file.originFileObj;
+    const file = info.file.originFileObj || info.file;
     if (file) {
       setCertificateFile(file);
-      setCertificateFileList([info.file]);
+      setCertificateFileList(newFileList);
     }
   };
 
@@ -631,13 +634,17 @@ const LandManagementPage = () => {
                         <Button
                           size="small"
                           icon={<EyeOutlined />}
-                          onClick={() => {
-                            // Tìm tài liệu và mở viewer
-                            const doc = linkedDocuments.find(d => d.docID === docId);
-                            if (doc) {
-                              openDocumentViewer(doc);
-                            } else {
-                              message.info('Không thể tìm thấy thông tin tài liệu');
+                          onClick={async () => {
+                            try {
+                              // Load document details
+                              const doc = await documentService.getDocument(docId);
+                              if (doc) {
+                                openDocumentViewer(doc);
+                              } else {
+                                message.info('Không thể tìm thấy thông tin tài liệu');
+                              }
+                            } catch (error) {
+                              message.error('Lỗi khi tải thông tin tài liệu: ' + error.message);
                             }
                           }}
                         >
@@ -700,7 +707,7 @@ const LandManagementPage = () => {
 
         {/* Document Linker Modal */}
         <DocumentLinker
-          visible={documentLinkerOpen}
+          open={documentLinkerOpen}
           onCancel={() => setDocumentLinkerOpen(false)}
           onSuccess={handleDocumentLinkSuccess}
           targetType="land"
@@ -710,7 +717,7 @@ const LandManagementPage = () => {
 
         {/* Document Viewer Modal */}
         <DocumentViewer
-          visible={documentViewerOpen}
+          open={documentViewerOpen}
           onCancel={() => setDocumentViewerOpen(false)}
           documentData={selectedDocument}
         />

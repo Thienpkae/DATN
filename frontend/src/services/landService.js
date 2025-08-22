@@ -24,20 +24,35 @@ const landService = {
   // Update existing land parcel
   async updateLandParcel(id, updateData) {
     try {
+      // Chỉ gửi những field có giá trị
+      const payload = {};
+      
+      if (updateData.area !== undefined) {
+        payload.area = Number(updateData.area);
+      }
+      if (updateData.location !== undefined) {
+        payload.location = updateData.location;
+      }
+      if (updateData.landUsePurpose !== undefined) {
+        payload.landUsePurpose = updateData.landUsePurpose;
+      }
+      if (updateData.legalStatus !== undefined) {
+        payload.legalStatus = updateData.legalStatus;
+      }
+      if (updateData.certificateId !== undefined) {
+        payload.certificateId = updateData.certificateId;
+      }
+      if (updateData.legalInfo !== undefined) {
+        payload.legalInfo = updateData.legalInfo;
+      }
+
       const response = await fetch(`/api/land-parcels/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`
         },
-        body: JSON.stringify({
-          area: Number(updateData.area),
-          location: updateData.location,
-          landUsePurpose: updateData.landUsePurpose,
-          legalStatus: updateData.legalStatus,
-          certificateId: updateData.certificateID || '',
-          legalInfo: updateData.legalInfo || ''
-        })
+        body: JSON.stringify(payload)
       });
       
       const result = await response.json();

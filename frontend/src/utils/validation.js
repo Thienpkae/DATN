@@ -1,7 +1,7 @@
 import * as Yup from 'yup';
 
 // Common validation patterns
-const PHONE_REGEX = /^[0-9]{10,11}$/;
+const PHONE_REGEX = /^(?:\+84|0)(3[2-9]|5[689]|7[0|6-9]|8[1-9]|9[0-9])[0-9]{7}$/;
 const CCCD_REGEX = /^[0-9]{12}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
@@ -12,7 +12,7 @@ const VALIDATION_MESSAGES = {
   INVALID_FORMAT: 'Định dạng không hợp lệ',
   MIN_LENGTH: (field, min) => `${field} phải có ít nhất ${min} ký tự`,
   MAX_LENGTH: (field, max) => `${field} không được vượt quá ${max} ký tự`,
-  INVALID_PHONE: 'Số điện thoại không hợp lệ (10-11 số)',
+  INVALID_PHONE: 'Số điện thoại Việt Nam không hợp lệ (vd: 03x/05x/07x/08x/09x + 7 số)',
   INVALID_CCCD: 'CCCD phải có đúng 12 số',
   INVALID_EMAIL: 'Email không hợp lệ',
   INVALID_PASSWORD: 'Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt',
@@ -303,6 +303,7 @@ export const userSchema = Yup.object().shape({
 
   phone: Yup.string()
     .required(VALIDATION_MESSAGES.REQUIRED)
+    .transform((value) => value ? value.trim().replace(/^\+84/, '0') : value)
     .matches(PHONE_REGEX, VALIDATION_MESSAGES.INVALID_PHONE),
 
   email: Yup.string()

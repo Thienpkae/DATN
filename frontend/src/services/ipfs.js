@@ -2,7 +2,8 @@
 import axios from 'axios';
 
 // Pinata API integration
-const PINATA_API_KEY = 'fb05bcad3dbc32c429cf';
+const PINATA_API_KEY = process.env.REACT_APP_PINATA_API_KEY || '3adaeba196b5d28c1b1b';
+const PINATA_SECRET_API_KEY = process.env.REACT_APP_PINATA_SECRET_API_KEY || 'e0922dbca4ab770a4d976363300e928dd69dc53f56f5d3b11dff67046e6520fb';
 const PINATA_BASE_URL = 'https://api.pinata.cloud/pinning';
 const PINATA_GATEWAY = 'https://gateway.pinata.cloud/ipfs';
 
@@ -39,7 +40,8 @@ export async function uploadFileToPinata(file, onProgress) {
       maxBodyLength: 'Infinity',
       headers: {
         'Content-Type': 'multipart/form-data',
-        'pinata_api_key': PINATA_API_KEY,
+        'pinata_api_key': `${PINATA_API_KEY}`,
+        'pinata_secret_api_key': `${PINATA_SECRET_API_KEY}`,
       },
       onUploadProgress: (progressEvent) => {
         if (onProgress && progressEvent.total) {
@@ -91,7 +93,8 @@ export async function uploadJSONToPinata(jsonData, name = 'metadata.json') {
     const response = await axios.post(url, payload, {
       headers: {
         'Content-Type': 'application/json',
-        'pinata_api_key': PINATA_API_KEY,
+        'pinata_api_key': `${PINATA_API_KEY}`,
+        'pinata_secret_api_key': `${PINATA_SECRET_API_KEY}`,
       },
     });
 

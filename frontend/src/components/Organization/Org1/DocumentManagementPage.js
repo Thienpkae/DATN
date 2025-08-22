@@ -1,45 +1,44 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Upload, Alert, Progress, Divider } from 'antd';
-import { EditOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined, DownloadOutlined, UploadOutlined, FileTextOutlined, LinkOutlined, CloudUploadOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Row, Col, Tooltip, Upload, Progress, Divider, Tabs, Typography } from 'antd';
+import { EditOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined, DownloadOutlined, UploadOutlined, FileTextOutlined, CloudUploadOutlined, CheckOutlined, ClearOutlined } from '@ant-design/icons';
 import documentService from '../../../services/documentService';
 import ipfsService from '../../../services/ipfs';
 import { useAuth } from '../../../hooks/useAuth';
 
 const { Option } = Select;
 const { TextArea } = Input;
+const { TabPane } = Tabs;
+const { Text } = Typography;
 
 const DocumentManagementPage = () => {
   const { user } = useAuth();
+  const [selected, setSelected] = useState(null);
+  const [editOpen, setEditOpen] = useState(false);
+
+  const [detailOpen, setDetailOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [fileList, setFileList] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [filters, setFilters] = useState({
     keyword: '',
     docType: undefined,
-    status: undefined,
-    fileType: undefined
+    verified: undefined
   });
   const [createOpen, setCreateOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [linkOpen, setLinkOpen] = useState(false);
-  const [selected, setSelected] = useState(null);
-  const [analysis, setAnalysis] = useState(null);
-  const [form] = Form.useForm();
   const [editForm] = Form.useForm();
-  const [linkForm] = Form.useForm();
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [fileList, setFileList] = useState([]);
+  const [form] = Form.useForm();
+  const [analysis, setAnalysis] = useState(null);
 
   const loadList = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await documentService.getAllDocumentsWithMetadata();
-      const data = Array.isArray(res) ? res : (res?.data ?? []);
-      setDocuments(data);
+      const docs = await documentService.getAllDocumentsWithMetadata();
+      setDocuments(docs);
     } catch (e) {
-      message.error(e.message || 'Không tải được danh sách tài liệu');
+      message.error(e.message || 'Lỗi khi tải danh sách tài liệu');
     } finally {
       setLoading(false);
     }
@@ -52,100 +51,93 @@ const DocumentManagementPage = () => {
   const onSearch = async () => {
     try {
       setLoading(true);
-      const res = await documentService.advancedSearch(filters);
-      const data = Array.isArray(res) ? res : (res?.data ?? []);
-      setDocuments(data);
+      const searchParams = {};
+      if (filters.keyword) searchParams.keyword = filters.keyword;
+      if (filters.docType) searchParams.type = filters.docType; // Backend dùng 'type'
+      if (filters.verified !== undefined) searchParams.verified = filters.verified;
+      
+      const docs = await documentService.searchDocuments(searchParams);
+      setDocuments(docs);
     } catch (e) {
-      message.error(e.message || 'Tìm kiếm thất bại');
+      message.error(e.message || 'Lỗi khi tìm kiếm');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFileUpload = async (file) => {
+  const onReset = () => {
+    setFilters({
+      keyword: '',
+      docType: '',
+      verified: undefined
+    });
+    loadList();
+  };
+
+  const onCreate = async () => {
     try {
+      const values = await form.validateFields();
+      if (!selectedFile) {
+        message.error('Vui lòng chọn file');
+        return;
+      }
+      
       setUploading(true);
       setUploadProgress(0);
       
-      // Validate file
-      if (!file) {
-        message.error('Vui lòng chọn file để upload');
-        return;
-      }
-
-      // Check file size (max 50MB)
-      const maxSize = 50 * 1024 * 1024; // 50MB
-      if (file.size > maxSize) {
-        message.error('File quá lớn. Kích thước tối đa là 50MB');
-        return;
-      }
-
-      // Get form values
-      const values = await form.validateFields();
+      // Generate document ID
+      const timestamp = Date.now();
+      const docID = `DOC_${timestamp}`;
       
-      // Create document metadata
-      const documentMetadata = {
-        docID: values.docID,
-        docType: values.docType,
-        title: values.title,
-        description: values.description,
-        organization: user?.org || 'Org1',
-        uploadedBy: user?.cccd || 'Unknown'
-      };
-
       // Upload to IPFS
       const uploadResult = await ipfsService.uploadDocumentToIPFS(
-        file, 
-        documentMetadata, 
+        selectedFile,
+        {
+          docID,
+          title: values.title,
+          description: values.description,
+          docType: values.docType
+        },
         (progress) => setUploadProgress(progress)
       );
-
-      // Create document in blockchain
+      
+      // Create document
       await documentService.createDocument({
-        docID: values.docID,
-        docType: values.docType,
+        id: docID, // Backend expect 'id'
+        type: values.docType, // Backend expect 'type'
         title: values.title,
         description: values.description,
         ipfsHash: uploadResult.fileHash,
         metadataHash: uploadResult.metadataHash,
-        fileType: file.type || file.name.split('.').pop().toUpperCase(),
-        fileSize: file.size
+        fileType: selectedFile.type || selectedFile.name.split('.').pop().toUpperCase(),
+        fileSize: selectedFile.size
       });
-
-      message.success('Tài liệu đã được upload thành công lên IPFS và blockchain');
+      
+      message.success('Tạo tài liệu thành công');
       setCreateOpen(false);
       form.resetFields();
       setSelectedFile(null);
       setFileList([]);
-      setUploadProgress(0);
       loadList();
     } catch (e) {
-      message.error(e.message || 'Upload tài liệu thất bại');
+      message.error(e.message || 'Tạo tài liệu thất bại');
     } finally {
       setUploading(false);
       setUploadProgress(0);
     }
   };
 
-  const onCreate = async () => {
-    if (!selectedFile) {
-      message.error('Vui lòng chọn file để upload');
-      return;
-    }
-    await handleFileUpload(selectedFile);
-  };
-
   const onEdit = async () => {
     try {
       const values = await editForm.validateFields();
       setLoading(true);
-      await documentService.updateDocument(values.docID, {
+      await documentService.updateDocument(selected.id, {
         title: values.title,
         description: values.description,
-        docType: values.docType,
-        fileType: values.fileType
+        type: values.docType // Backend expect 'type'
       });
       message.success('Cập nhật tài liệu thành công');
+      setLoading(false);
       setEditOpen(false);
       loadList();
     } catch (e) {
@@ -155,59 +147,29 @@ const DocumentManagementPage = () => {
     }
   };
 
-  const onDelete = useCallback(async (docID) => {
-    try {
-      await documentService.deleteDocument(docID);
-      message.success('Xóa tài liệu thành công');
-      loadList();
-    } catch (e) {
-      message.error(e.message || 'Xóa thất bại');
-    }
-  }, [loadList]);
 
-  const onLink = async () => {
-    try {
-      const values = await linkForm.validateFields();
-      setLoading(true);
-      if (values.linkType === 'land') {
-        await documentService.linkDocumentToLand({
-          docID: values.docID,
-          landParcelId: values.targetID
-        });
-      } else {
-        await documentService.linkDocumentToTransaction({
-          docID: values.docID,
-          transactionId: values.targetID
-        });
-      }
-      message.success('Liên kết tài liệu thành công');
-      setLinkOpen(false);
-      loadList();
-    } catch (e) {
-      message.error(e.message || 'Liên kết thất bại');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const onAnalyze = async (docID) => {
     try {
-      const res = await documentService.analyzeDocument(docID);
-      setAnalysis(res);
-      setDetailOpen(true);
+      setLoading(true);
+      const result = await documentService.analyzeDocument(docID);
+      setAnalysis(result);
+      message.success('Phân tích tài liệu thành công');
     } catch (e) {
       message.error(e.message || 'Phân tích thất bại');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDownload = useCallback(async (record) => {
     try {
       if (!record.ipfsHash) {
-        message.error('Không có hash IPFS để tải file');
+        message.error('Không có file để tải');
         return;
       }
       
-      await ipfsService.downloadFileFromIPFS(record.ipfsHash, record.title || record.docID);
+      await ipfsService.downloadFileFromIPFS(record.ipfsHash, record.title || 'document');
       message.success('Tải file thành công');
     } catch (e) {
       message.error(e.message || 'Tải file thất bại');
@@ -215,72 +177,97 @@ const DocumentManagementPage = () => {
   }, []);
 
   const handleFileChange = (info) => {
-    if (info.file.status === 'removed') {
+    const { fileList: newFileList } = info;
+    
+    if (newFileList.length === 0) {
       setSelectedFile(null);
       setFileList([]);
       return;
     }
     
-    const file = info.file.originFileObj;
+    const file = info.file.originFileObj || info.file;
     if (file) {
       setSelectedFile(file);
-      setFileList([info.file]);
+      setFileList(newFileList);
     }
   };
 
+  const handleDelete = useCallback(async (record) => {
+    try {
+      await documentService.deleteDocument(record.id);
+      message.success('Xóa tài liệu thành công');
+      loadList();
+    } catch (e) {
+      message.error(e.message || 'Xóa thất bại');
+    }
+  }, [loadList]);
+
+  const handleVerify = useCallback(async (record) => {
+    try {
+      Modal.confirm({
+        title: 'Xác thực tài liệu',
+        content: `Bạn có chắc chắn muốn xác thực tài liệu "${record.title}"?`,
+        okText: 'Xác thực',
+        cancelText: 'Hủy',
+        onOk: async () => {
+          setLoading(true);
+          try {
+            await documentService.verifyDocument(record.id, user?.cccd || 'Unknown');
+            message.success('Xác thực tài liệu thành công');
+            loadList();
+          } catch (e) {
+            message.error(e.message || 'Xác thực thất bại');
+          } finally {
+            setLoading(false);
+          }
+        }
+      });
+    } catch (e) {
+      message.error(e.message || 'Lỗi khi xác thực');
+    }
+  }, [loadList, user?.cccd]);
+
   const columns = useMemo(() => ([
-    { title: 'Mã tài liệu', dataIndex: 'docID', key: 'docID' },
+    { title: 'Mã tài liệu', dataIndex: 'id', key: 'id', render: v => <code>{v}</code> },
     { title: 'Tiêu đề', dataIndex: 'title', key: 'title' },
-    { title: 'Loại', dataIndex: 'docType', key: 'docType', render: v => <Tag>{v}</Tag> },
-    { title: 'Trạng thái', dataIndex: 'verified', key: 'verified', render: v => <Tag color={v ? 'green' : 'orange'}>{v ? 'Đã xác thực' : 'Chờ xác thực'}</Tag> },
-    { title: 'Loại file', dataIndex: 'fileType', key: 'fileType' },
+    { title: 'Loại', dataIndex: 'type', key: 'type', render: v => <Tag color="blue">{v}</Tag> },
+    { title: 'Trạng thái', dataIndex: 'verified', key: 'verified', render: v => v ? <Tag color="green">Đã xác thực</Tag> : <Tag color="orange">Chờ xác thực</Tag> },
+    { title: 'Loại file', dataIndex: 'fileType', key: 'fileType', render: v => <Tag color="blue">{v}</Tag> },
     { title: 'Kích thước', dataIndex: 'fileSize', key: 'fileSize', render: v => v ? `${(v / 1024).toFixed(2)} KB` : 'N/A' },
     { title: 'Người upload', dataIndex: 'uploadedBy', key: 'uploadedBy' },
     {
       title: 'Thao tác', key: 'actions', fixed: 'right', render: (_, record) => (
         <Space>
-          <Tooltip title="Tải file">
-            <Button 
-              icon={<DownloadOutlined />} 
-              onClick={() => handleDownload(record)}
-              disabled={!record.ipfsHash}
-            />
+          <Tooltip title="Tải về">
+            <Button icon={<DownloadOutlined />} onClick={() => handleDownload(record)} />
           </Tooltip>
           <Tooltip title="Xem chi tiết">
-            <Button icon={<EyeOutlined />} onClick={() => {
-              setSelected(record);
-              setDetailOpen(true);
-            }} />
-          </Tooltip>
-          <Tooltip title="Phân tích">
-            <Button icon={<FileTextOutlined />} onClick={() => onAnalyze(record.docID)} />
-          </Tooltip>
-          <Tooltip title="Liên kết">
-            <Button icon={<LinkOutlined />} onClick={() => {
-              linkForm.setFieldsValue({ docID: record.docID });
-              setLinkOpen(true);
-            }} />
+            <Button icon={<EyeOutlined />} onClick={() => openDetail(record)} />
           </Tooltip>
           <Tooltip title="Sửa">
             <Button icon={<EditOutlined />} onClick={() => {
               setSelected(record);
               editForm.setFieldsValue({
-                docID: record.docID,
                 title: record.title,
                 description: record.description,
-                docType: record.docType,
-                fileType: record.fileType
+                docType: record.type
               });
               setEditOpen(true);
             }} />
           </Tooltip>
+
           <Tooltip title="Xóa">
-            <Button danger icon={<DeleteOutlined />} onClick={() => onDelete(record.docID)} />
+            <Button icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
           </Tooltip>
         </Space>
       )
     }
-  ]), [editForm, linkForm, onDelete, handleDownload]);
+  ]), [editForm, handleDelete, handleDownload]);
+
+  const openDetail = (record) => {
+    setSelected(record);
+    setDetailOpen(true);
+  };
 
   return (
     <Card
@@ -295,21 +282,17 @@ const DocumentManagementPage = () => {
             onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
           />
           <Select placeholder="Loại tài liệu" allowClear style={{ width: 150 }} value={filters.docType} onChange={(v) => setFilters({ ...filters, docType: v })}>
-            {documentService.getDocumentTypes().map(type => (
-              <Option key={type} value={type}>{type}</Option>
-            ))}
+            <Option value="CERTIFICATE">Giấy chứng nhận</Option>
+            <Option value="CONTRACT">Hợp đồng</Option>
+            <Option value="REPORT">Báo cáo</Option>
+            <Option value="OTHER">Khác</Option>
           </Select>
-          <Select placeholder="Trạng thái" allowClear style={{ width: 150 }} value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })}>
-            {documentService.getDocumentStatuses().map(status => (
-              <Option key={status} value={status}>{status}</Option>
-            ))}
-          </Select>
-          <Select placeholder="Loại file" allowClear style={{ width: 150 }} value={filters.fileType} onChange={(v) => setFilters({ ...filters, fileType: v })}>
-            {documentService.getFileTypes().map(type => (
-              <Option key={type} value={type}>{type}</Option>
-            ))}
+          <Select placeholder="Trạng thái xác thực" allowClear style={{ width: 150 }} value={filters.verified} onChange={(v) => setFilters({ ...filters, verified: v })}>
+            <Option value={true}>Đã xác thực</Option>
+            <Option value={false}>Chờ xác thực</Option>
           </Select>
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
+          <Button icon={<ClearOutlined />} onClick={onReset}>Reset</Button>
           <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
           <Button type="primary" icon={<CloudUploadOutlined />} onClick={() => setCreateOpen(true)}>Upload tài liệu</Button>
         </Space>
@@ -324,44 +307,28 @@ const DocumentManagementPage = () => {
         pagination={{ pageSize: 10, showSizeChanger: true }}
       />
 
-      {/* Create Document with File Upload */}
-      <Modal 
-        title="Upload tài liệu lên IPFS" 
-        open={createOpen} 
-        onOk={onCreate} 
-        onCancel={() => {
-          setCreateOpen(false);
-          setSelectedFile(null);
-          setFileList([]);
-          setUploadProgress(0);
-        }} 
-        confirmLoading={uploading} 
-        width={720}
-        okText="Upload tài liệu"
-        cancelText="Hủy"
-      >
+      {/* Create Document */}
+      <Modal title="Tạo tài liệu mới" open={createOpen} onOk={onCreate} onCancel={() => setCreateOpen(false)} confirmLoading={uploading} width={720}>
         <Form layout="vertical" form={form}>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="docID" label="Mã tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
-                <Input />
+              <Form.Item name="title" label="Tiêu đề" rules={[{ required: true, message: 'Bắt buộc' }]}>
+                <Input placeholder="Nhập tiêu đề tài liệu" />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item name="docType" label="Loại tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
                 <Select placeholder="Chọn loại">
-                  {documentService.getDocumentTypes().map(type => (
-                    <Option key={type} value={type}>{type}</Option>
-                  ))}
+                  <Option value="CERTIFICATE">Giấy chứng nhận</Option>
+                  <Option value="CONTRACT">Hợp đồng</Option>
+                  <Option value="REPORT">Báo cáo</Option>
+                  <Option value="OTHER">Khác</Option>
                 </Select>
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="title" label="Tiêu đề" rules={[{ required: true, message: 'Bắt buộc' }]}>
-            <Input />
-          </Form.Item>
           <Form.Item name="description" label="Mô tả">
-            <TextArea rows={3} />
+            <TextArea rows={4} placeholder="Nhập mô tả tài liệu" />
           </Form.Item>
           
           <Divider>Upload file lên IPFS</Divider>
@@ -369,153 +336,366 @@ const DocumentManagementPage = () => {
           <Form.Item label="Chọn file" required>
             <Upload
               fileList={fileList}
-              beforeUpload={() => false}
               onChange={handleFileChange}
+              beforeUpload={() => false}
               maxCount={1}
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.xls,.xlsx"
             >
               <Button icon={<UploadOutlined />}>Chọn file</Button>
             </Upload>
             <div style={{ marginTop: 8, fontSize: '12px', color: '#666' }}>
-              Hỗ trợ: PDF, DOC, DOCX, JPG, PNG, TXT, XLS, XLSX. Tối đa 50MB
+              Hỗ trợ: PDF, DOC, DOCX, JPG, PNG. Kích thước tối đa: 50MB
             </div>
           </Form.Item>
-
-          {selectedFile && (
-            <Alert
-              message={`File đã chọn: ${selectedFile.name}`}
-              description={`Kích thước: ${(selectedFile.size / 1024).toFixed(2)} KB | Loại: ${selectedFile.type || 'Không xác định'}`}
-              type="info"
-              showIcon
-              style={{ marginBottom: 16 }}
-            />
-          )}
-
+          
           {uploading && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ marginBottom: 8 }}>Đang upload lên IPFS...</div>
+            <div>
               <Progress percent={uploadProgress} status="active" />
+              <Text type="secondary">Đang upload lên IPFS...</Text>
             </div>
           )}
         </Form>
       </Modal>
 
       {/* Edit Document */}
-      <Modal title="Cập nhật tài liệu" open={editOpen} onOk={onEdit} onCancel={() => setEditOpen(false)} confirmLoading={loading} width={720}>
+      <Modal title="Sửa tài liệu" open={editOpen} onOk={onEdit} onCancel={() => setEditOpen(false)} confirmLoading={loading} width={640}>
         <Form layout="vertical" form={editForm}>
-          <Form.Item name="docID" label="Mã tài liệu">
-            <Input disabled />
-          </Form.Item>
-          <Form.Item name="title" label="Tiêu đề" rules={[{ required: true, message: 'Bắt buộc' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="description" label="Mô tả">
-            <TextArea rows={3} />
-          </Form.Item>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="docType" label="Loại tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
-                <Select placeholder="Chọn loại">
-                  {documentService.getDocumentTypes().map(type => (
-                    <Option key={type} value={type}>{type}</Option>
-                  ))}
-                </Select>
+              <Form.Item name="title" label="Tiêu đề" rules={[{ required: true, message: 'Bắt buộc' }]}>
+                <Input placeholder="Nhập tiêu đề tài liệu" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="fileType" label="Loại file" rules={[{ required: true, message: 'Bắt buộc' }]}>
+              <Form.Item name="docType" label="Loại tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
                 <Select placeholder="Chọn loại">
-                  {documentService.getFileTypes().map(type => (
-                    <Option key={type} value={type}>{type}</Option>
-                  ))}
+                  <Option value="CERTIFICATE">Giấy chứng nhận</Option>
+                  <Option value="CONTRACT">Hợp đồng</Option>
+                  <Option value="REPORT">Báo cáo</Option>
+                  <Option value="OTHER">Khác</Option>
                 </Select>
               </Form.Item>
             </Col>
           </Row>
-        </Form>
-      </Modal>
-
-      {/* Link Document */}
-      <Modal title="Liên kết tài liệu" open={linkOpen} onOk={onLink} onCancel={() => setLinkOpen(false)} confirmLoading={loading} width={640}>
-        <Form layout="vertical" form={linkForm}>
-          <Form.Item name="docID" label="Mã tài liệu">
-            <Input disabled />
-          </Form.Item>
-          <Form.Item name="linkType" label="Loại liên kết" rules={[{ required: true, message: 'Bắt buộc' }]}>
-            <Select placeholder="Chọn loại">
-              <Option value="land">Liên kết với thửa đất</Option>
-              <Option value="transaction">Liên kết với giao dịch</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item name="targetID" label="Mã đích" rules={[{ required: true, message: 'Bắt buộc' }]}>
-            <Input placeholder="Nhập mã thửa đất hoặc giao dịch" />
+          <Form.Item name="description" label="Mô tả">
+            <TextArea rows={4} placeholder="Nhập mô tả tài liệu" />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* Detail + Analysis */}
-      <Drawer title="Chi tiết tài liệu" width={720} open={detailOpen} onClose={() => setDetailOpen(false)}>
+      <Modal 
+        title="Chi tiết tài liệu & Phân tích" 
+        open={detailOpen} 
+        onCancel={() => setDetailOpen(false)} 
+        width={800}
+        footer={[
+          <Button key="close" onClick={() => setDetailOpen(false)}>
+            Đóng
+          </Button>
+        ]}
+      >
         {selected && (
           <div>
-            <Row gutter={16}>
-              <Col span={12}><strong>Mã:</strong> {selected.docID}</Col>
-              <Col span={12}><strong>Loại:</strong> {selected.docType}</Col>
-            </Row>
-            <Row gutter={16} style={{ marginTop: 12 }}>
-              <Col span={12}><strong>Tiêu đề:</strong> {selected.title}</Col>
-              <Col span={12}><strong>Trạng thái:</strong> {selected.verified ? 'Đã xác thực' : 'Chờ xác thực'}</Col>
-            </Row>
-            <Row gutter={16} style={{ marginTop: 12 }}>
-              <Col span={12}><strong>Loại file:</strong> {selected.fileType}</Col>
-              <Col span={12}><strong>Kích thước:</strong> {selected.fileSize ? `${(selected.fileSize / 1024).toFixed(2)} KB` : 'N/A'}</Col>
-            </Row>
-            <Row gutter={16} style={{ marginTop: 12 }}>
-              <Col span={12}><strong>Người upload:</strong> {selected.uploadedBy}</Col>
-              <Col span={12}><strong>Ngày tạo:</strong> {selected.createdAt ? new Date(selected.createdAt).toLocaleDateString('vi-VN') : 'N/A'}</Col>
-            </Row>
-            <div style={{ marginTop: 12 }}>
-              <strong>Mô tả:</strong> {selected.displayDescription || selected.description || '-'}
-            </div>
-            <div style={{ marginTop: 12 }}>
-              <strong>Hash IPFS:</strong> 
-              {selected.ipfsHash ? (
-                <div>
-                  <div style={{ fontFamily: 'monospace', fontSize: '12px', background: '#f5f5f5', padding: 8, borderRadius: 4, marginTop: 4 }}>
-                    {selected.ipfsHash}
+            <Tabs defaultActiveKey="1">
+                             <TabPane tab="Thông tin cơ bản" key="1">
+                 <div style={{ padding: '16px 0' }}>
+                   <Row gutter={24}>
+                     <Col span={24}>
+                       <div style={{ marginBottom: 24, padding: '20px 0', borderBottom: '1px solid #f0f0f0' }}>
+                         <Text strong style={{ fontSize: 18 }}>{selected.title}</Text>
+                         <br />
+                         <Text type="secondary" style={{ fontSize: 13 }}>Mã: <code>{selected.id}</code></Text>
+                       </div>
+                     </Col>
+                   </Row>
+                   
+                   <Row gutter={24}>
+                     <Col span={12}>
+                       <div style={{ marginBottom: 16 }}>
+                         <Text strong>Loại tài liệu</Text>
+                         <br />
+                         <Tag color="blue" style={{ marginTop: 6 }}>{selected.type}</Tag>
+                       </div>
+                     </Col>
+                     <Col span={12}>
+                       <div style={{ marginBottom: 16 }}>
+                         <Text strong>Trạng thái</Text>
+                         <br />
+                         <div style={{ marginTop: 6 }}>
+                           {selected.verified ? (
+                             <Tag color="green">Đã xác thực</Tag>
+                           ) : (
+                             <Tag color="orange">Chờ xác thực</Tag>
+                           )}
+                         </div>
+                       </div>
+                     </Col>
+                   </Row>
+                   
+                   <Row gutter={24}>
+                     <Col span={12}>
+                       <div style={{ marginBottom: 16 }}>
+                         <Text strong>Loại file</Text>
+                         <br />
+                         <Tag color="blue" style={{ marginTop: 6 }}>{selected.fileType}</Tag>
+                       </div>
+                     </Col>
+                     <Col span={12}>
+                       <div style={{ marginBottom: 16 }}>
+                         <Text strong>Kích thước</Text>
+                         <br />
+                         <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>
+                           {selected.fileSize ? `${(selected.fileSize / 1024).toFixed(2)} KB` : 'N/A'}
+                         </Text>
+                       </div>
+                     </Col>
+                   </Row>
+                   
+                   <Row gutter={24}>
+                     <Col span={12}>
+                       <div style={{ marginBottom: 16 }}>
+                         <Text strong>Người upload</Text>
+                         <br />
+                         <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>{selected.uploadedBy}</Text>
+                       </div>
+                     </Col>
+                     <Col span={12}>
+                       <div style={{ marginBottom: 16 }}>
+                         <Text strong>Ngày tạo</Text>
+                         <br />
+                         <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>
+                           {selected.createdAt ? new Date(selected.createdAt).toLocaleString('vi-VN') : 'N/A'}
+                         </Text>
+                       </div>
+                     </Col>
+                   </Row>
+                   
+                   <Row gutter={24}>
+                     <Col span={24}>
+                       <div style={{ marginBottom: 16 }}>
+                         <Text strong>Mô tả</Text>
+                         <br />
+                         <Text type="secondary" style={{ marginTop: 6, display: 'block', lineHeight: 1.6 }}>
+                           {selected.metadata ? selected.metadata.originalDescription : selected.description}
+                         </Text>
+                       </div>
+                     </Col>
+                   </Row>
+                 </div>
+               </TabPane>
+              
+                             <TabPane tab="Metadata IPFS" key="2">
+                 <div style={{ padding: '16px 0' }}>
+                   {selected.metadata ? (
+                     <div>
+                       <Row gutter={24}>
+                         <Col span={24}>
+                           <div style={{ marginBottom: 24, padding: '20px 0', borderBottom: '1px solid #f0f0f0' }}>
+                             <Text strong style={{ fontSize: 16 }}>IPFS Metadata</Text>
+                           </div>
+                         </Col>
+                       </Row>
+                       
+                       <Row gutter={24}>
+                         <Col span={24}>
+                           <div style={{ marginBottom: 16 }}>
+                             <Text strong>Hash file gốc</Text>
+                             <br />
+                             <div style={{ marginTop: 6, padding: 8, background: '#f5f5f5', borderRadius: 4, fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>
+                               <Text copyable type="secondary">{selected.ipfsHash}</Text>
+                             </div>
+                           </div>
+                         </Col>
+                       </Row>
+                       
+                       <Row gutter={24}>
+                         <Col span={24}>
+                           <div style={{ marginBottom: 16 }}>
+                             <Text strong>Hash metadata</Text>
+                             <br />
+                             <div style={{ marginTop: 6, padding: 8, background: '#f5f5f5', borderRadius: 4, fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>
+                               <Text copyable type="secondary">{selected.metadata.metadataHash}</Text>
+                             </div>
+                           </div>
+                         </Col>
+                       </Row>
+                       
+                       <Row gutter={24}>
+                         <Col span={12}>
+                           <div style={{ marginBottom: 16 }}>
+                             <Text strong>Mô tả gốc</Text>
+                             <br />
+                             <Text type="secondary" style={{ marginTop: 6, display: 'block', lineHeight: 1.6 }}>
+                               {selected.metadata.originalDescription}
+                             </Text>
+                           </div>
+                         </Col>
+                         <Col span={12}>
+                           <div style={{ marginBottom: 16 }}>
+                             <Text strong>Ngày upload metadata</Text>
+                             <br />
+                             <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>
+                               {selected.metadata.metadataUploadedAt ? 
+                                 new Date(selected.metadata.metadataUploadedAt).toLocaleString('vi-VN') : 'N/A'
+                               }
+                             </Text>
+                           </div>
+                         </Col>
+                       </Row>
+                       
+                       <Row gutter={24}>
+                         <Col span={12}>
+                           <div style={{ marginBottom: 16 }}>
+                             <Text strong>Người upload metadata</Text>
+                             <br />
+                             <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>
+                               {selected.metadata.metadataUploadedBy}
+                             </Text>
+                           </div>
+                         </Col>
+                       </Row>
+                       
+                       <Divider />
+                       
+                       <div style={{ textAlign: 'center', marginTop: 16 }}>
+                         <Button 
+                           type="primary" 
+                           icon={<DownloadOutlined />}
+                           onClick={() => handleDownload(selected)}
+                           style={{ marginRight: 12 }}
+                         >
+                           Tải file từ IPFS
+                         </Button>
+                         <Button 
+                           icon={<EyeOutlined />}
+                           onClick={() => window.open(`https://gateway.pinata.cloud/ipfs/${selected.ipfsHash}`, '_blank')}
+                         >
+                           Xem trực tuyến
+                         </Button>
+                       </div>
+                     </div>
+                   ) : (
+                     <div style={{ textAlign: 'center', padding: 32 }}>
+                       <Text type="secondary" style={{ fontSize: 14 }}>Không có metadata IPFS</Text>
+                       <br />
+                       <Text type="secondary">Hash file: {selected.ipfsHash || 'N/A'}</Text>
+                     </div>
+                   )}
+                 </div>
+               </TabPane>
+              
+              <TabPane tab="Phân tích tài liệu" key="3">
+                                 <div style={{ marginBottom: 16 }}>
+                   <Button 
+                     type="primary" 
+                     icon={<FileTextOutlined />}
+                     onClick={() => onAnalyze(selected.id)}
+                     loading={loading}
+                   >
+                     Phân tích tài liệu
+                   </Button>
+                 </div>
+                
+                {analysis ? (
+                  <div>
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Text strong>Kết quả phân tích:</Text>
+                        <br />
+                        <Text type="secondary">{analysis.result}</Text>
+                      </Col>
+                      <Col span={12}>
+                        <Text strong>Độ tin cậy:</Text>
+                        <br />
+                        <Text type="secondary">{analysis.confidence}%</Text>
+                      </Col>
+                    </Row>
+                    <Row gutter={16}>
+                      <Col span={24}>
+                        <Text strong>Chi tiết:</Text>
+                        <br />
+                        <Text type="secondary">{analysis.details}</Text>
+                      </Col>
+                    </Row>
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Text strong>Ngày phân tích:</Text>
+                        <br />
+                        <Text type="secondary">
+                          {analysis.analyzedAt ? new Date(analysis.analyzedAt).toLocaleString('vi-VN') : 'N/A'}
+                        </Text>
+                      </Col>
+                      <Col span={12}>
+                        <Text strong>Người phân tích:</Text>
+                        <br />
+                        <Text type="secondary">{analysis.analyzedBy}</Text>
+                      </Col>
+                    </Row>
                   </div>
-                  <Button 
-                    type="link" 
-                    icon={<DownloadOutlined />} 
-                    onClick={() => handleDownload(selected)}
-                    style={{ padding: 0, marginTop: 4 }}
-                  >
-                    Tải file từ IPFS
-                  </Button>
-                </div>
-              ) : '-'}
-            </div>
-            {selected.metadata && selected.metadata.hasMetadata && (
-              <div style={{ marginTop: 12 }}>
-                <strong>Metadata Hash:</strong> 
-                <div style={{ fontFamily: 'monospace', fontSize: '12px', background: '#f5f5f5', padding: 8, borderRadius: 4, marginTop: 4 }}>
-                  {selected.metadata.metadataHash}
-                </div>
-                <div style={{ marginTop: 8, fontSize: '12px', color: '#666' }}>
-                  Upload lúc: {selected.metadata.metadataUploadedAt ? new Date(selected.metadata.metadataUploadedAt).toLocaleString('vi-VN') : 'N/A'}
-                </div>
-              </div>
-            )}
-            {analysis && (
-              <div style={{ marginTop: 16 }}>
-                <strong>Kết quả phân tích:</strong>
-                <pre style={{ background: '#f5f5f5', padding: 12, borderRadius: 4, marginTop: 8 }}>
-                  {JSON.stringify(analysis, null, 2)}
-                </pre>
-              </div>
-            )}
+                                 ) : (
+                   <Text type="secondary">Chưa có kết quả phân tích. Nhấn nút "Phân tích tài liệu" để bắt đầu.</Text>
+                 )}
+               </TabPane>
+               
+               <TabPane tab="Xác thực tài liệu" key="4">
+                 <Row gutter={16}>
+                   <Col span={12}>
+                     <Text strong>Trạng thái xác thực:</Text>
+                     <br />
+                     {selected.verified ? (
+                       <Tag color="green">Đã xác thực</Tag>
+                     ) : (
+                       <Tag color="orange">Chờ xác thực</Tag>
+                     )}
+                   </Col>
+                   <Col span={12}>
+                     <Text strong>Người xác thực:</Text>
+                     <br />
+                     <Text type="secondary">{selected.verifiedBy || 'Chưa có'}</Text>
+                   </Col>
+                 </Row>
+                 <Row gutter={16}>
+                   <Col span={12}>
+                     <Text strong>Ngày xác thực:</Text>
+                     <br />
+                     <Text type="secondary">
+                       {selected.verifiedAt && selected.verifiedAt !== '0001-01-01T00:00:00Z' ? 
+                         new Date(selected.verifiedAt).toLocaleString('vi-VN') : 'Chưa có'
+                       }
+                     </Text>
+                   </Col>
+                 </Row>
+                 
+                 <Divider />
+                 
+                 <div style={{ marginTop: 16 }}>
+                   {!selected.verified ? (
+                     <Button 
+                       type="primary" 
+                       icon={<CheckOutlined />}
+                       onClick={() => {
+                         setDetailOpen(false);
+                         handleVerify(selected);
+                       }}
+                       loading={loading}
+                     >
+                       Xác thực tài liệu
+                     </Button>
+                   ) : (
+                     <div>
+                       <Text type="success">✓ Tài liệu đã được xác thực</Text>
+                       <br />
+                       <Text type="secondary" style={{ fontSize: '12px' }}>
+                         Xác thực bởi {selected.verifiedBy} vào {selected.verifiedAt ? new Date(selected.verifiedAt).toLocaleString('vi-VN') : 'N/A'}
+                       </Text>
+                     </div>
+                   )}
+                 </div>
+               </TabPane>
+             </Tabs>
           </div>
         )}
-      </Drawer>
+      </Modal>
     </Card>
   );
 };

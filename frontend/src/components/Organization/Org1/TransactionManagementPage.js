@@ -403,7 +403,7 @@ const TransactionManagementPage = () => {
 
         {/* Document Linker Modal */}
         <DocumentLinker
-          visible={documentLinkerOpen}
+          open={documentLinkerOpen}
           onCancel={() => setDocumentLinkerOpen(false)}
           onSuccess={handleDocumentLinkSuccess}
           targetType="transaction"
@@ -413,7 +413,7 @@ const TransactionManagementPage = () => {
 
         {/* Document Viewer Modal */}
         <DocumentViewer
-          visible={documentViewerOpen}
+          open={documentViewerOpen}
           onCancel={() => setDocumentViewerOpen(false)}
           documentData={selectedDocument}
         />

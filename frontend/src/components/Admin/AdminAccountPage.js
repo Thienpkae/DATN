@@ -462,7 +462,7 @@ const AdminAccountPage = () => {
       {/* Create/Edit User Modal */}
       <Modal
         title={editingUser ? 'Chỉnh sửa người dùng' : 'Tạo người dùng mới'}
-        visible={modalVisible}
+        open={modalVisible}
         onOk={handleModalOk}
         onCancel={() => setModalVisible(false)}
         confirmLoading={loading}

@@ -103,7 +103,7 @@ const Org1AdminPage = ({ onLogout }) => {
           <div style={{ marginBottom: 12 }}>
             <Text type="secondary">Quản trị hệ thống cho tổ chức Org1</Text>
           </div>
-          <Tabs items={items} destroyInactiveTabPane />
+          <Tabs items={items} destroyOnHidden />
         </div>
       </Content>
     </Layout>

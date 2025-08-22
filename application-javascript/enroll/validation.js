@@ -32,7 +32,7 @@ function validateCCCD(cccd) {
 
 function validatePhone(phone) {
     if (!phoneRegex.test(phone)) {
-        throw new ValidationError('Invalid Vietnamese phone number');
+        throw new ValidationError('Số điện thoại Việt Nam không hợp lệ (vd: 03x/05x/07x/08x/09x + 7 số)');
     }
 }
 
