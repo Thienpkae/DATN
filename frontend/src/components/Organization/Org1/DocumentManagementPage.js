@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Row, Col, Tooltip, Upload, Progress, Divider, Tabs, Typography } from 'antd';
-import { EditOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined, DownloadOutlined, UploadOutlined, FileTextOutlined, CloudUploadOutlined, CheckOutlined, ClearOutlined } from '@ant-design/icons';
+import { EditOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined, DownloadOutlined, UploadOutlined, FileTextOutlined, CloudUploadOutlined } from '@ant-design/icons';
 import documentService from '../../../services/documentService';
 import ipfsService from '../../../services/ipfs';
 import { useAuth } from '../../../hooks/useAuth';
 
 const { Option } = Select;
 const { TextArea } = Input;
-const { TabPane } = Tabs;
+
 const { Text } = Typography;
 
 const DocumentManagementPage = () => {
@@ -31,6 +31,7 @@ const DocumentManagementPage = () => {
   const [editForm] = Form.useForm();
   const [form] = Form.useForm();
   const [analysis, setAnalysis] = useState(null);
+  const [documentHistory, setDocumentHistory] = useState([]);
 
   const loadList = useCallback(async () => {
     try {
@@ -46,6 +47,32 @@ const DocumentManagementPage = () => {
 
   useEffect(() => {
     loadList();
+    
+    // Listen for document creation, update and delete events to auto-refresh
+    const handleDocumentCreated = () => {
+      console.log('Document created event received, refreshing list...');
+      loadList();
+    };
+    
+    const handleDocumentUpdated = () => {
+      console.log('Document updated event received, refreshing list...');
+      loadList();
+    };
+    
+    const handleDocumentDeleted = () => {
+      console.log('Document deleted event received, refreshing list...');
+      loadList();
+    };
+    
+    window.addEventListener('documentCreated', handleDocumentCreated);
+    window.addEventListener('documentUpdated', handleDocumentUpdated);
+    window.addEventListener('documentDeleted', handleDocumentDeleted);
+    
+    return () => {
+      window.removeEventListener('documentCreated', handleDocumentCreated);
+      window.removeEventListener('documentUpdated', handleDocumentUpdated);
+      window.removeEventListener('documentDeleted', handleDocumentDeleted);
+    };
   }, [loadList]);
 
   const onSearch = async () => {
@@ -57,7 +84,17 @@ const DocumentManagementPage = () => {
       if (filters.verified !== undefined) searchParams.verified = filters.verified;
       
       const docs = await documentService.searchDocuments(searchParams);
-      setDocuments(docs);
+      // Đảm bảo docs luôn là array
+      const documentsArray = Array.isArray(docs) ? docs : (docs.documents || []);
+      console.log('Search results:', documentsArray);
+      
+      // Kiểm tra nếu không có documents
+      if (!documentsArray || documentsArray.length === 0) {
+        message.info('Không tìm thấy tài liệu nào');
+        setDocuments([]);
+      } else {
+        setDocuments(documentsArray);
+      }
     } catch (e) {
       message.error(e.message || 'Lỗi khi tìm kiếm');
     } finally {
@@ -65,14 +102,7 @@ const DocumentManagementPage = () => {
     }
   };
 
-  const onReset = () => {
-    setFilters({
-      keyword: '',
-      docType: '',
-      verified: undefined
-    });
-    loadList();
-  };
+
 
   const onCreate = async () => {
     try {
@@ -85,9 +115,8 @@ const DocumentManagementPage = () => {
       setUploading(true);
       setUploadProgress(0);
       
-      // Generate document ID
-      const timestamp = Date.now();
-      const docID = `DOC_${timestamp}`;
+      // Use docID from form
+      const docID = values.docID;
       
       // Upload to IPFS
       const uploadResult = await ipfsService.uploadDocumentToIPFS(
@@ -101,16 +130,18 @@ const DocumentManagementPage = () => {
         (progress) => setUploadProgress(progress)
       );
       
-      // Create document
+      // Create document (automatically verified by Org1)
       await documentService.createDocument({
-        id: docID, // Backend expect 'id'
-        type: values.docType, // Backend expect 'type'
+        docID: docID, // Backend expect 'docID'
+        docType: values.docType, // Backend expect 'docType'
         title: values.title,
         description: values.description,
         ipfsHash: uploadResult.fileHash,
         metadataHash: uploadResult.metadataHash,
         fileType: selectedFile.type || selectedFile.name.split('.').pop().toUpperCase(),
-        fileSize: selectedFile.size
+        fileSize: selectedFile.size,
+        verified: true, // Org1 tạo tài liệu sẽ tự động được xác thực
+        verifiedBy: user?.cccd || 'Unknown' // Người tạo tài liệu (backend sẽ truyền vào chaincode)
       });
       
       message.success('Tạo tài liệu thành công');
@@ -119,6 +150,11 @@ const DocumentManagementPage = () => {
       setSelectedFile(null);
       setFileList([]);
       loadList();
+      
+      // Dispatch custom event to notify other pages to refresh
+      window.dispatchEvent(new CustomEvent('documentCreated', {
+        detail: { documentId: docID }
+      }));
     } catch (e) {
       message.error(e.message || 'Tạo tài liệu thất bại');
     } finally {
@@ -131,15 +167,20 @@ const DocumentManagementPage = () => {
     try {
       const values = await editForm.validateFields();
       setLoading(true);
-      await documentService.updateDocument(selected.id, {
+      await documentService.updateDocument(selected.docID, {
         title: values.title,
         description: values.description,
-        type: values.docType // Backend expect 'type'
+        docType: values.docType // Backend expect 'docType'
       });
       message.success('Cập nhật tài liệu thành công');
       setLoading(false);
       setEditOpen(false);
       loadList();
+      
+      // Dispatch custom event to notify other pages to refresh
+      window.dispatchEvent(new CustomEvent('documentUpdated', {
+        detail: { documentId: selected.docID }
+      }));
     } catch (e) {
       message.error(e.message || 'Cập nhật thất bại');
     } finally {
@@ -161,6 +202,17 @@ const DocumentManagementPage = () => {
       setLoading(false);
     }
   };
+
+  const loadDocumentHistory = useCallback(async (docID) => {
+    try {
+      if (!docID) return;
+      const history = await documentService.getDocumentHistory(docID);
+      setDocumentHistory(history);
+    } catch (e) {
+      console.error('Error loading document history:', e);
+      setDocumentHistory([]);
+    }
+  }, []);
 
   const handleDownload = useCallback(async (record) => {
     try {
@@ -194,41 +246,30 @@ const DocumentManagementPage = () => {
 
   const handleDelete = useCallback(async (record) => {
     try {
-      await documentService.deleteDocument(record.id);
+      await documentService.deleteDocument(record.docID);
       message.success('Xóa tài liệu thành công');
       loadList();
+      
+      // Dispatch custom event to notify other pages to refresh
+      window.dispatchEvent(new CustomEvent('documentDeleted', {
+        detail: { documentId: record.docID }
+      }));
     } catch (e) {
       message.error(e.message || 'Xóa thất bại');
     }
   }, [loadList]);
 
-  const handleVerify = useCallback(async (record) => {
-    try {
-      Modal.confirm({
-        title: 'Xác thực tài liệu',
-        content: `Bạn có chắc chắn muốn xác thực tài liệu "${record.title}"?`,
-        okText: 'Xác thực',
-        cancelText: 'Hủy',
-        onOk: async () => {
-          setLoading(true);
-          try {
-            await documentService.verifyDocument(record.id, user?.cccd || 'Unknown');
-            message.success('Xác thực tài liệu thành công');
-            loadList();
-          } catch (e) {
-            message.error(e.message || 'Xác thực thất bại');
-          } finally {
-            setLoading(false);
-          }
-        }
-      });
-    } catch (e) {
-      message.error(e.message || 'Lỗi khi xác thực');
+  const openDetail = useCallback((record) => {
+    setSelected(record);
+    setDetailOpen(true);
+    // Load document history when opening detail
+    if (record.docID) {
+      loadDocumentHistory(record.docID);
     }
-  }, [loadList, user?.cccd]);
+  }, [loadDocumentHistory]);
 
   const columns = useMemo(() => ([
-    { title: 'Mã tài liệu', dataIndex: 'id', key: 'id', render: v => <code>{v}</code> },
+    { title: 'Mã tài liệu', dataIndex: 'docID', key: 'docID', render: v => <code>{v}</code> },
     { title: 'Tiêu đề', dataIndex: 'title', key: 'title' },
     { title: 'Loại', dataIndex: 'type', key: 'type', render: v => <Tag color="blue">{v}</Tag> },
     { title: 'Trạng thái', dataIndex: 'verified', key: 'verified', render: v => v ? <Tag color="green">Đã xác thực</Tag> : <Tag color="orange">Chờ xác thực</Tag> },
@@ -262,12 +303,7 @@ const DocumentManagementPage = () => {
         </Space>
       )
     }
-  ]), [editForm, handleDelete, handleDownload]);
-
-  const openDetail = (record) => {
-    setSelected(record);
-    setDetailOpen(true);
-  };
+  ]), [editForm, handleDelete, handleDownload, openDetail]);
 
   return (
     <Card
@@ -292,7 +328,6 @@ const DocumentManagementPage = () => {
             <Option value={false}>Chờ xác thực</Option>
           </Select>
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
-          <Button icon={<ClearOutlined />} onClick={onReset}>Reset</Button>
           <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
           <Button type="primary" icon={<CloudUploadOutlined />} onClick={() => setCreateOpen(true)}>Upload tài liệu</Button>
         </Space>
@@ -312,10 +347,17 @@ const DocumentManagementPage = () => {
         <Form layout="vertical" form={form}>
           <Row gutter={16}>
             <Col span={12}>
+              <Form.Item name="docID" label="Mã tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
+                <Input placeholder="Nhập mã tài liệu" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
               <Form.Item name="title" label="Tiêu đề" rules={[{ required: true, message: 'Bắt buộc' }]}>
                 <Input placeholder="Nhập tiêu đề tài liệu" />
               </Form.Item>
             </Col>
+          </Row>
+          <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="docType" label="Loại tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
                 <Select placeholder="Chọn loại">
@@ -396,303 +438,402 @@ const DocumentManagementPage = () => {
       >
         {selected && (
           <div>
-            <Tabs defaultActiveKey="1">
-                             <TabPane tab="Thông tin cơ bản" key="1">
-                 <div style={{ padding: '16px 0' }}>
-                   <Row gutter={24}>
-                     <Col span={24}>
-                       <div style={{ marginBottom: 24, padding: '20px 0', borderBottom: '1px solid #f0f0f0' }}>
-                         <Text strong style={{ fontSize: 18 }}>{selected.title}</Text>
-                         <br />
-                         <Text type="secondary" style={{ fontSize: 13 }}>Mã: <code>{selected.id}</code></Text>
-                       </div>
-                     </Col>
-                   </Row>
-                   
-                   <Row gutter={24}>
-                     <Col span={12}>
-                       <div style={{ marginBottom: 16 }}>
-                         <Text strong>Loại tài liệu</Text>
-                         <br />
-                         <Tag color="blue" style={{ marginTop: 6 }}>{selected.type}</Tag>
-                       </div>
-                     </Col>
-                     <Col span={12}>
-                       <div style={{ marginBottom: 16 }}>
-                         <Text strong>Trạng thái</Text>
-                         <br />
-                         <div style={{ marginTop: 6 }}>
-                           {selected.verified ? (
-                             <Tag color="green">Đã xác thực</Tag>
-                           ) : (
-                             <Tag color="orange">Chờ xác thực</Tag>
-                           )}
-                         </div>
-                       </div>
-                     </Col>
-                   </Row>
-                   
-                   <Row gutter={24}>
-                     <Col span={12}>
-                       <div style={{ marginBottom: 16 }}>
-                         <Text strong>Loại file</Text>
-                         <br />
-                         <Tag color="blue" style={{ marginTop: 6 }}>{selected.fileType}</Tag>
-                       </div>
-                     </Col>
-                     <Col span={12}>
-                       <div style={{ marginBottom: 16 }}>
-                         <Text strong>Kích thước</Text>
-                         <br />
-                         <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>
-                           {selected.fileSize ? `${(selected.fileSize / 1024).toFixed(2)} KB` : 'N/A'}
-                         </Text>
-                       </div>
-                     </Col>
-                   </Row>
-                   
-                   <Row gutter={24}>
-                     <Col span={12}>
-                       <div style={{ marginBottom: 16 }}>
-                         <Text strong>Người upload</Text>
-                         <br />
-                         <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>{selected.uploadedBy}</Text>
-                       </div>
-                     </Col>
-                     <Col span={12}>
-                       <div style={{ marginBottom: 16 }}>
-                         <Text strong>Ngày tạo</Text>
-                         <br />
-                         <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>
-                           {selected.createdAt ? new Date(selected.createdAt).toLocaleString('vi-VN') : 'N/A'}
-                         </Text>
-                       </div>
-                     </Col>
-                   </Row>
-                   
-                   <Row gutter={24}>
-                     <Col span={24}>
-                       <div style={{ marginBottom: 16 }}>
-                         <Text strong>Mô tả</Text>
-                         <br />
-                         <Text type="secondary" style={{ marginTop: 6, display: 'block', lineHeight: 1.6 }}>
-                           {selected.metadata ? selected.metadata.originalDescription : selected.description}
-                         </Text>
-                       </div>
-                     </Col>
-                   </Row>
-                 </div>
-               </TabPane>
-              
-                             <TabPane tab="Metadata IPFS" key="2">
-                 <div style={{ padding: '16px 0' }}>
-                   {selected.metadata ? (
-                     <div>
-                       <Row gutter={24}>
-                         <Col span={24}>
-                           <div style={{ marginBottom: 24, padding: '20px 0', borderBottom: '1px solid #f0f0f0' }}>
-                             <Text strong style={{ fontSize: 16 }}>IPFS Metadata</Text>
-                           </div>
-                         </Col>
-                       </Row>
-                       
-                       <Row gutter={24}>
-                         <Col span={24}>
-                           <div style={{ marginBottom: 16 }}>
-                             <Text strong>Hash file gốc</Text>
-                             <br />
-                             <div style={{ marginTop: 6, padding: 8, background: '#f5f5f5', borderRadius: 4, fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>
-                               <Text copyable type="secondary">{selected.ipfsHash}</Text>
-                             </div>
-                           </div>
-                         </Col>
-                       </Row>
-                       
-                       <Row gutter={24}>
-                         <Col span={24}>
-                           <div style={{ marginBottom: 16 }}>
-                             <Text strong>Hash metadata</Text>
-                             <br />
-                             <div style={{ marginTop: 6, padding: 8, background: '#f5f5f5', borderRadius: 4, fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>
-                               <Text copyable type="secondary">{selected.metadata.metadataHash}</Text>
-                             </div>
-                           </div>
-                         </Col>
-                       </Row>
-                       
-                       <Row gutter={24}>
-                         <Col span={12}>
-                           <div style={{ marginBottom: 16 }}>
-                             <Text strong>Mô tả gốc</Text>
-                             <br />
-                             <Text type="secondary" style={{ marginTop: 6, display: 'block', lineHeight: 1.6 }}>
-                               {selected.metadata.originalDescription}
-                             </Text>
-                           </div>
-                         </Col>
-                         <Col span={12}>
-                           <div style={{ marginBottom: 16 }}>
-                             <Text strong>Ngày upload metadata</Text>
-                             <br />
-                             <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>
-                               {selected.metadata.metadataUploadedAt ? 
-                                 new Date(selected.metadata.metadataUploadedAt).toLocaleString('vi-VN') : 'N/A'
-                               }
-                             </Text>
-                           </div>
-                         </Col>
-                       </Row>
-                       
-                       <Row gutter={24}>
-                         <Col span={12}>
-                           <div style={{ marginBottom: 16 }}>
-                             <Text strong>Người upload metadata</Text>
-                             <br />
-                             <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>
-                               {selected.metadata.metadataUploadedBy}
-                             </Text>
-                           </div>
-                         </Col>
-                       </Row>
-                       
-                       <Divider />
-                       
-                       <div style={{ textAlign: 'center', marginTop: 16 }}>
-                         <Button 
-                           type="primary" 
-                           icon={<DownloadOutlined />}
-                           onClick={() => handleDownload(selected)}
-                           style={{ marginRight: 12 }}
-                         >
-                           Tải file từ IPFS
-                         </Button>
-                         <Button 
-                           icon={<EyeOutlined />}
-                           onClick={() => window.open(`https://gateway.pinata.cloud/ipfs/${selected.ipfsHash}`, '_blank')}
-                         >
-                           Xem trực tuyến
-                         </Button>
-                       </div>
-                     </div>
-                   ) : (
-                     <div style={{ textAlign: 'center', padding: 32 }}>
-                       <Text type="secondary" style={{ fontSize: 14 }}>Không có metadata IPFS</Text>
-                       <br />
-                       <Text type="secondary">Hash file: {selected.ipfsHash || 'N/A'}</Text>
-                     </div>
-                   )}
-                 </div>
-               </TabPane>
-              
-              <TabPane tab="Phân tích tài liệu" key="3">
-                                 <div style={{ marginBottom: 16 }}>
-                   <Button 
-                     type="primary" 
-                     icon={<FileTextOutlined />}
-                     onClick={() => onAnalyze(selected.id)}
-                     loading={loading}
-                   >
-                     Phân tích tài liệu
-                   </Button>
-                 </div>
-                
-                {analysis ? (
-                  <div>
-                    <Row gutter={16}>
-                      <Col span={12}>
-                        <Text strong>Kết quả phân tích:</Text>
+            <Tabs 
+              defaultActiveKey="1"
+              items={[
+                {
+                  key: "1",
+                  label: "Thông tin cơ bản",
+                  children: (
+                    <div style={{ padding: '16px 0' }}>
+                      <Row gutter={24}>
+                        <Col span={24}>
+                          <div style={{ marginBottom: 24, padding: '20px 0', borderBottom: '1px solid #f0f0f0' }}>
+                            <Text strong style={{ fontSize: 18 }}>{selected.title}</Text>
+                            <br />
+                            <Text type="secondary" style={{ fontSize: 13 }}>Mã: <code>{selected.docID}</code></Text>
+                          </div>
+                        </Col>
+                      </Row>
+                      
+                      <Row gutter={24}>
+                        <Col span={12}>
+                          <div style={{ marginBottom: 16 }}>
+                            <Text strong>Loại tài liệu</Text>
+                            <br />
+                            <Tag color="blue" style={{ marginTop: 6 }}>{selected.type}</Tag>
+                          </div>
+                        </Col>
+                        <Col span={12}>
+                          <div style={{ marginBottom: 16 }}>
+                            <Text strong>Trạng thái</Text>
+                            <br />
+                            <div style={{ marginTop: 6 }}>
+                              {selected.verified ? (
+                                <Tag color="green">Đã xác thực</Tag>
+                              ) : (
+                                <Tag color="orange">Chờ xác thực</Tag>
+                              )}
+                            </div>
+                          </div>
+                        </Col>
+                      </Row>
+                      
+                      <Row gutter={24}>
+                        <Col span={12}>
+                          <div style={{ marginBottom: 16 }}>
+                            <Text strong>Loại file</Text>
+                            <br />
+                            <Tag color="blue" style={{ marginTop: 6 }}>{selected.fileType}</Tag>
+                          </div>
+                        </Col>
+                        <Col span={12}>
+                          <div style={{ marginBottom: 16 }}>
+                            <Text strong>Kích thước</Text>
+                            <br />
+                            <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>
+                              {selected.fileSize ? `${(selected.fileSize / 1024).toFixed(2)} KB` : 'N/A'}
+                            </Text>
+                          </div>
+                        </Col>
+                      </Row>
+                      
+                      <Row gutter={24}>
+                        <Col span={12}>
+                          <div style={{ marginBottom: 16 }}>
+                            <Text strong>Người upload</Text>
+                            <br />
+                            <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>{selected.uploadedBy}</Text>
+                          </div>
+                        </Col>
+                        <Col span={12}>
+                          <div style={{ marginBottom: 16 }}>
+                            <Text strong>Ngày tạo</Text>
+                            <br />
+                            <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>
+                              {selected.createdAt ? new Date(selected.createdAt).toLocaleString('vi-VN') : 'N/A'}
+                            </Text>
+                          </div>
+                        </Col>
+                      </Row>
+                      
+                      <Row gutter={24}>
+                        <Col span={24}>
+                          <div style={{ marginBottom: 16 }}>
+                            <Text strong>Mô tả</Text>
+                            <br />
+                            <Text type="secondary" style={{ marginTop: 6, display: 'block', lineHeight: 1.6 }}>
+                              {selected.metadata ? selected.metadata.originalDescription : selected.description}
+                            </Text>
+                          </div>
+                        </Col>
+                      </Row>
+                    </div>
+                  )
+                },
+                {
+                  key: "2",
+                  label: "Metadata IPFS",
+                  children: (
+                    <div style={{ padding: '16px 0' }}>
+                      {selected.metadata ? (
+                        <div>
+                          <Row gutter={24}>
+                            <Col span={24}>
+                              <div style={{ marginBottom: 24, padding: '20px 0', borderBottom: '1px solid #f0f0f0' }}>
+                                <Text strong style={{ fontSize: 16 }}>IPFS Metadata</Text>
+                              </div>
+                            </Col>
+                          </Row>
+                          
+                          <Row gutter={24}>
+                            <Col span={24}>
+                              <div style={{ marginBottom: 16 }}>
+                                <Text strong>Hash file gốc</Text>
+                                <br />
+                                <div style={{ marginTop: 6, padding: 8, background: '#f5f5f5', borderRadius: 4, fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>
+                                  <Text copyable type="secondary">{selected.ipfsHash}</Text>
+                                </div>
+                              </div>
+                            </Col>
+                          </Row>
+                          
+                          <Row gutter={24}>
+                            <Col span={24}>
+                              <div style={{ marginBottom: 16 }}>
+                                <Text strong>Hash metadata</Text>
+                                <br />
+                                <div style={{ marginTop: 6, padding: 8, background: '#f5f5f5', borderRadius: 4, fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>
+                                  <Text copyable type="secondary">{selected.metadata.metadataHash}</Text>
+                                </div>
+                              </div>
+                            </Col>
+                          </Row>
+                          
+                          <Row gutter={24}>
+                            <Col span={12}>
+                              <div style={{ marginBottom: 16 }}>
+                                <Text strong>Mô tả gốc</Text>
+                                <br />
+                                <Text type="secondary" style={{ marginTop: 6, display: 'block', lineHeight: 1.6 }}>
+                                  {selected.metadata.originalDescription}
+                                </Text>
+                              </div>
+                            </Col>
+                            <Col span={12}>
+                              <div style={{ marginBottom: 16 }}>
+                                <Text strong>Ngày upload metadata</Text>
+                                <br />
+                                <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>
+                                  {selected.metadata.metadataUploadedAt ? 
+                                    new Date(selected.metadata.metadataUploadedAt).toLocaleString('vi-VN') : 'N/A'
+                                  }
+                                </Text>
+                              </div>
+                            </Col>
+                          </Row>
+                          
+                          <Row gutter={24}>
+                            <Col span={12}>
+                              <div style={{ marginBottom: 16 }}>
+                                <Text strong>Người upload metadata</Text>
+                                <br />
+                                <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>
+                                  {selected.metadata.metadataUploadedBy}
+                                </Text>
+                              </div>
+                            </Col>
+                          </Row>
+                          
+                          <Divider />
+                          
+                          <div style={{ textAlign: 'center', marginTop: 16 }}>
+                            <Button 
+                              type="primary" 
+                              icon={<DownloadOutlined />}
+                              onClick={() => handleDownload(selected)}
+                            >
+                              Tải file từ IPFS
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: 32 }}>
+                          <Text type="secondary" style={{ fontSize: 14 }}>Không có metadata IPFS</Text>
+                          <br />
+                          <Text type="secondary">Hash file: {selected.ipfsHash || 'N/A'}</Text>
+                        </div>
+                      )}
+                    </div>
+                  )
+                },
+                {
+                  key: "3",
+                  label: "Phân tích tài liệu",
+                  children: (
+                    <div>
+                      <div style={{ marginBottom: 16 }}>
+                        <Button 
+                          type="primary" 
+                          icon={<FileTextOutlined />}
+                          onClick={() => onAnalyze(selected.docID)}
+                          loading={loading}
+                        >
+                          Phân tích tài liệu
+                        </Button>
+                      </div>
+                      
+                      {analysis ? (
+                        <div>
+                          <Row gutter={16}>
+                            <Col span={12}>
+                              <Text strong>Kết quả phân tích:</Text>
+                              <br />
+                              <Text type="secondary">{analysis.result}</Text>
+                            </Col>
+                            <Col span={12}>
+                              <Text strong>Độ tin cậy:</Text>
+                              <br />
+                              <Text type="secondary">{analysis.confidence}%</Text>
+                            </Col>
+                          </Row>
+                          <Row gutter={16}>
+                            <Col span={24}>
+                              <Text strong>Chi tiết:</Text>
+                              <br />
+                              <Text type="secondary">{analysis.details}</Text>
+                            </Col>
+                          </Row>
+                          <Row gutter={16}>
+                            <Col span={12}>
+                              <Text strong>Ngày phân tích:</Text>
+                              <br />
+                              <Text type="secondary">
+                                {analysis.analyzedAt ? new Date(analysis.analyzedAt).toLocaleString('vi-VN') : 'N/A'}
+                              </Text>
+                            </Col>
+                            <Col span={12}>
+                              <Text strong>Người phân tích:</Text>
+                              <br />
+                              <Text type="secondary">{analysis.analyzedBy}</Text>
+                            </Col>
+                          </Row>
+                        </div>
+                      ) : (
+                        <Text type="secondary">Chưa có kết quả phân tích. Nhấn nút "Phân tích tài liệu" để bắt đầu.</Text>
+                      )}
+                    </div>
+                  )
+                },
+                {
+                  key: "4",
+                  label: "Lịch sử thay đổi",
+                  children: (
+                    <div style={{ padding: '16px 0' }}>
+                      <div style={{ marginBottom: 16 }}>
+                        <Text strong style={{ fontSize: 16 }}>Lịch sử thay đổi tài liệu</Text>
+                      </div>
+                      
+                      {/* Lịch sử thay đổi từ chaincode GetHistoryForKey */}
+                      <div style={{ marginBottom: 16 }}>
+                        <Text strong style={{ fontSize: 16 }}>Lịch sử thay đổi tài liệu</Text>
+                      </div>
+                      
+                      {documentHistory && documentHistory.length > 0 ? (
+                        <div>
+                          {documentHistory.map((item, index) => (
+                            <div key={index} style={{ 
+                              background: '#fff', 
+                              border: '1px solid #e8e8e8', 
+                              borderRadius: '8px', 
+                              padding: '16px',
+                              marginBottom: '12px'
+                            }}>
+                              <Row gutter={16}>
+                                <Col span={24}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                    <Tag color={item.isDelete ? 'red' : 'blue'}>
+                                      {item.isDelete ? 'Đã xóa' : 'Thay đổi'}
+                                    </Tag>
+                                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                                      {item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleString('vi-VN') : 'N/A'}
+                                    </Text>
+                                  </div>
+                                </Col>
+                              </Row>
+                              
+                              <Row gutter={16}>
+                                <Col span={12}>
+                                  <Text strong>Transaction ID:</Text>
+                                  <br />
+                                  <Text type="secondary" style={{ fontSize: '12px', fontFamily: 'monospace' }}>
+                                    {item.txId}
+                                  </Text>
+                                </Col>
+                                <Col span={12}>
+                                  <Text strong>Tiêu đề:</Text>
+                                  <br />
+                                  <Text type="secondary">{item.document?.title || 'N/A'}</Text>
+                                </Col>
+                              </Row>
+                              
+                              <Row gutter={16} style={{ marginTop: 8 }}>
+                                <Col span={12}>
+                                  <Text strong>Loại tài liệu:</Text>
+                                  <br />
+                                  <Tag color="blue">{item.document?.type || 'N/A'}</Tag>
+                                </Col>
+                                <Col span={12}>
+                                  <Text strong>Trạng thái xác thực:</Text>
+                                  <br />
+                                  <Tag color={item.document?.verified ? 'green' : 'orange'}>
+                                    {item.document?.verified ? 'Đã xác thực' : 'Chờ xác thực'}
+                                  </Tag>
+                                </Col>
+                              </Row>
+                              
+                              <Row gutter={16} style={{ marginTop: 8 }}>
+                                <Col span={12}>
+                                  <Text strong>Người xác thực:</Text>
+                                  <br />
+                                  <Text type="secondary">{item.document?.verifiedBy || 'Chưa có'}</Text>
+                                </Col>
+                                <Col span={12}>
+                                  <Text strong>Ngày xác thực:</Text>
+                                  <br />
+                                  <Text type="secondary">
+                                    {item.document?.verifiedAt && item.document.verifiedAt !== '0001-01-01T00:00:00Z' ? 
+                                      new Date(item.document.verifiedAt).toLocaleString('vi-VN') : 'Chưa có'
+                                    }
+                                  </Text>
+                                </Col>
+                              </Row>
+                              
+                              <Row gutter={16} style={{ marginTop: 8 }}>
+                                <Col span={12}>
+                                  <Text strong>Người upload:</Text>
+                                  <br />
+                                  <Text type="secondary">{item.document?.uploadedBy || 'N/A'}</Text>
+                                </Col>
+                                <Col span={12}>
+                                  <Text strong>Ngày tạo:</Text>
+                                  <br />
+                                  <Text type="secondary">
+                                    {item.document?.createdAt ? new Date(item.document.createdAt).toLocaleString('vi-VN') : 'N/A'}
+                                  </Text>
+                                </Col>
+                              </Row>
+                              
+                              <Row gutter={16} style={{ marginTop: 8 }}>
+                                <Col span={12}>
+                                  <Text strong>Ngày cập nhật:</Text>
+                                  <br />
+                                  <Text type="secondary">
+                                    {item.document?.updatedAt ? new Date(item.document.updatedAt).toLocaleString('vi-VN') : 'N/A'}
+                                  </Text>
+                                </Col>
+                                <Col span={12}>
+                                  <Text strong>IPFS Hash:</Text>
+                                  <br />
+                                  <Text type="secondary" style={{ fontSize: '12px', fontFamily: 'monospace' }}>
+                                    {item.document?.ipfsHash || 'N/A'}
+                                  </Text>
+                                </Col>
+                              </Row>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ 
+                          background: '#f9f9f9', 
+                          border: '1px solid #e8e8e8', 
+                          borderRadius: '8px', 
+                          padding: '32px',
+                          textAlign: 'center'
+                        }}>
+                          <Text type="secondary">Chưa có lịch sử thay đổi</Text>
+                        </div>
+                      )}
+                      
+                      <div style={{ 
+                        background: '#f0f8ff', 
+                        border: '1px solid #d6e4ff', 
+                        borderRadius: '8px', 
+                        padding: '16px',
+                        marginTop: '16px'
+                      }}>
+                        <Text type="success">✓ Tài liệu đã được xác thực tự động</Text>
                         <br />
-                        <Text type="secondary">{analysis.result}</Text>
-                      </Col>
-                      <Col span={12}>
-                        <Text strong>Độ tin cậy:</Text>
-                        <br />
-                        <Text type="secondary">{analysis.confidence}%</Text>
-                      </Col>
-                    </Row>
-                    <Row gutter={16}>
-                      <Col span={24}>
-                        <Text strong>Chi tiết:</Text>
-                        <br />
-                        <Text type="secondary">{analysis.details}</Text>
-                      </Col>
-                    </Row>
-                    <Row gutter={16}>
-                      <Col span={12}>
-                        <Text strong>Ngày phân tích:</Text>
-                        <br />
-                        <Text type="secondary">
-                          {analysis.analyzedAt ? new Date(analysis.analyzedAt).toLocaleString('vi-VN') : 'N/A'}
+                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                          Xác thực bởi người tạo khi tạo tài liệu
                         </Text>
-                      </Col>
-                      <Col span={12}>
-                        <Text strong>Người phân tích:</Text>
-                        <br />
-                        <Text type="secondary">{analysis.analyzedBy}</Text>
-                      </Col>
-                    </Row>
-                  </div>
-                                 ) : (
-                   <Text type="secondary">Chưa có kết quả phân tích. Nhấn nút "Phân tích tài liệu" để bắt đầu.</Text>
-                 )}
-               </TabPane>
-               
-               <TabPane tab="Xác thực tài liệu" key="4">
-                 <Row gutter={16}>
-                   <Col span={12}>
-                     <Text strong>Trạng thái xác thực:</Text>
-                     <br />
-                     {selected.verified ? (
-                       <Tag color="green">Đã xác thực</Tag>
-                     ) : (
-                       <Tag color="orange">Chờ xác thực</Tag>
-                     )}
-                   </Col>
-                   <Col span={12}>
-                     <Text strong>Người xác thực:</Text>
-                     <br />
-                     <Text type="secondary">{selected.verifiedBy || 'Chưa có'}</Text>
-                   </Col>
-                 </Row>
-                 <Row gutter={16}>
-                   <Col span={12}>
-                     <Text strong>Ngày xác thực:</Text>
-                     <br />
-                     <Text type="secondary">
-                       {selected.verifiedAt && selected.verifiedAt !== '0001-01-01T00:00:00Z' ? 
-                         new Date(selected.verifiedAt).toLocaleString('vi-VN') : 'Chưa có'
-                       }
-                     </Text>
-                   </Col>
-                 </Row>
-                 
-                 <Divider />
-                 
-                 <div style={{ marginTop: 16 }}>
-                   {!selected.verified ? (
-                     <Button 
-                       type="primary" 
-                       icon={<CheckOutlined />}
-                       onClick={() => {
-                         setDetailOpen(false);
-                         handleVerify(selected);
-                       }}
-                       loading={loading}
-                     >
-                       Xác thực tài liệu
-                     </Button>
-                   ) : (
-                     <div>
-                       <Text type="success">✓ Tài liệu đã được xác thực</Text>
-                       <br />
-                       <Text type="secondary" style={{ fontSize: '12px' }}>
-                         Xác thực bởi {selected.verifiedBy} vào {selected.verifiedAt ? new Date(selected.verifiedAt).toLocaleString('vi-VN') : 'N/A'}
-                       </Text>
-                     </div>
-                   )}
-                 </div>
-               </TabPane>
-             </Tabs>
+                      </div>
+                    </div>
+                  )
+                }
+
+              ]}
+            />
           </div>
         )}
       </Modal>

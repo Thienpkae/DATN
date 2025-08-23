@@ -365,7 +365,7 @@ func (s *LandRegistryChaincode) IssueLandCertificate(ctx contractapi.Transaction
 // ========================================
 
 // CreateDocument - Tạo tài liệu mới
-func (s *LandRegistryChaincode) CreateDocument(ctx contractapi.TransactionContextInterface, docID, docType, title, description, ipfsHash, fileType string, fileSize int64) error {
+func (s *LandRegistryChaincode) CreateDocument(ctx contractapi.TransactionContextInterface, docID, docType, title, description, ipfsHash, fileType string, fileSize int64, verified bool, verifiedBy string) error {
 	userID, err := GetCallerID(ctx)
 	if err != nil {
 		return err
@@ -390,7 +390,7 @@ func (s *LandRegistryChaincode) CreateDocument(ctx contractapi.TransactionContex
 
 	// Tạo tài liệu mới
 	doc := &Document{
-		ID:          docID,
+		DocID:       docID,
 		Type:        docType,
 		Title:       title,
 		Description: description,
@@ -398,9 +398,15 @@ func (s *LandRegistryChaincode) CreateDocument(ctx contractapi.TransactionContex
 		FileSize:    fileSize,
 		FileType:    fileType,
 		UploadedBy:  userID,
-		Verified:    false,
+		Verified:    verified,
+		VerifiedBy:  verifiedBy,
 		CreatedAt:   txTime,
 		UpdatedAt:   txTime,
+	}
+
+	// Set verified time if verified
+	if verified {
+		doc.VerifiedAt = txTime
 	}
 
 	// Lưu tài liệu
@@ -414,8 +420,6 @@ func (s *LandRegistryChaincode) CreateDocument(ctx contractapi.TransactionContex
 
 	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "CREATE_DOCUMENT", userID, fmt.Sprintf("Tạo tài liệu %s", title))
 }
-
-
 
 // UpdateDocument - Cập nhật thông tin tài liệu
 func (s *LandRegistryChaincode) UpdateDocument(ctx contractapi.TransactionContextInterface, docID, title, description string) error {
@@ -484,8 +488,6 @@ func (s *LandRegistryChaincode) DeleteDocument(ctx contractapi.TransactionContex
 		return fmt.Errorf("người dùng %s không có quyền xóa tài liệu %s", userID, docID)
 	}
 
-	// Tài liệu giờ độc lập, không cần xóa khỏi thửa đất hay giao dịch
-
 	// Xóa tài liệu
 	if err := ctx.GetStub().DelState(docID); err != nil {
 		return fmt.Errorf("lỗi khi xóa tài liệu: %v", err)
@@ -537,8 +539,6 @@ func (s *LandRegistryChaincode) VerifyDocument(ctx contractapi.TransactionContex
 	if err := ctx.GetStub().PutState(docID, docJSON); err != nil {
 		return fmt.Errorf("lỗi khi cập nhật tài liệu: %v", err)
 	}
-
-	// Document giờ độc lập, không cần cập nhật trạng thái thửa đất
 
 	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "VERIFY_DOCUMENT", userID, fmt.Sprintf("Chứng thực tài liệu %s", docID))
 }

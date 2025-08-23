@@ -114,7 +114,7 @@ const NotificationsPage = () => {
       fetchNotifications();
       fetchStats();
     }
-  }, [user?.cccd, fetchNotifications, fetchStats]);
+  }, [user?.cccd, fetchNotifications, fetchStats]); // Include the callback functions as dependencies
 
   const handleMarkAsRead = async (notificationId) => {
     try {

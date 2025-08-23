@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Table, Button, Input, Space, Tag, message, Drawer, Row, Col, Tabs, List, Typography, Tooltip } from 'antd';
-import { SearchOutlined, ReloadOutlined, HistoryOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, HistoryOutlined, EyeOutlined, FileTextOutlined, ClearOutlined } from '@ant-design/icons';
 import landService from '../../../services/landService';
 import authService from '../../../services/auth';
 import { LAND_USE_PURPOSES, LEGAL_STATUSES } from '../../../services/index';
@@ -174,6 +174,10 @@ const LandManagementPage = () => {
           <Input placeholder="Từ khóa" allowClear style={{ width: 240 }} value={keyword} onChange={(e) => setKeyword(e.target.value)} />
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
           <Button icon={<ReloadOutlined />} onClick={loadMyLands}>Tải lại</Button>
+          <Button icon={<ClearOutlined />} onClick={() => {
+            setKeyword('');
+            loadMyLands();
+          }}>Reset</Button>
         </Space>
       }
     >

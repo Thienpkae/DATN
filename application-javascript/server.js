@@ -90,7 +90,7 @@ app.get('/api/documents/type/:docType', authenticateJWT, documentService.getDocu
 app.get('/api/documents/land-parcel/:landParcelID', authenticateJWT, documentService.getDocumentsByLandParcel);
 app.get('/api/documents/transaction/:txID', authenticateJWT, documentService.getDocumentsByTransaction);
 app.get('/api/documents/uploader/:uploaderID', authenticateJWT, documentService.getDocumentsByUploader);
-app.get('/api/documents/history/:ipfsHash', authenticateJWT, documentService.getDocumentHistory);
+app.get('/api/documents/history/:docID', authenticateJWT, documentService.getDocumentHistory);
 app.get('/api/documents', authenticateJWT, checkOrg(['Org1', 'Org2']), documentService.getAllDocuments);
 app.get('/api/documents/:docID', authenticateJWT, documentService.getDocument);
 app.put('/api/documents/:docID', authenticateJWT, documentService.updateDocument);
@@ -178,9 +178,6 @@ async function startServer() {
             console.log('   Other users → Org3');
         });
 
-        // Initialize WebSocket for notifications
-        const NotificationWebSocketServer = require('./websocket/notificationWebSocket');
-        new NotificationWebSocketServer(server);
     } catch (error) {
         console.error(`❌ Failed to start server: ${error.message}`);
         process.exit(1);

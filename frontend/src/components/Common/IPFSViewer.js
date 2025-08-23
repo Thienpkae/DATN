@@ -60,12 +60,7 @@ const IPFSViewer = ({
     return ipfsService.validateIPFSHash(ipfsHash);
   };
 
-  const commonGateways = [
-    { name: 'Pinata', url: `https://gateway.pinata.cloud/ipfs/${ipfsHash}` },
-    { name: 'Cloudflare', url: `https://cloudflare-ipfs.com/ipfs/${ipfsHash}` },
-    { name: 'IPFS.io', url: `https://ipfs.io/ipfs/${ipfsHash}` },
-    { name: 'Dweb', url: `https://dweb.link/ipfs/${ipfsHash}` }
-  ];
+
 
   if (!ipfsHash) {
     return (
@@ -189,28 +184,7 @@ const IPFSViewer = ({
         </>
       )}
 
-      <Divider orientation="left">IPFS Gateways</Divider>
-      <List size="small" bordered>
-        {commonGateways.map((gateway, index) => (
-          <List.Item
-            key={index}
-            actions={[
-              <Button 
-                size="small" 
-                type="link" 
-                onClick={() => window.open(gateway.url, '_blank')}
-              >
-                Mở
-              </Button>
-            ]}
-          >
-            <List.Item.Meta
-              title={gateway.name}
-              description={gateway.url}
-            />
-          </List.Item>
-        ))}
-      </List>
+
     </Card>
   );
 };

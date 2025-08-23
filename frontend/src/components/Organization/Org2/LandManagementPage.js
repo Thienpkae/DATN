@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Table, Button, Input, Select, Space, Tag, message, Drawer, Row, Col, Tabs, List, Typography, Tooltip } from 'antd';
-import { SearchOutlined, ReloadOutlined, HistoryOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, HistoryOutlined, EyeOutlined, FileTextOutlined, ClearOutlined } from '@ant-design/icons';
 import landService from '../../../services/landService';
 import { LAND_USE_PURPOSES, LEGAL_STATUSES } from '../../../services/index';
 
@@ -11,7 +11,8 @@ const { Text } = Typography;
 const LandManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [lands, setLands] = useState([]);
-  const [filters, setFilters] = useState({ keyword: '', landUsePurpose: undefined, legalStatus: undefined });
+  const defaultFilters = { keyword: '', landUsePurpose: undefined, legalStatus: undefined };
+  const [filters, setFilters] = useState(defaultFilters);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [history, setHistory] = useState([]);
@@ -187,6 +188,10 @@ const LandManagementPage = () => {
             ))}
           </Select>
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
+          <Button icon={<ClearOutlined />} onClick={() => {
+            setFilters(defaultFilters);
+            loadList();
+          }}>Reset</Button>
           <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
         </Space>
       }

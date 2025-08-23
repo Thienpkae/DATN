@@ -71,15 +71,32 @@ const landService = {
 
             const { contract } = await connectToNetwork(org, userID);
 
+            // Get current land parcel data to fill missing fields
+            const currentLandResult = await contract.evaluateTransaction('QueryLandByID', id, userID);
+            const currentLand = JSON.parse(currentLandResult.toString());
+
+            // Use current values for fields not provided in update
+            const finalArea = area !== undefined && area !== null ? area.toString() : currentLand.area.toString();
+            const finalLocation = location !== undefined ? location : currentLand.location;
+            const finalLandUsePurpose = landUsePurpose !== undefined ? landUsePurpose : currentLand.landUsePurpose;
+            const finalLegalStatus = legalStatus !== undefined ? legalStatus : currentLand.legalStatus;
+            const finalCertificateId = certificateId !== undefined ? certificateId : currentLand.certificateID;
+            const finalLegalInfo = legalInfo !== undefined ? legalInfo : currentLand.legalInfo;
+
+            // Validate area if provided
+            if (area !== undefined && area !== null && (isNaN(parseFloat(finalArea)) || parseFloat(finalArea) < 0)) {
+                throw new Error('Diện tích không hợp lệ');
+            }
+
             await contract.submitTransaction(
                 'UpdateLandParcel',
                 id,
-                area.toString(),
-                location,
-                landUsePurpose,
-                legalStatus,
-                certificateId || '',
-                legalInfo || ''
+                finalArea,
+                finalLocation,
+                finalLandUsePurpose,
+                finalLegalStatus,
+                finalCertificateId,
+                finalLegalInfo
             );
 
             // Get the updated land parcel to return as response data

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Modal, Descriptions, Tag, Button, Space, message, Divider, Alert } from 'antd';
-import { DownloadOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons';
+import { Modal, Tag, Button, Space, message, Alert, Typography, Tabs, Row, Col, Divider } from 'antd';
+import { DownloadOutlined, FileTextOutlined, EyeOutlined } from '@ant-design/icons';
 import documentService from '../../services/documentService';
 import ipfsService from '../../services/ipfs';
-import IPFSViewer from './IPFSViewer';
+
+const { Text } = Typography;
 
 const DocumentViewer = ({ 
   visible, 
@@ -61,6 +62,8 @@ const DocumentViewer = ({
     window.open(url, '_blank');
   };
 
+
+
   if (!document && !loading) {
     return null;
   }
@@ -90,7 +93,7 @@ const DocumentViewer = ({
           </Button>
         )
       ]}
-      width={900}
+      width={800}
     >
       {loading && (
         <div style={{ textAlign: 'center', padding: '40px' }}>
@@ -109,92 +112,187 @@ const DocumentViewer = ({
       )}
 
       {document && (
-        <>
-          <Descriptions title="Thông tin cơ bản" bordered column={2} style={{ marginBottom: 24 }}>
-            <Descriptions.Item label="Mã tài liệu" span={2}>
-              <code style={{ fontSize: '14px', background: '#f5f5f5', padding: '4px 8px', borderRadius: '4px' }}>
-                {document.docID || document.ID}
-              </code>
-            </Descriptions.Item>
-            <Descriptions.Item label="Tiêu đề">
-              {document.title || 'N/A'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Loại tài liệu">
-              <Tag color="blue">{document.docType || document.Type}</Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="Trạng thái xác thực">
-              <Tag color={document.verified ? 'green' : 'orange'}>
-                {document.verified ? 'Đã xác thực' : 'Chờ xác thực'}
-              </Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="Loại file">
-              {document.fileType || document.FileType || 'N/A'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Kích thước">
-              {document.fileSize || document.FileSize ? 
-                `${((document.fileSize || document.FileSize) / 1024).toFixed(2)} KB` : 'N/A'
-              }
-            </Descriptions.Item>
-            <Descriptions.Item label="Người upload">
-              {document.uploadedBy || document.UploadedBy || 'N/A'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Ngày tạo">
-              {document.createdAt ? new Date(document.createdAt).toLocaleString('vi-VN') : 'N/A'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Mô tả" span={2}>
-              {document.displayDescription || document.description || 'Không có mô tả'}
-            </Descriptions.Item>
-          </Descriptions>
-
-          {document.metadata && document.metadata.hasMetadata && (
-            <>
-              <Divider orientation="left">Metadata IPFS</Divider>
-              <Descriptions bordered column={2} style={{ marginBottom: 24 }}>
-                <Descriptions.Item label="Metadata Hash">
-                  <code style={{ fontSize: '12px', background: '#f5f5f5', padding: '4px 8px', borderRadius: '4px' }}>
-                    {document.metadata.metadataHash}
-                  </code>
-                </Descriptions.Item>
-                <Descriptions.Item label="Upload lúc">
-                  {document.metadata.metadataUploadedAt ? 
-                    new Date(document.metadata.metadataUploadedAt).toLocaleString('vi-VN') : 'N/A'
-                  }
-                </Descriptions.Item>
-                <Descriptions.Item label="Upload bởi">
-                  {document.metadata.metadataUploadedBy || 'N/A'}
-                </Descriptions.Item>
-              </Descriptions>
-            </>
-          )}
-
-          {document.ipfsHash && (
-            <>
-              <Divider orientation="left">IPFS File</Divider>
-              <IPFSViewer
-                ipfsHash={document.ipfsHash}
-                fileName={document.title || document.docID}
-                fileType={document.fileType || document.FileType}
-                fileSize={document.fileSize || document.FileSize}
-                showDetails={true}
-              />
-            </>
-          )}
-
-          {document.verified && (
-            <>
-              <Divider orientation="left">Thông tin xác thực</Divider>
-              <Descriptions bordered column={2}>
-                <Descriptions.Item label="Người xác thực">
-                  {document.verifiedBy || document.VerifiedBy || 'N/A'}
-                </Descriptions.Item>
-                <Descriptions.Item label="Thời gian xác thực">
-                  {document.verifiedAt ? new Date(document.verifiedAt).toLocaleString('vi-VN') : 'N/A'}
-                </Descriptions.Item>
-              </Descriptions>
-            </>
-          )}
-        </>
+        <Tabs
+          defaultActiveKey="basic"
+          items={[
+            {
+              key: 'basic',
+              label: 'Thông tin cơ bản',
+              children: (
+                <div style={{ padding: '16px 0' }}>
+                  <Row gutter={24}>
+                    <Col span={24}>
+                      <div style={{ marginBottom: 24, padding: '20px 0', borderBottom: '1px solid #f0f0f0' }}>
+                        <Text strong style={{ fontSize: 18 }}>{document.title}</Text>
+                        <br />
+                        <Text type="secondary" style={{ fontSize: 13 }}>Mã: <code>{document.docID}</code></Text>
+                      </div>
+                    </Col>
+                  </Row>
+                  
+                  <Row gutter={24}>
+                    <Col span={12}>
+                      <div style={{ marginBottom: 12 }}>
+                        <Text strong>Loại tài liệu: </Text>
+                        <Tag color="blue">{document.type}</Tag>
+                      </div>
+                      
+                      <div style={{ marginBottom: 12 }}>
+                        <Text strong>Trạng thái xác thực: </Text>
+                        <Tag color={document.verified ? 'green' : 'orange'}>
+                          {document.verified ? 'Đã xác thực' : 'Chờ xác thực'}
+                        </Tag>
+                      </div>
+                      
+                      <div style={{ marginBottom: 12 }}>
+                        <Text strong>Loại file: </Text>
+                        <Text type="secondary">{document.fileType}</Text>
+                      </div>
+                      
+                      <div style={{ marginBottom: 12 }}>
+                        <Text strong>Kích thước: </Text>
+                        <Text type="secondary">{(document.fileSize / 1024).toFixed(2)} KB</Text>
+                      </div>
+                    </Col>
+                    
+                    <Col span={12}>
+                      <div style={{ marginBottom: 12 }}>
+                        <Text strong>Người upload: </Text>
+                        <Text type="secondary">{document.uploadedBy}</Text>
+                      </div>
+                      
+                      <div style={{ marginBottom: 12 }}>
+                        <Text strong>Ngày tạo: </Text>
+                        <Text type="secondary">{new Date(document.createdAt).toLocaleString('vi-VN')}</Text>
+                      </div>
+                      
+                      <div style={{ marginBottom: 12 }}>
+                        <Text strong>Ngày cập nhật: </Text>
+                        <Text type="secondary">{new Date(document.updatedAt).toLocaleString('vi-VN')}</Text>
+                      </div>
+                      
+                      <div style={{ marginBottom: 12 }}>
+                        <Text strong>IPFS Hash: </Text>
+                        <code style={{ fontSize: '12px', background: '#f5f5f5', padding: '4px 8px', borderRadius: '4px' }}>
+                          {document.ipfsHash}
+                        </code>
+                      </div>
+                    </Col>
+                  </Row>
+                  
+                  <Divider />
+                  
+                  <div style={{ marginBottom: 12 }}>
+                    <Text strong>Mô tả: </Text>
+                    <Text type="secondary">
+                      {(() => {
+                        try {
+                          const parsed = JSON.parse(document.description || '{}');
+                          return parsed.originalDescription || 'Không có mô tả';
+                        } catch {
+                          return document.description || 'Không có mô tả';
+                        }
+                      })()}
+                    </Text>
+                  </div>
+                </div>
+              )
+            },
+            {
+              key: 'metadata',
+              label: 'Metadata IPFS',
+              children: (
+                <div style={{ padding: '16px 0' }}>
+                  {(() => {
+                    try {
+                      const parsed = JSON.parse(document.description || '{}');
+                      if (parsed.metadataHash) {
+                        return (
+                          <div>
+                            <div style={{ marginBottom: 16 }}>
+                              <Text strong>Metadata Hash: </Text>
+                              <code style={{ fontSize: '12px', background: '#f5f5f5', padding: '4px 8px', borderRadius: '4px' }}>
+                                {parsed.metadataHash}
+                              </code>
+                            </div>
+                            
+                            <div style={{ marginBottom: 16 }}>
+                              <Text strong>Ngày upload metadata: </Text>
+                              <Text type="secondary">
+                                {parsed.metadataUploadedAt ? new Date(parsed.metadataUploadedAt).toLocaleString('vi-VN') : 'Không có'}
+                              </Text>
+                            </div>
+                            
+                            <div style={{ marginBottom: 16 }}>
+                              <Text strong>Người upload metadata: </Text>
+                              <Text type="secondary">{parsed.metadataUploadedBy || 'Không có'}</Text>
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return <Text type="secondary">Không có metadata IPFS</Text>;
+                      }
+                    } catch {
+                      return <Text type="secondary">Không có metadata IPFS</Text>;
+                    }
+                  })()}
+                  
+                  <Divider />
+                  
+                  <div style={{ marginBottom: 12 }}>
+                    <Text strong>Hash file: </Text>
+                    <code style={{ fontSize: '12px', background: '#f5f5f5', padding: '4px 8px', borderRadius: '4px' }}>
+                      {document.ipfsHash}
+                    </code>
+                  </div>
+                </div>
+              )
+            },
+            {
+              key: 'analysis',
+              label: 'Phân tích tài liệu',
+              children: (
+                <div style={{ padding: '16px 0' }}>
+                  <Text type="secondary">Chức năng phân tích tài liệu sẽ được phát triển sau.</Text>
+                </div>
+              )
+            },
+            {
+              key: 'verification',
+              label: 'Xác thực tài liệu',
+              children: (
+                <div style={{ padding: '16px 0' }}>
+                  <div style={{ marginBottom: 12 }}>
+                    <Text strong>Trạng thái: </Text>
+                    <Tag color={document.verified ? 'green' : 'orange'}>
+                      {document.verified ? 'Đã xác thực' : 'Chờ xác thực'}
+                    </Tag>
+                  </div>
+                  
+                  {document.verified && (
+                    <>
+                      <div style={{ marginBottom: 12 }}>
+                        <Text strong>Người xác thực: </Text>
+                        <Text type="secondary">{document.verifiedBy || 'Không có'}</Text>
+                      </div>
+                      
+                      <div style={{ marginBottom: 12 }}>
+                        <Text strong>Ngày xác thực: </Text>
+                        <Text type="secondary">
+                          {document.verifiedAt && document.verifiedAt !== '0001-01-01T00:00:00Z' 
+                            ? new Date(document.verifiedAt).toLocaleString('vi-VN') 
+                            : 'Không có'}
+                        </Text>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            }
+          ]}
+        />
       )}
+
     </Modal>
   );
 };

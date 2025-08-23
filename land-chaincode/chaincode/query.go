@@ -407,9 +407,11 @@ func (s *LandRegistryChaincode) QueryDocumentsByKeyword(ctx contractapi.Transact
 
 	documents, err := s.getQueryResultForDocuments(ctx, queryString)
 	if err != nil {
-		return nil, err
+		log.Printf("Error executing document query: %v", err)
+		return nil, fmt.Errorf("lỗi khi thực hiện truy vấn tài liệu: %v", err)
 	}
 
+	log.Printf("Found %d documents", len(documents))
 	return documents, nil
 }
 
@@ -420,7 +422,7 @@ func (s *LandRegistryChaincode) QueryAllDocuments(ctx contractapi.TransactionCon
 		return nil, err
 	}
 
-	queryString := `{"selector":{"id":{"$exists":true},"type":{"$exists":true}}}`
+	queryString := `{"selector":{"docID":{"$exists":true,"$ne":""},"type":{"$exists":true,"$nin":["","LOG"]},"ipfsHash":{"$exists":true,"$ne":""}}}`
 	documents, err := s.getQueryResultForDocuments(ctx, queryString)
 	if err != nil {
 		return nil, err
@@ -439,80 +441,61 @@ func (s *LandRegistryChaincode) QueryVerifiedDocuments(ctx contractapi.Transacti
 	return s.QueryDocumentsByStatus(ctx, "verified", userID)
 }
 
-// QueryDocumentHistory - Truy vấn lịch sử tài liệu
-func (s *LandRegistryChaincode) QueryDocumentHistory(ctx contractapi.TransactionContextInterface, ipfsHash, userID string) ([]map[string]interface{}, error) {
-	// Truy vấn lịch sử của tài liệu trong các thửa đất
-	// Sử dụng query để tìm thửa đất có document chứa IPFS hash
-	queryString := fmt.Sprintf(`{"selector":{"documentIds":{"$elemMatch":{"$eq":"%s"}}}}`, ipfsHash)
-
-	lands, err := s.getQueryResultForLands(ctx, queryString)
+// QueryDocumentHistory - Truy vấn lịch sử thay đổi của tài liệu (sử dụng GetHistoryForKey)
+func (s *LandRegistryChaincode) QueryDocumentHistory(ctx contractapi.TransactionContextInterface, docID, userID string) ([]map[string]interface{}, error) {
+	// Kiểm tra quyền truy cập
+	mspID, err := GetCallerOrgMSP(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	// Kiểm tra xem tài liệu có tồn tại không
+	doc, err := GetDocument(ctx, docID)
+	if err != nil {
+		return nil, fmt.Errorf("tài liệu %s không tồn tại: %v", docID, err)
+	}
+
+	// Org3MSP chỉ có thể xem lịch sử tài liệu của chính mình
+	if mspID == "Org3MSP" && doc.UploadedBy != userID {
+		return nil, fmt.Errorf("người dùng %s không có quyền xem lịch sử tài liệu %s", userID, docID)
+	}
+
+	// Lấy lịch sử thay đổi của tài liệu sử dụng GetHistoryForKey
+	resultsIterator, err := ctx.GetStub().GetHistoryForKey(docID)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi lấy lịch sử tài liệu: %v", err)
+	}
+	defer resultsIterator.Close()
 
 	var history []map[string]interface{}
-	for _, land := range lands {
-		// Kiểm tra quyền truy cập cho Org3
-		mspID, err := GetCallerOrgMSP(ctx)
-		if err == nil && mspID == "Org3MSP" && land.OwnerID != userID {
-			continue // Bỏ qua nếu không phải chủ sở hữu
+	for resultsIterator.HasNext() {
+		response, err := resultsIterator.Next()
+		if err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc kết quả lịch sử: %v", err)
 		}
 
-		// Kiểm tra xem document có chứa IPFS hash không
-		for _, docID := range land.DocumentIDs {
-			doc, err := GetDocument(ctx, docID)
-			if err != nil {
-				continue
+		var docData Document
+		if len(response.Value) > 0 {
+			if err := json.Unmarshal(response.Value, &docData); err != nil {
+				return nil, fmt.Errorf("lỗi khi giải mã dữ liệu tài liệu: %v", err)
 			}
-			if doc.IPFSHash == ipfsHash {
-				history = append(history, map[string]interface{}{
-					"landParcelID": land.ID,
-					"ownerID":      land.OwnerID,
-					"ipfsHash":     ipfsHash,
-					"type":         "land",
-					"location":     land.Location,
-					"area":         land.Area,
-				})
-				break
-			}
+		} else {
+			docData = Document{DocID: docID}
 		}
+
+		historyEntry := map[string]interface{}{
+			"txId":        response.TxId,
+			"timestamp":   response.Timestamp,
+			"isDelete":    response.IsDelete,
+			"document":    docData,
+		}
+		history = append(history, historyEntry)
 	}
 
-	// Truy vấn lịch sử trong các giao dịch
-	queryString = fmt.Sprintf(`{"selector":{"documentIds":{"$elemMatch":{"$eq":"%s"}}}}`, ipfsHash)
-
-	transactions, err := s.getQueryResultForTransactions(ctx, queryString)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, tx := range transactions {
-		// Kiểm tra quyền truy cập cho Org3
-		mspID, err := GetCallerOrgMSP(ctx)
-		if err == nil && mspID == "Org3MSP" && tx.FromOwnerID != userID && tx.ToOwnerID != userID {
-			continue // Bỏ qua nếu không liên quan
-		}
-
-		// Kiểm tra xem document có chứa IPFS hash không
-		for _, docID := range tx.DocumentIDs {
-			doc, err := GetDocument(ctx, docID)
-			if err != nil {
-				continue
-			}
-			if doc.IPFSHash == ipfsHash {
-				history = append(history, map[string]interface{}{
-					"txID":        tx.TxID,
-					"type":        "transaction",
-					"txType":      tx.Type,
-					"fromOwnerID": tx.FromOwnerID,
-					"toOwnerID":   tx.ToOwnerID,
-					"ipfsHash":    ipfsHash,
-					"status":      tx.Status,
-					"lastUpdated": tx.UpdatedAt,
-				})
-				break
-			}
-		}
+	// Ghi log giao dịch
+	logDetails := fmt.Sprintf("Truy vấn lịch sử tài liệu %s", docID)
+	if err := RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_DOCUMENT_HISTORY", userID, logDetails); err != nil {
+		log.Printf("Lỗi khi ghi log giao dịch: %v", err)
 	}
 
 	return history, nil
@@ -887,24 +870,39 @@ func buildQueryStringForTransactions(keyword string, filters map[string]string, 
 func buildQueryStringForDocuments(keyword string, filters map[string]string, userID, mspID string) string {
 	selector := map[string]interface{}{}
 
-	if keyword != "" {
-		// Tìm kiếm theo từ khóa trong các trường liên quan
-		searchConditions := []map[string]interface{}{
-			{"id": map[string]interface{}{"$regex": keyword}},
-			{"title": map[string]interface{}{"$regex": keyword}},
-			{"description": map[string]interface{}{"$regex": keyword}},
-		}
-		selector["$or"] = searchConditions
-	}
+	// Luôn lọc ra các bản ghi trống và LOG entries
+	selector["docID"] = map[string]interface{}{"$exists": true, "$ne": ""}
+	selector["type"] = map[string]interface{}{"$exists": true, "$nin": []string{"", "LOG"}}
+	selector["ipfsHash"] = map[string]interface{}{"$exists": true, "$ne": ""}
 
 	// Áp dụng các bộ lọc bổ sung
 	for key, value := range filters {
-		selector[key] = value
+		// Handle boolean fields
+		if key == "verified" {
+			if value == "true" {
+				selector[key] = true
+			} else if value == "false" {
+				selector[key] = false
+			}
+		} else {
+			selector[key] = value
+		}
 	}
 
 	// Áp dụng kiểm soát truy cập theo tổ chức
 	if mspID == "Org3MSP" {
 		selector["uploadedBy"] = userID
+	}
+
+	// Nếu có keyword, thêm search conditions
+	if keyword != "" {
+		// Tìm kiếm theo từ khóa trong các trường liên quan
+		searchConditions := []map[string]interface{}{
+			{"docID": map[string]interface{}{"$regex": keyword}},
+			{"title": map[string]interface{}{"$regex": keyword}},
+			{"description": map[string]interface{}{"$regex": keyword}},
+		}
+		selector["$or"] = searchConditions
 	}
 
 	queryBytes, _ := json.Marshal(map[string]interface{}{
@@ -987,6 +985,12 @@ func (s *LandRegistryChaincode) getQueryResultForDocuments(ctx contractapi.Trans
 			log.Printf("Lỗi khi giải mã tài liệu: %v", err)
 			continue
 		}
+		
+		// Lọc ra các bản ghi trống và LOG entries
+		if doc.DocID == "" || doc.Type == "" || doc.Type == "LOG" || doc.IPFSHash == "" {
+			continue
+		}
+		
 		documents = append(documents, &doc)
 	}
 

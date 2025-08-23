@@ -2,114 +2,28 @@ import apiClient, { API_ENDPOINTS, handleApiError } from './api';
 
 // Notification Service - Handles all notification operations
 const notificationService = {
-  // WebSocket connection
-  ws: null,
-  reconnectAttempts: 0,
-  maxReconnectAttempts: 5,
-  reconnectDelay: 1000,
-
-  // Initialize WebSocket connection
+  // WebSocket removed - using polling instead
+  
+  // Initialize WebSocket connection (disabled)
   initializeWebSocket(userId, onMessage, onError, onClose) {
-    try {
-      const baseHttp = apiClient.defaults.baseURL || '';
-      const wsBase = (process.env.REACT_APP_WS_URL) 
-        ? process.env.REACT_APP_WS_URL
-        : baseHttp.replace(/^http/, 'ws');
-      const wsUrl = `${wsBase}${API_ENDPOINTS.WS.NOTIFICATIONS}`;
-      const token = localStorage.getItem('jwt_token');
-      
-      if (!token) {
-        console.warn('No JWT token available for WebSocket connection');
-        onError(new Error('No authentication token'));
-        return;
-      }
-      
-      this.ws = new WebSocket(`${wsUrl}?token=${token}`);
-
-      this.ws.onopen = () => {
-        console.log('WebSocket connected');
-        this.reconnectAttempts = 0;
-        
-        // Subscribe to notifications
-        this.subscribe(userId);
-      };
-
-      this.ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          onMessage(data);
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-        }
-      };
-
-      this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        onError(error);
-      };
-
-      this.ws.onclose = (event) => {
-        console.log('WebSocket closed:', event.code, event.reason);
-        onClose(event);
-        
-        // Attempt to reconnect if not manually closed
-        if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
-          this.attemptReconnect(userId, onMessage, onError, onClose);
-        }
-      };
-
-    } catch (error) {
-      console.error('Failed to initialize WebSocket:', error);
-      onError(error);
-    }
+    console.log('WebSocket disabled - using polling instead');
+    // Call onMessage with empty data to indicate WebSocket is disabled
+    onMessage({ type: 'WEBSOCKET_DISABLED', data: null });
   },
 
-  // Attempt to reconnect WebSocket
-  attemptReconnect(userId, onMessage, onError, onClose) {
-    this.reconnectAttempts++;
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-    
-    console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-    
-    setTimeout(() => {
-      this.initializeWebSocket(userId, onMessage, onError, onClose);
-    }, delay);
-  },
-
-  // Close WebSocket connection
+  // Close WebSocket connection (disabled)
   closeWebSocket() {
-    if (this.ws) {
-      this.ws.close(1000, 'User logout');
-      this.ws = null;
-    }
+    console.log('WebSocket disabled - using polling instead');
   },
 
-  // Subscribe to notifications
+  // Subscribe to notifications (disabled)
   async subscribe(userId) {
-    try {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({
-          type: 'subscribe',
-          userId: userId
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to subscribe to notifications:', error);
-    }
+    console.log('WebSocket disabled - using polling instead');
   },
 
-  // Unsubscribe from notifications
+  // Unsubscribe from notifications (disabled)
   async unsubscribe(userId) {
-    try {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({
-          type: 'unsubscribe',
-          userId: userId
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to unsubscribe from notifications:', error);
-    }
+    console.log('WebSocket disabled - using polling instead');
   },
 
   // Get all notifications

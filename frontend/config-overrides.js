@@ -17,7 +17,7 @@ module.exports = function override(config, env) {
     "assert": require.resolve("assert")
   };
 
-  // Add plugins for global polyfills
+  // Adds plugins for global polyfills
   config.plugins = [
     ...config.plugins,
     new (require('webpack')).ProvidePlugin({
@@ -27,4 +27,16 @@ module.exports = function override(config, env) {
   ];
 
   return config;
+};
+
+// Override dev server configuration
+module.exports.devServer = function(configFunction) {
+  return function(proxy, allowedHost) {
+    const config = configFunction(proxy, allowedHost);
+    
+    // Fix allowedHosts issue
+    config.allowedHosts = ['localhost', '127.0.0.1'];
+    
+    return config;
+  };
 };

@@ -67,8 +67,16 @@ const documentService = {
         params: searchParams
       });
       console.log('searchDocuments response:', response);
-      // Backend returns { success: true, data: [...] }
-      return response.data.data || response.data;
+      // Backend returns { success: true, data: [...] } or { success: true, data: {documents: [...]} }
+      const data = response.data.data || response.data;
+      // Đảm bảo luôn trả về array
+      if (Array.isArray(data)) {
+        return data;
+      } else if (data && Array.isArray(data.documents)) {
+        return data.documents;
+      } else {
+        return [];
+      }
     } catch (error) {
       console.error('searchDocuments error:', error);
       throw new Error(error.response?.data?.message || 'Lỗi khi tìm kiếm');
@@ -146,10 +154,10 @@ const documentService = {
   },
 
   // Get document history
-  async getDocumentHistory(ipfsHash) {
+  async getDocumentHistory(docID) {
     try {
-      console.log('Calling getDocumentHistory API for:', ipfsHash);
-      const url = API_ENDPOINTS.DOCUMENT.GET_HISTORY.replace(':ipfsHash', ipfsHash);
+      console.log('Calling getDocumentHistory API for:', docID);
+      const url = API_ENDPOINTS.DOCUMENT.GET_HISTORY.replace(':docID', docID);
       const response = await apiClient.get(url);
       console.log('getDocumentHistory response:', response);
       return response.data.data || response.data;

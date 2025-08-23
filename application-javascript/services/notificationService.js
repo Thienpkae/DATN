@@ -3,19 +3,7 @@ const User = require('../models/User');
 
 class NotificationService {
     constructor() {
-        this.wsClients = new Map(); // Store WebSocket connections
-    }
-
-    // Register WebSocket client
-    registerClient(userId, ws) {
-        this.wsClients.set(userId, ws);
-        console.log(`📱 User ${userId} connected for notifications`);
-    }
-
-    // Unregister WebSocket client
-    unregisterClient(userId) {
-        this.wsClients.delete(userId);
-        console.log(`📱 User ${userId} disconnected from notifications`);
+        // WebSocket removed - using polling instead
     }
 
     // Main method to create and send notification
@@ -253,34 +241,10 @@ class NotificationService {
         }
     }
 
-    // Send real-time notification via WebSocket
+    // Send notification (WebSocket removed - using polling instead)
     async sendRealTimeNotification(userId, notification) {
-        const client = this.wsClients.get(userId);
-        
-        if (client && client.readyState === 1) { // WebSocket.OPEN
-            try {
-                const notificationData = {
-                    id: notification._id,
-                    type: notification.type,
-                    title: notification.title,
-                    message: notification.message,
-                    priority: notification.priority,
-                    actionUrl: notification.actionUrl,
-                    createdAt: notification.createdAt
-                };
-
-                client.send(JSON.stringify({
-                    type: 'NOTIFICATION',
-                    data: notificationData
-                }));
-
-                console.log(`📤 Real-time notification sent to user ${userId}`);
-            } catch (error) {
-                console.error(`❌ Error sending real-time notification to ${userId}:`, error);
-                // Remove failed connection
-                this.unregisterClient(userId);
-            }
-        }
+        // WebSocket removed - notifications will be fetched via API polling
+        console.log(`📤 Notification created for user ${userId}: ${notification.title}`);
     }
 
     // Notify multiple users

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Badge } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined, FileTextOutlined, LinkOutlined, DownloadOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, FileTextOutlined, LinkOutlined, DownloadOutlined, ClearOutlined } from '@ant-design/icons';
 import documentService from '../../../services/documentService';
 import ipfsService from '../../../services/ipfs';
 
@@ -9,12 +9,14 @@ const { Option } = Select;
 const DocumentManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [documents, setDocuments] = useState([]);
-  const [filters, setFilters] = useState({
+  const defaultFilters = {
     keyword: '',
     docType: undefined,
     status: undefined,
     fileType: undefined
-  });
+  };
+  
+  const [filters, setFilters] = useState(defaultFilters);
   const [detailOpen, setDetailOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -36,6 +38,32 @@ const DocumentManagementPage = () => {
 
   useEffect(() => {
     loadList();
+    
+    // Listen for document creation, update and delete events to auto-refresh
+    const handleDocumentCreated = () => {
+      console.log('Document created event received, refreshing list...');
+      loadList();
+    };
+    
+    const handleDocumentUpdated = () => {
+      console.log('Document updated event received, refreshing list...');
+      loadList();
+    };
+    
+    const handleDocumentDeleted = () => {
+      console.log('Document deleted event received, refreshing list...');
+      loadList();
+    };
+    
+    window.addEventListener('documentCreated', handleDocumentCreated);
+    window.addEventListener('documentUpdated', handleDocumentUpdated);
+    window.addEventListener('documentDeleted', handleDocumentDeleted);
+    
+    return () => {
+      window.removeEventListener('documentCreated', handleDocumentCreated);
+      window.removeEventListener('documentUpdated', handleDocumentUpdated);
+      window.removeEventListener('documentDeleted', handleDocumentDeleted);
+    };
   }, []);
 
   const onSearch = async () => {
@@ -69,6 +97,11 @@ const DocumentManagementPage = () => {
       message.success('Liên kết tài liệu thành công');
       setLinkOpen(false);
       loadList();
+      
+      // Dispatch custom event to notify other pages to refresh
+      window.dispatchEvent(new CustomEvent('documentUpdated', {
+        detail: { documentId: values.docID }
+      }));
     } catch (e) {
       message.error(e.message || 'Liên kết thất bại');
     } finally {
@@ -176,6 +209,10 @@ const DocumentManagementPage = () => {
             ))}
           </Select>
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
+          <Button icon={<ClearOutlined />} onClick={() => {
+            setFilters(defaultFilters);
+            loadList();
+          }}>Reset</Button>
           <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
         </Space>
       }

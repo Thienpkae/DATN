@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Badge,
   Dropdown,
@@ -35,8 +35,6 @@ const NotificationCenter = () => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [wsConnected, setWsConnected] = useState(false);
-  const wsRef = useRef(null);
 
   useEffect(() => {
     if (user?.cccd) {
@@ -47,8 +45,7 @@ const NotificationCenter = () => {
           // Get initial notifications
           await fetchNotifications();
           
-          // Initialize WebSocket for real-time notifications
-          functionsRef.current.initializeWebSocket();
+          // WebSocket disabled - using polling instead
           
         } catch (error) {
           console.error('Error initializing notifications:', error);
@@ -61,9 +58,7 @@ const NotificationCenter = () => {
       init();
     }
     return () => {
-      if (wsRef.current) {
-        notificationService.closeWebSocket();
-      }
+      // WebSocket disabled - using polling instead
     };
   }, [user?.cccd]);
 
@@ -72,80 +67,51 @@ const NotificationCenter = () => {
   const fetchNotifications = async () => {
     try {
       const response = await notificationService.getUserNotifications();
-      if (response.success) {
-        setNotifications(response.data.notifications || []);
-        setUnreadCount(response.data.pagination?.unreadCount || 0);
+      
+      if (response.success && response.data) {
+        // Handle different response structures
+        const notificationsData = response.data.notifications || response.data || [];
+        const unreadCountData = response.data.pagination?.unreadCount || (Array.isArray(notificationsData) ? notificationsData.filter(n => !n.read).length : 0);
+        
+        setNotifications(Array.isArray(notificationsData) ? notificationsData : []);
+        setUnreadCount(unreadCountData);
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
   };
 
-  const handleWebSocketMessage = useCallback((data) => {
-    const type = (data?.type || '').toUpperCase();
-    if (type === 'CONNECTION_ESTABLISHED') {
-      setWsConnected(true);
-      return;
-    }
-    if (type === 'NOTIFICATION' && data.data) {
-      const notif = data.data;
-      setNotifications(prev => [notif, ...prev]);
-      setUnreadCount(prev => prev + 1);
-      message.info(notif.message);
-      return;
-    }
-    if (type === 'UNREADCOUNT' && typeof data.count === 'number') {
-      setUnreadCount(data.count);
-      return;
-    }
-  }, []);
-
-  const handleWebSocketError = useCallback((error) => {
-    console.error('WebSocket error:', error);
-    setWsConnected(false);
-  }, []);
-
-  const handleWebSocketClose = useCallback((event) => {
-    console.log('WebSocket closed:', event);
-    setWsConnected(false);
-    
-    // Attempt to reconnect after a delay
-    setTimeout(() => {
-      if (user?.cccd) {
-        functionsRef.current.initializeWebSocket();
+  // Polling for notifications instead of WebSocket
+  const pollNotifications = useCallback(async () => {
+    try {
+      const response = await notificationService.getUserNotifications();
+      
+      if (response.success && response.data) {
+        // Handle different response structures
+        const notificationsData = response.data.notifications || response.data || [];
+        const unreadCountData = response.data.pagination?.unreadCount || (Array.isArray(notificationsData) ? notificationsData.filter(n => !n.read).length : 0);
+        
+        setNotifications(Array.isArray(notificationsData) ? notificationsData : []);
+        setUnreadCount(unreadCountData);
       }
-    }, 5000);
-  }, [user?.cccd]);
+    } catch (error) {
+      console.error('Error polling notifications:', error);
+    }
+  }, []);
 
-  const initializeWebSocket = useCallback(() => {
-    if (!user?.cccd) return;
-
-    notificationService.initializeWebSocket(
-      user.cccd,
-      handleWebSocketMessage,
-      handleWebSocketError,
-      handleWebSocketClose
-    );
-    wsRef.current = true;
-  }, [user?.cccd, handleWebSocketMessage, handleWebSocketError, handleWebSocketClose]);
-
-  // Store functions in refs to avoid dependency issues
-  const functionsRef = useRef({
-    initializeWebSocket,
-    handleWebSocketMessage,
-    handleWebSocketError,
-    handleWebSocketClose
-  });
-
-  // Update refs when functions change
+  // Poll every 30 seconds (disable on notifications page)
   useEffect(() => {
-    functionsRef.current = {
-      initializeWebSocket,
-      handleWebSocketMessage,
-      handleWebSocketError,
-      handleWebSocketClose
-    };
-  }, [initializeWebSocket, handleWebSocketMessage, handleWebSocketError, handleWebSocketClose]);
+    // Don't poll if we're on the notifications page
+    const isNotificationsPage = window.location.pathname === '/notifications';
+    if (isNotificationsPage) return;
+    
+    const interval = setInterval(pollNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [pollNotifications]);
+
+  // WebSocket functions removed - using polling instead
+
+  // WebSocket refs removed - using polling instead
 
   const handleMarkAsRead = async (notificationId) => {
     try {
@@ -292,14 +258,14 @@ const NotificationCenter = () => {
           <div style={{ textAlign: 'center', padding: '20px' }}>
             <Spin />
           </div>
-        ) : notifications.length === 0 ? (
+        ) : !Array.isArray(notifications) || notifications.length === 0 ? (
           <Empty
             description="Không có thông báo nào"
             style={{ padding: '20px', background: 'transparent' }}
           />
         ) : (
           <List
-            dataSource={notifications.slice(0, 10)}
+            dataSource={Array.isArray(notifications) ? notifications.slice(0, 10) : []}
             renderItem={(notification) => (
               <List.Item
                 style={{
@@ -353,7 +319,7 @@ const NotificationCenter = () => {
         )}
       </div>
 
-      {notifications.length > 10 && (
+      {Array.isArray(notifications) && notifications.length > 10 && (
         <div
           style={{
             padding: '12px 16px',
@@ -387,9 +353,9 @@ const NotificationCenter = () => {
           icon={<BellOutlined />}
           style={{
             fontSize: '18px',
-            color: wsConnected ? token.colorPrimary : token.colorTextTertiary
+            color: token.colorPrimary
           }}
-          title={wsConnected ? 'Thông báo (Đã kết nối)' : 'Thông báo (Đang kết nối...)'}
+          title="Thông báo (Polling mode)"
         />
       </Badge>
     </Dropdown>

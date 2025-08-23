@@ -20,7 +20,7 @@ type Land struct {
 
 // Document định nghĩa tài liệu độc lập
 type Document struct {
-	ID          string    `json:"id"`          // Mã tài liệu
+	DocID       string    `json:"docID"`       // Mã tài liệu
 	Type        string    `json:"type"`        // Loại tài liệu (CERTIFICATE, CONTRACT, MAP, OTHER)
 	Title       string    `json:"title"`       // Tiêu đề tài liệu
 	Description string    `json:"description"` // Mô tả tài liệu

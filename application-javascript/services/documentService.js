@@ -8,7 +8,7 @@ const documentService = {
     // Create document
     async createDocument(req, res) {
         try {
-            const { docID, docType, title, description, ipfsHash, metadataHash, fileType, fileSize } = req.body;
+            const { docID, docType, title, description, ipfsHash, metadataHash, fileType, fileSize, verified } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
@@ -43,7 +43,9 @@ const documentService = {
                 finalDescription,
                 ipfsHash,
                 fileType,
-                fileSize || 0
+                fileSize || 0,
+                verified || false,
+                verified ? userID : ''
             );
 
             // Send notification to user
@@ -504,14 +506,34 @@ const documentService = {
     // Search documents by keyword
     async searchDocuments(req, res) {
         try {
-            const { keyword } = req.query;
-            const { filters } = req.query;
+            const { keyword, filters, ...otherParams } = req.query;
             const userID = req.user.cccd;
             const org = req.user.org;
 
             const { contract } = await connectToNetwork(org, userID);
             
-            const filtersJSON = filters ? JSON.stringify(filters) : '{}';
+            // Build filters object from query params
+            let filtersObj = {};
+            
+            // If filters is provided as a string, try to parse it
+            if (filters) {
+                try {
+                    filtersObj = JSON.parse(filters);
+                } catch (e) {
+                    console.log('Invalid filters JSON, ignoring:', filters);
+                }
+            }
+            
+            // Add other query params as filters
+            Object.keys(otherParams).forEach(key => {
+                if (otherParams[key] !== undefined && otherParams[key] !== '') {
+                    filtersObj[key] = otherParams[key];
+                }
+            });
+            
+            const filtersJSON = JSON.stringify(filtersObj);
+            console.log('Final filters JSON:', filtersJSON);
+            
             const result = await contract.evaluateTransaction(
                 'QueryDocumentsByKeyword',
                 keyword || '',
@@ -519,7 +541,22 @@ const documentService = {
                 userID
             );
 
-            const documents = JSON.parse(result.toString());
+            console.log('Raw chaincode result:', result.toString());
+            
+            let documents;
+            try {
+                const resultString = result.toString();
+                if (!resultString || resultString.trim() === '') {
+                    console.log('Empty response from chaincode, returning empty array');
+                    documents = [];
+                } else {
+                    documents = JSON.parse(resultString);
+                }
+            } catch (parseError) {
+                console.error('JSON parse error:', parseError);
+                console.error('Raw result:', result.toString());
+                throw new Error('Invalid response from chaincode: ' + parseError.message);
+            }
             
             res.json({
                 success: true,
@@ -690,7 +727,7 @@ const documentService = {
     // Get document history
     async getDocumentHistory(req, res) {
         try {
-            const { ipfsHash } = req.params;
+            const { docID } = req.params;
             const userID = req.user.cccd;
             const org = req.user.org;
 
@@ -698,7 +735,7 @@ const documentService = {
 
             const result = await contract.evaluateTransaction(
                 'QueryDocumentHistory',
-                ipfsHash,
+                docID,
                 userID
             );
 

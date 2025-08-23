@@ -48,7 +48,7 @@ export const API_ENDPOINTS = {
     GET_BY_LAND: '/documents/land-parcel/:landParcelID',
     GET_BY_TRANSACTION: '/documents/transaction/:txID',
     GET_BY_UPLOADER: '/documents/uploader/:uploaderID',
-    GET_HISTORY: '/documents/history/:ipfsHash',
+    GET_HISTORY: '/documents/history/:docID',
     VERIFY: '/documents/:docID/verify',
     REJECT: '/documents/:docID/reject',
     ANALYZE: '/documents/:docID/analyze',

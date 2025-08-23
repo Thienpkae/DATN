@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Divider } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined, CheckCircleOutlined, ForwardOutlined, HistoryOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, CheckCircleOutlined, ForwardOutlined, HistoryOutlined, ClearOutlined } from '@ant-design/icons';
 import transactionService from '../../../services/transactionService';
 
 const { Option } = Select;
@@ -9,11 +9,13 @@ const { Option } = Select;
 const TransactionManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState([]);
-  const [filters, setFilters] = useState({
+  const defaultFilters = {
     keyword: '',
     type: undefined,
     status: undefined
-  });
+  };
+  
+  const [filters, setFilters] = useState(defaultFilters);
   const [detailOpen, setDetailOpen] = useState(false);
   const [processOpen, setProcessOpen] = useState(false);
   const [forwardOpen, setForwardOpen] = useState(false);
@@ -197,6 +199,10 @@ const TransactionManagementPage = () => {
             <Option value="SUPPLEMENT_REQUESTED">Yêu cầu bổ sung</Option>
           </Select>
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
+          <Button icon={<ClearOutlined />} onClick={() => {
+            setFilters(defaultFilters);
+            loadList();
+          }}>Reset</Button>
           <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
         </Space>
       }

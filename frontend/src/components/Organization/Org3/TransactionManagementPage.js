@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Divider, Tabs } from 'antd';
-import { PlusOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, CheckCircleOutlined, HistoryOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, CheckCircleOutlined, HistoryOutlined, ClearOutlined } from '@ant-design/icons';
 import transactionService from '../../../services/transactionService';
 import authService from '../../../services/auth';
 
@@ -11,11 +11,13 @@ const { TabPane } = Tabs;
 const TransactionManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState([]);
-  const [filters, setFilters] = useState({
+  const defaultFilters = {
     keyword: '',
     type: undefined,
     status: undefined
-  });
+  };
+  
+  const [filters, setFilters] = useState(defaultFilters);
   const [createOpen, setCreateOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -339,6 +341,14 @@ const TransactionManagementPage = () => {
           </Select>
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
           <Button icon={<ReloadOutlined />} onClick={() => activeTab === 'my' ? loadMyTransactions() : loadAllTransactions()}>Tải lại</Button>
+          <Button icon={<ClearOutlined />} onClick={() => {
+            setFilters(defaultFilters);
+            if (activeTab === 'my') {
+              loadMyTransactions();
+            } else {
+              loadAllTransactions();
+            }
+          }}>Reset</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>Tạo giao dịch</Button>
         </Space>
       }
