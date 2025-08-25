@@ -763,7 +763,7 @@ const transactionService = {
             console.error('Error getting transactions by owner:', error);
             res.status(500).json({
                 success: false,
-                message: 'Lỗi khi lấy giao dịch theo chủ sở hữu',
+                message: 'Lỗi khi lấy giao dịch theo chủ sử dụng',
                 error: error.message
             });
         }

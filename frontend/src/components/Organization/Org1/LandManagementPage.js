@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tabs, List, Typography, Tooltip, Upload, Alert, Divider, InputNumber } from 'antd';
-import { PlusOutlined, EditOutlined, SearchOutlined, ReloadOutlined, HistoryOutlined, FileDoneOutlined, EyeOutlined, LinkOutlined, FileTextOutlined, UploadOutlined, ClearOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, SearchOutlined, ReloadOutlined, HistoryOutlined, FileDoneOutlined, EyeOutlined, LinkOutlined, FileTextOutlined, UploadOutlined } from '@ant-design/icons';
 import landService from '../../../services/landService';
 import documentService from '../../../services/documentService';
 import ipfsService from '../../../services/ipfs';
@@ -344,13 +344,9 @@ const LandManagementPage = () => {
                 <Option key={key} value={key}>{key} - {value}</Option>
               ))}
             </Select>
-            <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
-            <Button icon={<ClearOutlined />} onClick={() => {
-              setFilters(defaultFilters);
-              loadList();
-            }}>Reset</Button>
-            <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>Tạo thửa đất</Button>
+                      <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
+          <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>Tạo thửa đất</Button>
           </Space>
         }
       >

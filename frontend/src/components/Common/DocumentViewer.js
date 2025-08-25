@@ -3,6 +3,7 @@ import { Modal, Tag, Button, Space, message, Alert, Typography, Tabs, Row, Col, 
 import { DownloadOutlined, FileTextOutlined, EyeOutlined } from '@ant-design/icons';
 import documentService from '../../services/documentService';
 import ipfsService from '../../services/ipfs';
+import OnlineDocumentViewer from './OnlineDocumentViewer';
 
 const { Text } = Typography;
 
@@ -15,6 +16,7 @@ const DocumentViewer = ({
   const [loading, setLoading] = useState(false);
   const [document, setDocument] = useState(null);
   const [error, setError] = useState(null);
+  const [onlineViewerOpen, setOnlineViewerOpen] = useState(false);
 
   const loadDocument = useCallback(async () => {
     try {
@@ -53,13 +55,7 @@ const DocumentViewer = ({
   };
 
   const handleViewOnline = () => {
-    if (!document?.ipfsHash) {
-      message.error('Không có hash IPFS để xem file');
-      return;
-    }
-    
-    const url = ipfsService.getPinataFileUrl(document.ipfsHash);
-    window.open(url, '_blank');
+    setOnlineViewerOpen(true);
   };
 
 
@@ -88,7 +84,7 @@ const DocumentViewer = ({
           </Button>
         ),
         document?.ipfsHash && (
-          <Button key="download" type="primary" icon={<DownloadOutlined />} onClick={handleDownload}>
+          <Button key="download" icon={<DownloadOutlined />} onClick={handleDownload}>
             Tải về
           </Button>
         )
@@ -293,6 +289,12 @@ const DocumentViewer = ({
         />
       )}
 
+      {/* Online Document Viewer */}
+      <OnlineDocumentViewer
+        visible={onlineViewerOpen}
+        onCancel={() => setOnlineViewerOpen(false)}
+        document={document}
+      />
     </Modal>
   );
 };

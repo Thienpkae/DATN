@@ -70,7 +70,7 @@ func ValidateLand(ctx contractapi.TransactionContextInterface, land Land, isUpda
 		return fmt.Errorf("diện tích thửa đất phải lớn hơn 0")
 	}
 	if land.OwnerID == "" {
-		return fmt.Errorf("CCCD chủ sở hữu không được để trống")
+		return fmt.Errorf("CCCD chủ sử dụng không được để trống")
 	}
 	if land.Location == "" {
 		return fmt.Errorf("vị trí thửa đất không được để trống")

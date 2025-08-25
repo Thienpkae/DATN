@@ -244,11 +244,11 @@ const documentService = {
   },
 
   // Verify document
-  async verifyDocument(docID, verifiedBy) {
+  async verifyDocument(docID, notes) {
     try {
-      console.log('Calling verifyDocument API for:', docID, 'by:', verifiedBy);
+      console.log('Calling verifyDocument API for:', docID, 'notes:', notes);
       const url = API_ENDPOINTS.DOCUMENT.VERIFY.replace(':docID', docID);
-      const response = await apiClient.put(url, { verifiedBy });
+      const response = await apiClient.post(url, { notes });
       console.log('verifyDocument response:', response);
       return response.data;
     } catch (error) {
@@ -258,11 +258,11 @@ const documentService = {
   },
 
   // Reject document
-  async rejectDocument(docID, rejectedBy, reason) {
+  async rejectDocument(docID, reason) {
     try {
-      console.log('Calling rejectDocument API for:', docID, 'by:', rejectedBy, 'reason:', reason);
+      console.log('Calling rejectDocument API for:', docID, 'reason:', reason);
       const url = API_ENDPOINTS.DOCUMENT.REJECT.replace(':docID', docID);
-      const response = await apiClient.put(url, { rejectedBy, reason });
+      const response = await apiClient.post(url, { reason });
       console.log('rejectDocument response:', response);
       return response.data;
     } catch (error) {
@@ -272,11 +272,12 @@ const documentService = {
   },
 
   // Analyze document
-  async analyzeDocument(docID) {
+  async analyzeDocument(docID, useGemini = false) {
     try {
-      console.log('Calling analyzeDocument API for:', docID);
+      console.log('Calling analyzeDocument API for:', docID, 'Use Gemini:', useGemini);
       const url = API_ENDPOINTS.DOCUMENT.ANALYZE.replace(':docID', docID);
-      const response = await apiClient.post(url);
+      const params = useGemini ? { useGemini: 'true' } : {};
+      const response = await apiClient.get(url, { params });
       console.log('analyzeDocument response:', response);
       return response.data;
     } catch (error) {
@@ -478,6 +479,34 @@ const documentService = {
       'XLSX',
       'TXT'
     ];
+  },
+
+  // Get current user information
+  async getCurrentUser() {
+    try {
+      console.log('Calling getCurrentUser API...');
+      const response = await apiClient.get(API_ENDPOINTS.USER.GET_CURRENT);
+      console.log('getCurrentUser response:', response);
+      return response.data.data || response.data;
+    } catch (error) {
+      console.error('getCurrentUser error:', error);
+      throw new Error(error.response?.data?.message || 'Lỗi khi lấy thông tin người dùng hiện tại');
+    }
+  },
+
+  // Get land information by LandID
+  async getLandByID(landID) {
+    try {
+      console.log('Calling getLandByID API for:', landID);
+      const url = API_ENDPOINTS.LAND.GET_BY_ID.replace(':landID', landID);
+      const response = await apiClient.get(url);
+      console.log('getLandByID response:', response);
+      return response.data.data || response.data;
+    } catch (error) {
+      console.error('getLandByID error:', error);
+      // Return null if land not found, don't throw error
+      return null;
+    }
   }
 };
 

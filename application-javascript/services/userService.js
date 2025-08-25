@@ -136,10 +136,40 @@ const updateUser = async (req, res) => {
     }
 };
 
+const getCurrentUser = async (req, res) => {
+    try {
+        const { cccd, org, role } = req.user;
+        
+        // Lấy thông tin chi tiết của user hiện tại
+        const user = await User.findOne({ cccd }).select('-password -otp -otpExpires');
+        if (!user) {
+            return res.status(404).json({ error: 'Không tìm thấy người dùng' });
+        }
+        
+        res.json({
+            success: true,
+            data: {
+                cccd: user.cccd,
+                name: user.fullName,
+                org: user.org,
+                role: user.role,
+                phone: user.phone,
+                isPhoneVerified: user.isPhoneVerified,
+                isLocked: user.isLocked,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: `Lấy thông tin người dùng hiện tại thất bại: ${error.message}` });
+    }
+};
+
 module.exports = {
     getUsers,
     getProfile,
     updateProfile,
     getUserByCCCD,
-    updateUser
+    updateUser,
+    getCurrentUser
 };

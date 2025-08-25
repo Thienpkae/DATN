@@ -352,10 +352,10 @@ Hệ thống quản lý đất đai sử dụng công nghệ blockchain để đ
 | **Tên chức năng** | Đăng ký thông tin thửa đất mới vào hệ thống |
 | **Tác nhân** | Cán bộ Sở Tài nguyên & Môi trường (Org1) |
 | **Mục đích** | Ghi nhận quyền sử dụng đất hợp pháp vào blockchain |
-| **Tiền điều kiện** | - Cán bộ đã đăng nhập với quyền Org1<br/>- Có đầy đủ hồ sơ pháp lý của thửa đất<br/>- Chủ sở hữu đã có tài khoản trong hệ thống |
-| **Kết quả đạt được** | - Thửa đất được tạo thành công với mã số duy nhất<br/>- Thông tin được lưu trữ bất biến trên blockchain<br/>- Chủ sở hữu nhận thông báo về thửa đất mới<br/>- Giấy chứng nhận quyền sử dụng đất được cấp (nếu có) |
+| **Tiền điều kiện** | - Cán bộ đã đăng nhập với quyền Org1<br/>- Có đầy đủ hồ sơ pháp lý của thửa đất<br/>- chủ sử dụng đã có tài khoản trong hệ thống |
+| **Kết quả đạt được** | - Thửa đất được tạo thành công với mã số duy nhất<br/>- Thông tin được lưu trữ bất biến trên blockchain<br/>- chủ sử dụng nhận thông báo về thửa đất mới<br/>- Giấy chứng nhận quyền sử dụng đất được cấp (nếu có) |
 | **Quy trình thực hiện** | 1. Cán bộ nhập thông tin thửa đất: ID, người sử dụng đất (CCCD), vị trí, mục đích sử dụng, trạng thái pháp lý, diện tích<br/>2. Cán bộ có thể nhập thông tin giấy chứng nhận: mã GCN (IPFS hash), thông tin pháp lý<br/>3. Hệ thống kiểm tra tính hợp lệ của thông tin theo quy tắc nghiệp vụ<br/>4. Hệ thống tạo thửa đất với thông tin cơ bản và danh sách tài liệu rỗng<br/>5. Hệ thống lưu thông tin thửa đất vào blockchain<br/>6. Hệ thống gửi thông báo cho người sử dụng đất<br/>7. Hệ thống trả về thông tin thửa đất đã tạo thành công |
-| **Trường hợp ngoại lệ** | - ID thửa đất đã tồn tại: Hệ thống thông báo "Thửa đất đã tồn tại"<br/>- Chủ sở hữu không tồn tại: Hệ thống yêu cầu đăng ký người sử dụng đất trước<br/>- Thông tin không hợp lệ: Hệ thống hiển thị lỗi chi tiết để sửa<br/>- Có mã GCN nhưng thiếu thông tin pháp lý: Hệ thống yêu cầu bổ sung |
+| **Trường hợp ngoại lệ** | - ID thửa đất đã tồn tại: Hệ thống thông báo "Thửa đất đã tồn tại"<br/>- chủ sử dụng không tồn tại: Hệ thống yêu cầu đăng ký người sử dụng đất trước<br/>- Thông tin không hợp lệ: Hệ thống hiển thị lỗi chi tiết để sửa<br/>- Có mã GCN nhưng thiếu thông tin pháp lý: Hệ thống yêu cầu bổ sung |
 | **Quy tắc nghiệp vụ** | - Mỗi thửa đất có ID duy nhất trong toàn hệ thống<br/>- Diện tích phải lớn hơn 0 và được ghi bằng mét vuông<br/>- Mục đích sử dụng phải thuộc danh mục: Đất ở, Đất nông nghiệp, Đất thương mại, Đất công nghiệp, Đất phi nông nghiệp<br/>- Trạng thái pháp lý phải thuộc: Có giấy chứng nhận, Chưa có GCN, Đang tranh chấp, Đang thế chấp<br/>- Nếu có mã GCN thì phải có thông tin pháp lý<br/>- Thông tin được lưu trữ bất biến trên blockchain |
 
 ---
@@ -368,7 +368,7 @@ Hệ thống quản lý đất đai sử dụng công nghệ blockchain để đ
 | **Tác nhân** | Cán bộ Sở Tài nguyên & Môi trường (Org1) |
 | **Mục đích** | Cập nhật thông tin thửa đất khi có thay đổi |
 | **Tiền điều kiện** | - Cán bộ đã đăng nhập với quyền Org1<br/>- Thửa đất đã tồn tại trong hệ thống<br/>- Thửa đất không ở trạng thái "Đang tranh chấp" hoặc "Đang thế chấp" |
-| **Kết quả đạt được** | - Thông tin thửa đất được cập nhật thành công<br/>- Lịch sử thay đổi được ghi lại<br/>- Chủ sở hữu nhận thông báo về thay đổi<br/>- Giấy chứng nhận được cập nhật (nếu có) |
+| **Kết quả đạt được** | - Thông tin thửa đất được cập nhật thành công<br/>- Lịch sử thay đổi được ghi lại<br/>- chủ sử dụng nhận thông báo về thay đổi<br/>- Giấy chứng nhận được cập nhật (nếu có) |
 | **Quy trình thực hiện** | 1. Cán bộ tìm kiếm thửa đất cần cập nhật<br/>2. Cán bộ chỉnh sửa thông tin: diện tích, vị trí, mục đích sử dụng, trạng thái pháp lý<br/>3. Cán bộ có thể cập nhật thông tin giấy chứng nhận: mã GCN (IPFS hash), thông tin pháp lý<br/>4. Hệ thống kiểm tra quyền chỉnh sửa và trạng thái thửa đất<br/>5. Hệ thống kiểm tra tính hợp lệ của thông tin mới<br/>6. Hệ thống lưu thông tin cập nhật vào blockchain<br/>7. Hệ thống ghi lại lịch sử thay đổi<br/>8. Hệ thống trả về thông tin đã cập nhật |
 | **Trường hợp ngoại lệ** | - Thửa đất không tồn tại: Hệ thống thông báo "Thửa đất không tìm thấy"<br/>- Thửa đất đang tranh chấp/thế chấp: Hệ thống từ chối cập nhật<br/>- Thông tin không hợp lệ: Hệ thống yêu cầu sửa lại<br/>- Có mã GCN nhưng thiếu thông tin pháp lý: Hệ thống yêu cầu bổ sung |
 | **Quy tắc nghiệp vụ** | - Không được thay đổi ID thửa đất và người sử dụng đất<br/>- Có thể cập nhật: diện tích, vị trí, mục đích sử dụng, trạng thái pháp lý<br/>- Nếu có mã GCN thì phải có thông tin pháp lý<br/>- Thửa đất đang tranh chấp hoặc thế chấp không thể cập nhật<br/>- Mọi thay đổi phải được ghi lại lịch sử bất biến |
@@ -400,7 +400,7 @@ Hệ thống quản lý đất đai sử dụng công nghệ blockchain để đ
 | **Tiền điều kiện** | - Đã đăng nhập vào hệ thống<br/>- Có CCCD của người sử dụng đất cần xem |
 | **Kết quả đạt được** | - Danh sách đầy đủ thửa đất của người sử dụng đất<br/>- Thông tin tổng hợp: số lượng, tổng diện tích<br/>- Trạng thái từng thửa đất được hiển thị |
 | **Quy trình thực hiện** | 1. Người dùng nhập CCCD của người sử dụng đất<br/>2. Hệ thống tìm kiếm tất cả thửa đất thuộc sở hữu<br/>3. Hệ thống kiểm tra quyền xem của người dùng<br/>4. Hệ thống hiển thị danh sách thửa đất với thông tin: ID, vị trí, diện tích, mục đích sử dụng, trạng thái pháp lý<br/>5. Hệ thống tính toán thông tin tổng hợp<br/>6. Hệ thống hiển thị trạng thái: có GCN, chưa có GCN, đang tranh chấp, đang thế chấp<br/>7. Người dùng có thể xem chi tiết từng thửa đất |
-| **Trường hợp ngoại lệ** | - Chủ sở hữu không tồn tại: Hệ thống thông báo "Người này không có trong hệ thống"<br/>- Không có thửa đất nào: Hệ thống thông báo "Chưa có thửa đất nào"<br/>- Không có quyền xem: Hệ thống từ chối truy cập |
+| **Trường hợp ngoại lệ** | - chủ sử dụng không tồn tại: Hệ thống thông báo "Người này không có trong hệ thống"<br/>- Không có thửa đất nào: Hệ thống thông báo "Chưa có thửa đất nào"<br/>- Không có quyền xem: Hệ thống từ chối truy cập |
 | **Quy tắc nghiệp vụ** | - Chỉ xem được thửa đất được phép theo quyền hạn<br/>- Org3 chỉ xem được thửa đất thuộc quyền sử dụng<br/>- Thông tin tổng hợp được tính theo thời gian thực<br/>- Thửa đất đang tranh chấp hoặc thế chấp được đánh dấu riêng |
 
 ---
@@ -475,7 +475,7 @@ Hệ thống quản lý đất đai sử dụng công nghệ blockchain để đ
 | **Tác nhân** | Toàn bộ người dùng đã đăng nhập |
 | **Mục đích** | Tạo mối quan hệ giữa tài liệu đã xác minh và thửa đất |
 | **Tiền điều kiện** | - Đã đăng nhập vào hệ thống<br/>- Tài liệu đã tồn tại và được xác minh<br/>- Thửa đất đã tồn tại trong hệ thống<br/>- Có quyền liên kết tài liệu |
-| **Kết quả đạt được** | - Mối quan hệ giữa tài liệu và thửa đất được tạo<br/>- Thông tin liên kết được lưu trên blockchain<br/>- Tài liệu xuất hiện trong danh sách tài liệu của thửa đất<br/>- Chủ sở hữu thửa đất nhận thông báo |
+| **Kết quả đạt được** | - Mối quan hệ giữa tài liệu và thửa đất được tạo<br/>- Thông tin liên kết được lưu trên blockchain<br/>- Tài liệu xuất hiện trong danh sách tài liệu của thửa đất<br/>- chủ sử dụng thửa đất nhận thông báo |
 | **Quy trình thực hiện** | 1. Người dùng chọn thửa đất cần liên kết tài liệu<br/>2. Người dùng chọn tài liệu đã xác minh để liên kết<br/>3. Hệ thống kiểm tra quyền liên kết của người dùng<br/>4. Hệ thống kiểm tra tài liệu đã được xác minh chưa<br/>5. Hệ thống kiểm tra tài liệu và thửa đất tồn tại<br/>6. Hệ thống kiểm tra tài liệu chưa được liên kết với thửa đất này<br/>7. Hệ thống thêm ID tài liệu vào danh sách DocumentIDs của thửa đất<br/>8. Hệ thống cập nhật thông tin thửa đất trên blockchain<br/>9. Hệ thống ghi log giao dịch liên kết<br/>10. Hệ thống trả về kết quả liên kết thành công |
 | **Trường hợp ngoại lệ** | - Tài liệu không tồn tại: Hệ thống thông báo "Tài liệu không tìm thấy"<br/>- Tài liệu chưa xác minh: Hệ thống thông báo "Tài liệu chưa được xác minh"<br/>- Thửa đất không tồn tại: Hệ thống thông báo "Thửa đất không tìm thấy"<br/>- Tài liệu đã liên kết: Hệ thống thông báo "Tài liệu đã được liên kết với thửa đất này"<br/>- Không có quyền liên kết: Hệ thống từ chối thao tác |
 | **Quy tắc nghiệp vụ** | - Chỉ tài liệu đã được xác minh mới có thể liên kết<br/>- Một tài liệu có thể liên kết với nhiều thửa đất<br/>- Org3 chỉ liên kết được tài liệu của mình với thửa đất thuộc quyền sử dụng<br/>- Thông tin liên kết được lưu bất biến trên blockchain<br/>- Mỗi liên kết được ghi log với timestamp |
@@ -718,7 +718,7 @@ Hệ thống quản lý đất đai sử dụng công nghệ blockchain để đ
 | **Mục đích** | Khởi tạo quy trình chuyển nhượng đất đai |
 | **Tiền điều kiện** | - Đã đăng nhập với quyền Org3<br/>- Là người sử dụng đất hợp pháp của thửa đất<br/>- Thửa đất không đang trong giao dịch khác<br/>- Thửa đất không ở trạng thái tranh chấp hoặc thế chấp |
 | **Kết quả đạt được** | - Yêu cầu chuyển nhượng được tạo thành công<br/>- Thông tin được lưu trên blockchain<br/>- Bên nhận được thông báo<br/>- Quy trình xử lý được bắt đầu |
-| **Quy trình thực hiện** | 1. Chủ sở hữu chọn thửa đất cần chuyển nhượng<br/>2. Chủ sở hữu nhập thông tin bên nhận (CCCD)<br/>3. Hệ thống kiểm tra quyền sở hữu và trạng thái thửa đất<br/>4. Hệ thống kiểm tra thửa đất không ở trạng thái tranh chấp/thế chấp<br/>5. Hệ thống tạo yêu cầu chuyển nhượng trên blockchain<br/>6. Hệ thống gửi thông báo cho bên nhận<br/>7. Hệ thống ghi log giao dịch<br/>8. Hệ thống trả về thông tin yêu cầu đã tạo |
+| **Quy trình thực hiện** | 1. chủ sử dụng chọn thửa đất cần chuyển nhượng<br/>2. chủ sử dụng nhập thông tin bên nhận (CCCD)<br/>3. Hệ thống kiểm tra quyền sở hữu và trạng thái thửa đất<br/>4. Hệ thống kiểm tra thửa đất không ở trạng thái tranh chấp/thế chấp<br/>5. Hệ thống tạo yêu cầu chuyển nhượng trên blockchain<br/>6. Hệ thống gửi thông báo cho bên nhận<br/>7. Hệ thống ghi log giao dịch<br/>8. Hệ thống trả về thông tin yêu cầu đã tạo |
 | **Trường hợp ngoại lệ** | - Không phải người sử dụng đất: Hệ thống từ chối tạo yêu cầu<br/>- Thửa đất đang tranh chấp/thế chấp: Hệ thống thông báo "Thửa đất không thể chuyển nhượng"<br/>- Bên nhận không tồn tại: Hệ thống yêu cầu kiểm tra thông tin<br/>- Thửa đất đang giao dịch: Hệ thống thông báo "Thửa đất đang trong giao dịch khác" |
 | **Quy tắc nghiệp vụ** | - Chỉ người sử dụng đất mới có quyền tạo yêu cầu<br/>- Thửa đất phải không ở trạng thái tranh chấp hoặc thế chấp<br/>- Một thửa đất chỉ có một giao dịch tại một thời điểm<br/>- Thông tin giao dịch được mã hóa bảo mật |
 
@@ -748,7 +748,7 @@ Hệ thống quản lý đất đai sử dụng công nghệ blockchain để đ
 | **Mục đích** | Chia nhỏ thửa đất để quản lý hoặc chuyển nhượng riêng biệt |
 | **Tiền điều kiện** | - Đã đăng nhập với quyền Org3<br/>- Là người sử dụng đất hợp pháp của thửa đất<br/>- Thửa đất có diện tích đủ lớn để tách<br/>- Thửa đất không ở trạng thái tranh chấp hoặc thế chấp |
 | **Kết quả đạt được** | - Yêu cầu tách thửa được tạo thành công<br/>- Kế hoạch tách được lưu trữ<br/>- Các thửa đất mới được tạo trên blockchain<br/>- Quy trình thẩm định được bắt đầu |
-| **Quy trình thực hiện** | 1. Chủ sở hữu chọn thửa đất cần tách<br/>2. Chủ sở hữu nhập thông tin các thửa đất mới (ID, diện tích, vị trí)<br/>3. Hệ thống kiểm tra quyền sở hữu và trạng thái thửa đất<br/>4. Hệ thống kiểm tra thửa đất không ở trạng thái tranh chấp/thế chấp<br/>5. Hệ thống validate thông tin các thửa đất mới<br/>6. Hệ thống kiểm tra tổng diện tích không vượt quá thửa gốc<br/>7. Hệ thống tạo yêu cầu tách thửa trên blockchain<br/>8. Hệ thống tạo các thửa đất mới trên blockchain<br/>9. Hệ thống ghi log giao dịch |
+| **Quy trình thực hiện** | 1. chủ sử dụng chọn thửa đất cần tách<br/>2. chủ sử dụng nhập thông tin các thửa đất mới (ID, diện tích, vị trí)<br/>3. Hệ thống kiểm tra quyền sở hữu và trạng thái thửa đất<br/>4. Hệ thống kiểm tra thửa đất không ở trạng thái tranh chấp/thế chấp<br/>5. Hệ thống validate thông tin các thửa đất mới<br/>6. Hệ thống kiểm tra tổng diện tích không vượt quá thửa gốc<br/>7. Hệ thống tạo yêu cầu tách thửa trên blockchain<br/>8. Hệ thống tạo các thửa đất mới trên blockchain<br/>9. Hệ thống ghi log giao dịch |
 | **Trường hợp ngoại lệ** | - Không phải người sử dụng đất: Hệ thống từ chối tạo yêu cầu<br/>- Thửa đất đang tranh chấp/thế chấp: Hệ thống thông báo "Thửa đất không thể tách"<br/>- Tổng diện tích vượt quá: Hệ thống thông báo "Tổng diện tích vượt quá thửa gốc"<br/>- Thông tin thửa mới không hợp lệ: Hệ thống yêu cầu sửa đổi |
 | **Quy tắc nghiệp vụ** | - Chỉ người sử dụng đất mới có quyền tạo yêu cầu<br/>- Thửa đất phải không ở trạng thái tranh chấp hoặc thế chấp<br/>- Tổng diện tích các thửa mới không được vượt quá thửa gốc<br/>- Thông tin thửa đất mới phải hợp lệ theo quy định |
 
@@ -763,7 +763,7 @@ Hệ thống quản lý đất đai sử dụng công nghệ blockchain để đ
 | **Mục đích** | Hợp nhất nhiều thửa đất liền kề để quản lý thống nhất |
 | **Tiền điều kiện** | - Đã đăng nhập với quyền Org3<br/>- Là người sử dụng đất của tất cả thửa đất cần gộp<br/>- Các thửa đất phải liền kề nhau<br/>- Tất cả thửa đất không ở trạng thái tranh chấp hoặc thế chấp |
 | **Kết quả đạt được** | - Yêu cầu gộp thửa được tạo thành công<br/>- Kế hoạch gộp được lưu trữ<br/>- Thửa đất mới được tạo trên blockchain<br/>- Quy trình thẩm định được bắt đầu |
-| **Quy trình thực hiện** | 1. Chủ sở hữu chọn các thửa đất cần gộp<br/>2. Chủ sở hữu nhập thông tin thửa đất mới sau khi gộp<br/>3. Hệ thống kiểm tra quyền sở hữu tất cả thửa đất<br/>4. Hệ thống kiểm tra tất cả thửa đất không ở trạng thái tranh chấp/thế chấp<br/>5. Hệ thống validate thông tin thửa đất mới<br/>6. Hệ thống kiểm tra diện tích thửa mới khớp với tổng diện tích các thửa gốc<br/>7. Hệ thống tạo yêu cầu gộp thửa trên blockchain<br/>8. Hệ thống tạo thửa đất mới trên blockchain<br/>9. Hệ thống ghi log giao dịch |
+| **Quy trình thực hiện** | 1. chủ sử dụng chọn các thửa đất cần gộp<br/>2. chủ sử dụng nhập thông tin thửa đất mới sau khi gộp<br/>3. Hệ thống kiểm tra quyền sở hữu tất cả thửa đất<br/>4. Hệ thống kiểm tra tất cả thửa đất không ở trạng thái tranh chấp/thế chấp<br/>5. Hệ thống validate thông tin thửa đất mới<br/>6. Hệ thống kiểm tra diện tích thửa mới khớp với tổng diện tích các thửa gốc<br/>7. Hệ thống tạo yêu cầu gộp thửa trên blockchain<br/>8. Hệ thống tạo thửa đất mới trên blockchain<br/>9. Hệ thống ghi log giao dịch |
 | **Trường hợp ngoại lệ** | - Không sở hữu đầy đủ: Hệ thống thông báo thiếu quyền sở hữu<br/>- Thửa đất đang tranh chấp/thế chấp: Hệ thống thông báo "Thửa đất không thể gộp"<br/>- Diện tích không khớp: Hệ thống thông báo "Diện tích thửa mới không khớp với tổng diện tích"<br/>- Thông tin thửa mới không hợp lệ: Hệ thống yêu cầu sửa đổi |
 | **Quy tắc nghiệp vụ** | - Chỉ người sử dụng đất mới có quyền tạo yêu cầu<br/>- Tất cả thửa đất phải không ở trạng thái tranh chấp hoặc thế chấp<br/>- Diện tích thửa đất mới phải bằng tổng diện tích các thửa gốc<br/>- Thông tin thửa đất mới phải hợp lệ theo quy định |
 
@@ -778,7 +778,7 @@ Hệ thống quản lý đất đai sử dụng công nghệ blockchain để đ
 | **Mục đích** | Thay đổi mục đích sử dụng đất theo nhu cầu mới |
 | **Tiền điều kiện** | - Đã đăng nhập với quyền Org3<br/>- Là người sử dụng đất hợp pháp của thửa đất<br/>- Mục đích mới phải được phép theo quy hoạch<br/>- Thửa đất không ở trạng thái tranh chấp hoặc thế chấp |
 | **Kết quả đạt được** | - Yêu cầu đổi mục đích được tạo thành công<br/>- Hồ sơ đề xuất được lưu trữ<br/>- Cơ quan có thẩm quyền nhận thông báo<br/>- Quy trình thẩm định được bắt đầu |
-| **Quy trình thực hiện** | 1. Chủ sở hữu chọn thửa đất cần đổi mục đích<br/>2. Chủ sở hữu chọn mục đích sử dụng mới<br/>3. Chủ sở hữu nhập lý do và kế hoạch sử dụng<br/>4. Hệ thống kiểm tra quyền sở hữu và trạng thái thửa đất<br/>5. Hệ thống kiểm tra thửa đất không ở trạng thái tranh chấp/thế chấp<br/>6. Hệ thống kiểm tra tính phù hợp của mục đích mới<br/>7. Hệ thống tạo yêu cầu đổi mục đích trên blockchain<br/>8. Hệ thống ghi log giao dịch |
+| **Quy trình thực hiện** | 1. chủ sử dụng chọn thửa đất cần đổi mục đích<br/>2. chủ sử dụng chọn mục đích sử dụng mới<br/>3. chủ sử dụng nhập lý do và kế hoạch sử dụng<br/>4. Hệ thống kiểm tra quyền sở hữu và trạng thái thửa đất<br/>5. Hệ thống kiểm tra thửa đất không ở trạng thái tranh chấp/thế chấp<br/>6. Hệ thống kiểm tra tính phù hợp của mục đích mới<br/>7. Hệ thống tạo yêu cầu đổi mục đích trên blockchain<br/>8. Hệ thống ghi log giao dịch |
 | **Trường hợp ngoại lệ** | - Không phải người sử dụng đất: Hệ thống từ chối tạo yêu cầu<br/>- Thửa đất đang tranh chấp/thế chấp: Hệ thống thông báo "Thửa đất không thể đổi mục đích"<br/>- Mục đích không được phép: Hệ thống thông báo "Mục đích không phù hợp quy hoạch"<br/>- Thửa đất đang giao dịch: Hệ thống từ chối tạo yêu cầu |
 | **Quy tắc nghiệp vụ** | - Chỉ người sử dụng đất mới có quyền tạo yêu cầu<br/>- Thửa đất phải không ở trạng thái tranh chấp hoặc thế chấp<br/>- Mục đích mới phải tuân thủ quy hoạch địa phương<br/>- Phải đóng phí chuyển đổi theo quy định |
 
@@ -793,7 +793,7 @@ Hệ thống quản lý đất đai sử dụng công nghệ blockchain để đ
 | **Mục đích** | Xin cấp lại GCN khi bị mất, hư hỏng hoặc cần cập nhật |
 | **Tiền điều kiện** | - Đã đăng nhập với quyền Org3<br/>- Là người sử dụng đất hợp pháp của thửa đất<br/>- Có lý do chính đáng để cấp lại<br/>- Thửa đất không ở trạng thái tranh chấp hoặc thế chấp |
 | **Kết quả đạt được** | - Yêu cầu cấp lại GCN được tạo thành công<br/>- Lý do cấp lại được ghi nhận<br/>- Cơ quan có thẩm quyền nhận thông báo<br/>- Quy trình xử lý được bắt đầu |
-| **Quy trình thực hiện** | 1. Chủ sở hữu chọn thửa đất cần cấp lại GCN<br/>2. Chủ sở hữu chọn lý do: mất, hư hỏng, thay đổi thông tin<br/>3. Chủ sở hữu nhập mô tả chi tiết về lý do<br/>4. Hệ thống kiểm tra quyền sở hữu và trạng thái thửa đất<br/>5. Hệ thống kiểm tra thửa đất không ở trạng thái tranh chấp/thế chấp<br/>6. Hệ thống tạo yêu cầu cấp lại GCN trên blockchain<br/>7. Hệ thống ghi log giao dịch |
+| **Quy trình thực hiện** | 1. chủ sử dụng chọn thửa đất cần cấp lại GCN<br/>2. chủ sử dụng chọn lý do: mất, hư hỏng, thay đổi thông tin<br/>3. chủ sử dụng nhập mô tả chi tiết về lý do<br/>4. Hệ thống kiểm tra quyền sở hữu và trạng thái thửa đất<br/>5. Hệ thống kiểm tra thửa đất không ở trạng thái tranh chấp/thế chấp<br/>6. Hệ thống tạo yêu cầu cấp lại GCN trên blockchain<br/>7. Hệ thống ghi log giao dịch |
 | **Trường hợp ngoại lệ** | - Không phải người sử dụng đất: Hệ thống từ chối tạo yêu cầu<br/>- Thửa đất đang tranh chấp/thế chấp: Hệ thống thông báo "Thửa đất không thể cấp lại GCN"<br/>- Lý do không hợp lệ: Hệ thống yêu cầu làm rõ<br/>- Đã có yêu cầu đang xử lý: Hệ thống thông báo trùng lặp |
 | **Quy tắc nghiệp vụ** | - Chỉ người sử dụng đất mới có quyền tạo yêu cầu<br/>- Thửa đất phải không ở trạng thái tranh chấp hoặc thế chấp<br/>- Phải có bằng chứng cho lý do cấp lại<br/>- Phí cấp lại theo quy định của địa phương |
 
@@ -837,7 +837,7 @@ Hệ thống quản lý đất đai sử dụng công nghệ blockchain để đ
 | **Tác nhân** | Cán bộ Sở Tài nguyên & Môi trường (Org1) |
 | **Mục đích** | Xác nhận và thực hiện việc tách thửa đất |
 | **Tiền điều kiện** | - Đã đăng nhập với quyền Org1<br/>- Kế hoạch tách đã được thẩm định<br/>- Đã hoàn thành khảo sát thực địa |
-| **Kết quả đạt được** | - Thửa đất gốc được đánh dấu đã tách<br/>- Các thửa đất mới được tạo trên blockchain<br/>- GCN riêng biệt được cấp cho từng thửa<br/>- Chủ sở hữu nhận thông báo hoàn thành |
+| **Kết quả đạt được** | - Thửa đất gốc được đánh dấu đã tách<br/>- Các thửa đất mới được tạo trên blockchain<br/>- GCN riêng biệt được cấp cho từng thửa<br/>- chủ sử dụng nhận thông báo hoàn thành |
 | **Quy trình thực hiện** | 1. Cán bộ Org1 xem yêu cầu tách thửa đã thẩm định<br/>2. Cán bộ kiểm tra kết quả khảo sát thực địa<br/>3. Cán bộ xác nhận kế hoạch tách phù hợp<br/>4. Cán bộ phê duyệt tách thửa<br/>5. Hệ thống đánh dấu thửa gốc đã tách<br/>6. Hệ thống tạo các thửa đất mới với mã riêng<br/>7. Hệ thống cấp GCN cho từng thửa mới<br/>8. Hệ thống gửi thông báo hoàn thành |
 | **Trường hợp ngoại lệ** | - Kế hoạch tách không phù hợp: Chuyển sang UC-51 (Từ chối)<br/>- Lỗi tạo thửa mới: Hệ thống báo lỗi và hoàn tác<br/>- Diện tích không khớp: Hệ thống yêu cầu kiểm tra lại |
 | **Quy tắc nghiệp vụ** | - Tổng diện tích các thửa mới phải bằng thửa gốc<br/>- Mỗi thửa mới có mã số riêng biệt<br/>- Thửa gốc không thể sử dụng sau khi tách |
@@ -852,7 +852,7 @@ Hệ thống quản lý đất đai sử dụng công nghệ blockchain để đ
 | **Tác nhân** | Cán bộ Sở Tài nguyên & Môi trường (Org1) |
 | **Mục đích** | Xác nhận và thực hiện việc gộp nhiều thửa thành một |
 | **Tiền điều kiện** | - Đã đăng nhập với quyền Org1<br/>- Kế hoạch gộp đã được thẩm định<br/>- Đã hoàn thành khảo sát thực địa |
-| **Kết quả đạt được** | - Các thửa đất cũ được đánh dấu đã gộp<br/>- Thửa đất mới được tạo trên blockchain<br/>- GCN mới được cấp cho thửa gộp<br/>- Chủ sở hữu nhận thông báo hoàn thành |
+| **Kết quả đạt được** | - Các thửa đất cũ được đánh dấu đã gộp<br/>- Thửa đất mới được tạo trên blockchain<br/>- GCN mới được cấp cho thửa gộp<br/>- chủ sử dụng nhận thông báo hoàn thành |
 | **Quy trình thực hiện** | 1. Cán bộ Org1 xem yêu cầu gộp thửa đã thẩm định<br/>2. Cán bộ kiểm tra kết quả khảo sát thực địa<br/>3. Cán bộ xác nhận kế hoạch gộp phù hợp<br/>4. Cán bộ phê duyệt gộp thửa<br/>5. Hệ thống đánh dấu các thửa cũ đã gộp<br/>6. Hệ thống tạo thửa đất mới với thông tin gộp<br/>7. Hệ thống cấp GCN mới cho thửa gộp<br/>8. Hệ thống vô hiệu hóa các GCN cũ |
 | **Trường hợp ngoại lệ** | - Kế hoạch gộp không phù hợp: Chuyển sang UC-51 (Từ chối)<br/>- Lỗi tạo thửa mới: Hệ thống báo lỗi và hoàn tác<br/>- Diện tích không khớp: Hệ thống yêu cầu kiểm tra lại |
 | **Quy tắc nghiệp vụ** | - Diện tích thửa mới bằng tổng diện tích các thửa cũ<br/>- Các thửa cũ không thể sử dụng sau khi gộp<br/>- Thửa mới có mã số hoàn toàn mới |
@@ -867,7 +867,7 @@ Hệ thống quản lý đất đai sử dụng công nghệ blockchain để đ
 | **Tác nhân** | Cán bộ Sở Tài nguyên & Môi trường (Org1) |
 | **Mục đích** | Xác nhận và thực hiện thay đổi mục đích sử dụng |
 | **Tiền điều kiện** | - Đã đăng nhập với quyền Org1<br/>- Đề xuất đổi mục đích đã được thẩm định<br/>- Phù hợp với quy hoạch địa phương |
-| **Kết quả đạt được** | - Mục đích sử dụng được cập nhật trên blockchain<br/>- GCN mới được cấp với mục đích mới<br/>- Phí chuyển đổi được ghi nhận<br/>- Chủ sở hữu nhận thông báo hoàn thành |
+| **Kết quả đạt được** | - Mục đích sử dụng được cập nhật trên blockchain<br/>- GCN mới được cấp với mục đích mới<br/>- Phí chuyển đổi được ghi nhận<br/>- chủ sử dụng nhận thông báo hoàn thành |
 | **Quy trình thực hiện** | 1. Cán bộ Org1 xem yêu cầu đổi mục đích đã thẩm định<br/>2. Cán bộ kiểm tra tính phù hợp với quy hoạch<br/>3. Cán bộ xác nhận phí chuyển đổi đã đóng<br/>4. Cán bộ phê duyệt đổi mục đích<br/>5. Hệ thống cập nhật mục đích sử dụng trên blockchain<br/>6. Hệ thống tạo GCN mới với mục đích mới<br/>7. Hệ thống vô hiệu hóa GCN cũ<br/>8. Hệ thống gửi thông báo hoàn thành |
 | **Trường hợp ngoại lệ** | - Không phù hợp quy hoạch: Chuyển sang UC-51 (Từ chối)<br/>- Chưa đóng phí: Hệ thống yêu cầu hoàn thành thanh toán<br/>- Lỗi cập nhật: Hệ thống báo lỗi và hoàn tác |
 | **Quy tắc nghiệp vụ** | - Phải tuân thủ nghiêm ngặt quy hoạch<br/>- Phí chuyển đổi phải được thanh toán đầy đủ<br/>- Thay đổi được ghi nhận vĩnh viễn |
@@ -882,7 +882,7 @@ Hệ thống quản lý đất đai sử dụng công nghệ blockchain để đ
 | **Tác nhân** | Cán bộ Sở Tài nguyên & Môi trường (Org1) |
 | **Mục đích** | Xác nhận và cấp lại GCN cho người sử dụng đất |
 | **Tiền điều kiện** | - Đã đăng nhập với quyền Org1<br/>- Yêu cầu cấp lại đã được xác minh<br/>- Lý do cấp lại được chấp nhận |
-| **Kết quả đạt được** | - GCN mới được cấp với thông tin cập nhật<br/>- GCN cũ được đánh dấu vô hiệu (nếu còn)<br/>- Thông tin cấp lại được ghi nhận<br/>- Chủ sở hữu nhận GCN mới |
+| **Kết quả đạt được** | - GCN mới được cấp với thông tin cập nhật<br/>- GCN cũ được đánh dấu vô hiệu (nếu còn)<br/>- Thông tin cấp lại được ghi nhận<br/>- chủ sử dụng nhận GCN mới |
 | **Quy trình thực hiện** | 1. Cán bộ Org1 xem yêu cầu cấp lại GCN<br/>2. Cán bộ kiểm tra lý do và bằng chứng<br/>3. Cán bộ xác nhận quyền sở hữu hiện tại<br/>4. Cán bộ phê duyệt cấp lại GCN<br/>5. Hệ thống tạo GCN mới với số sê-ri mới<br/>6. Hệ thống đánh dấu GCN cũ vô hiệu<br/>7. Hệ thống ghi nhận lý do và thời gian cấp lại<br/>8. Hệ thống gửi thông báo và GCN mới |
 | **Trường hợp ngoại lệ** | - Lý do không hợp lệ: Chuyển sang UC-51 (Từ chối)<br/>- Không xác minh được quyền sở hữu: Hệ thống yêu cầu bổ sung<br/>- Lỗi tạo GCN: Hệ thống báo lỗi |
 | **Quy tắc nghiệp vụ** | - Phải có bằng chứng rõ ràng cho lý do cấp lại<br/>- GCN mới có giá trị pháp lý đầy đủ<br/>- Phí cấp lại theo quy định |
@@ -944,7 +944,7 @@ Hệ thống quản lý đất đai sử dụng công nghệ blockchain để đ
 | **Tiền điều kiện** | - Đã đăng nhập vào hệ thống<br/>- Có CCCD của người sử dụng đất cần xem |
 | **Kết quả đạt được** | - Danh sách giao dịch của người sử dụng đất<br/>- Thống kê hoạt động giao dịch<br/>- Trạng thái từng giao dịch được hiển thị |
 | **Quy trình thực hiện** | 1. Người dùng nhập CCCD của người sử dụng đất<br/>2. Hệ thống tìm tất cả giao dịch liên quan<br/>3. Hệ thống kiểm tra quyền xem<br/>4. Hệ thống hiển thị danh sách giao dịch<br/>5. Hệ thống thống kê theo loại và trạng thái<br/>6. Hệ thống sắp xếp theo thời gian<br/>7. Người dùng có thể xem chi tiết giao dịch |
-| **Trường hợp ngoại lệ** | - Chủ sở hữu không tồn tại: Hệ thống thông báo "Người này không có trong hệ thống"<br/>- Không có giao dịch: Hệ thống thông báo "Chưa có giao dịch nào"<br/>- Không có quyền xem: Hệ thống từ chối truy cập |
+| **Trường hợp ngoại lệ** | - chủ sử dụng không tồn tại: Hệ thống thông báo "Người này không có trong hệ thống"<br/>- Không có giao dịch: Hệ thống thông báo "Chưa có giao dịch nào"<br/>- Không có quyền xem: Hệ thống từ chối truy cập |
 | **Quy tắc nghiệp vụ** | - Chỉ xem được giao dịch được phép theo quyền hạn<br/>- Thống kê được tính theo thời gian thực<br/>- Bao gồm cả giao dịch đã hủy |
 
 ---

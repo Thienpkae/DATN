@@ -4,6 +4,9 @@ import { EditOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, DeleteOutlin
 import documentService from '../../../services/documentService';
 import ipfsService from '../../../services/ipfs';
 import { useAuth } from '../../../hooks/useAuth';
+import OnlineDocumentViewer from '../../Common/OnlineDocumentViewer';
+
+const { confirm } = Modal;
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -32,6 +35,7 @@ const DocumentManagementPage = () => {
   const [form] = Form.useForm();
   const [analysis, setAnalysis] = useState(null);
   const [documentHistory, setDocumentHistory] = useState([]);
+  const [onlineViewerOpen, setOnlineViewerOpen] = useState(false);
 
   const loadList = useCallback(async () => {
     try {
@@ -118,30 +122,20 @@ const DocumentManagementPage = () => {
       // Use docID from form
       const docID = values.docID;
       
-      // Upload to IPFS
-      const uploadResult = await ipfsService.uploadDocumentToIPFS(
-        selectedFile,
-        {
-          docID,
-          title: values.title,
-          description: values.description,
-          docType: values.docType
-        },
-        (progress) => setUploadProgress(progress)
-      );
+      // Upload file to IPFS
+      const ipfsHash = await ipfsService.uploadFileToIPFS(selectedFile, (progress) => setUploadProgress(progress));
       
       // Create document (automatically verified by Org1)
       await documentService.createDocument({
-        docID: docID, // Backend expect 'docID'
-        docType: values.docType, // Backend expect 'docType'
+        docID: docID,
+        docType: values.docType,
         title: values.title,
         description: values.description,
-        ipfsHash: uploadResult.fileHash,
-        metadataHash: uploadResult.metadataHash,
+        ipfsHash: ipfsHash,
         fileType: selectedFile.type || selectedFile.name.split('.').pop().toUpperCase(),
         fileSize: selectedFile.size,
         verified: true, // Org1 tạo tài liệu sẽ tự động được xác thực
-        verifiedBy: user?.cccd || 'Unknown' // Người tạo tài liệu (backend sẽ truyền vào chaincode)
+        verifiedBy: user?.cccd || 'Unknown'
       });
       
       message.success('Tạo tài liệu thành công');
@@ -167,13 +161,14 @@ const DocumentManagementPage = () => {
     try {
       const values = await editForm.validateFields();
       setLoading(true);
+      
+      // Chỉ cập nhật title và description theo logic chaincode
       await documentService.updateDocument(selected.docID, {
         title: values.title,
-        description: values.description,
-        docType: values.docType // Backend expect 'docType'
+        description: values.description
       });
+      
       message.success('Cập nhật tài liệu thành công');
-      setLoading(false);
       setEditOpen(false);
       loadList();
       
@@ -244,19 +239,40 @@ const DocumentManagementPage = () => {
     }
   };
 
-  const handleDelete = useCallback(async (record) => {
-    try {
-      await documentService.deleteDocument(record.docID);
-      message.success('Xóa tài liệu thành công');
-      loadList();
-      
-      // Dispatch custom event to notify other pages to refresh
-      window.dispatchEvent(new CustomEvent('documentDeleted', {
-        detail: { documentId: record.docID }
-      }));
-    } catch (e) {
-      message.error(e.message || 'Xóa thất bại');
-    }
+  const handleDelete = useCallback((record) => {
+    confirm({
+      title: 'Xác nhận xóa tài liệu',
+      content: (
+        <div>
+          <p>Bạn có chắc chắn muốn xóa tài liệu này không?</p>
+          <p><strong>Mã tài liệu:</strong> {record.docID}</p>
+          <p><strong>Tiêu đề:</strong> {record.title}</p>
+          <p style={{ color: 'red', marginTop: 10 }}>
+            ⚠️ Hành động này không thể hoàn tác!
+          </p>
+        </div>
+      ),
+      okText: 'Xóa',
+      okType: 'danger',
+      cancelText: 'Hủy',
+      async onOk() {
+        try {
+          await documentService.deleteDocument(record.docID);
+          message.success('Xóa tài liệu thành công');
+          loadList();
+          
+          // Dispatch custom event to notify other pages to refresh
+          window.dispatchEvent(new CustomEvent('documentDeleted', {
+            detail: { documentId: record.docID }
+          }));
+        } catch (e) {
+          message.error(e.message || 'Xóa thất bại');
+        }
+      },
+      onCancel() {
+        console.log('Hủy xóa tài liệu');
+      },
+    });
   }, [loadList]);
 
   const openDetail = useCallback((record) => {
@@ -285,25 +301,38 @@ const DocumentManagementPage = () => {
           <Tooltip title="Xem chi tiết">
             <Button icon={<EyeOutlined />} onClick={() => openDetail(record)} />
           </Tooltip>
-          <Tooltip title="Sửa">
-            <Button icon={<EditOutlined />} onClick={() => {
-              setSelected(record);
-              editForm.setFieldsValue({
-                title: record.title,
-                description: record.description,
-                docType: record.type
-              });
-              setEditOpen(true);
-            }} />
+          <Tooltip title={record.uploadedBy !== user?.userId ? "Chỉ người upload mới được sửa" : "Sửa"}>
+            <Button 
+              icon={<EditOutlined />} 
+              onClick={() => {
+                console.log('Edit button clicked:', { 
+                  recordUploadedBy: record.uploadedBy, 
+                  currentUserId: user?.userId,
+                  canEdit: record.uploadedBy === user?.userId 
+                });
+                setSelected(record);
+                editForm.setFieldsValue({
+                  title: record.title,
+                  description: record.description
+                });
+                setEditOpen(true);
+              }}
+              disabled={record.uploadedBy !== user?.userId}
+            />
           </Tooltip>
 
-          <Tooltip title="Xóa">
-            <Button icon={<DeleteOutlined />} danger onClick={() => handleDelete(record)} />
+          <Tooltip title={record.uploadedBy !== user?.userId ? "Chỉ người upload mới được xóa" : "Xóa"}>
+            <Button 
+              icon={<DeleteOutlined />} 
+              danger 
+              onClick={() => handleDelete(record)}
+              disabled={record.uploadedBy !== user?.userId}
+            />
           </Tooltip>
         </Space>
       )
     }
-  ]), [editForm, handleDelete, handleDownload, openDetail]);
+  ]), [editForm, handleDelete, handleDownload, openDetail, user?.userId]);
 
   return (
     <Card
@@ -402,25 +431,26 @@ const DocumentManagementPage = () => {
       <Modal title="Sửa tài liệu" open={editOpen} onOk={onEdit} onCancel={() => setEditOpen(false)} confirmLoading={loading} width={640}>
         <Form layout="vertical" form={editForm}>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col span={24}>
               <Form.Item name="title" label="Tiêu đề" rules={[{ required: true, message: 'Bắt buộc' }]}>
                 <Input placeholder="Nhập tiêu đề tài liệu" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="docType" label="Loại tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
-                <Select placeholder="Chọn loại">
-                  <Option value="CERTIFICATE">Giấy chứng nhận</Option>
-                  <Option value="CONTRACT">Hợp đồng</Option>
-                  <Option value="REPORT">Báo cáo</Option>
-                  <Option value="OTHER">Khác</Option>
-                </Select>
               </Form.Item>
             </Col>
           </Row>
           <Form.Item name="description" label="Mô tả">
             <TextArea rows={4} placeholder="Nhập mô tả tài liệu" />
           </Form.Item>
+          <div style={{ 
+            background: '#fff7e6', 
+            border: '1px solid #ffd591', 
+            borderRadius: '6px', 
+            padding: '12px',
+            marginTop: '16px'
+          }}>
+            <Text type="warning" style={{ fontSize: '12px' }}>
+              💡 Lưu ý: Chỉ có thể cập nhật tiêu đề và mô tả. Loại tài liệu không thể thay đổi sau khi tạo.
+            </Text>
+          </div>
         </Form>
       </Modal>
 
@@ -523,112 +553,46 @@ const DocumentManagementPage = () => {
                             <Text strong>Mô tả</Text>
                             <br />
                             <Text type="secondary" style={{ marginTop: 6, display: 'block', lineHeight: 1.6 }}>
-                              {selected.metadata ? selected.metadata.originalDescription : selected.description}
+                              {selected.description || 'Không có mô tả'}
                             </Text>
                           </div>
                         </Col>
                       </Row>
+                      
+                      <Divider />
+                      
+                      <Row gutter={24}>
+                        <Col span={24}>
+                          <div style={{ textAlign: 'center', marginTop: 16 }}>
+                            <Space size="large">
+                              <Button 
+                                type="primary" 
+                                icon={<EyeOutlined />}
+                                onClick={() => setOnlineViewerOpen(true)}
+                                disabled={!selected.ipfsHash}
+                                size="large"
+                              >
+                                Xem trực tuyến
+                              </Button>
+                              <Button 
+                                icon={<DownloadOutlined />}
+                                onClick={() => handleDownload(selected)}
+                                disabled={!selected.ipfsHash}
+                                size="large"
+                              >
+                                Tải về
+                              </Button>
+                            </Space>
+                          </div>
+                        </Col>
+                      </Row>
+                      
+
                     </div>
                   )
                 },
                 {
                   key: "2",
-                  label: "Metadata IPFS",
-                  children: (
-                    <div style={{ padding: '16px 0' }}>
-                      {selected.metadata ? (
-                        <div>
-                          <Row gutter={24}>
-                            <Col span={24}>
-                              <div style={{ marginBottom: 24, padding: '20px 0', borderBottom: '1px solid #f0f0f0' }}>
-                                <Text strong style={{ fontSize: 16 }}>IPFS Metadata</Text>
-                              </div>
-                            </Col>
-                          </Row>
-                          
-                          <Row gutter={24}>
-                            <Col span={24}>
-                              <div style={{ marginBottom: 16 }}>
-                                <Text strong>Hash file gốc</Text>
-                                <br />
-                                <div style={{ marginTop: 6, padding: 8, background: '#f5f5f5', borderRadius: 4, fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>
-                                  <Text copyable type="secondary">{selected.ipfsHash}</Text>
-                                </div>
-                              </div>
-                            </Col>
-                          </Row>
-                          
-                          <Row gutter={24}>
-                            <Col span={24}>
-                              <div style={{ marginBottom: 16 }}>
-                                <Text strong>Hash metadata</Text>
-                                <br />
-                                <div style={{ marginTop: 6, padding: 8, background: '#f5f5f5', borderRadius: 4, fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>
-                                  <Text copyable type="secondary">{selected.metadata.metadataHash}</Text>
-                                </div>
-                              </div>
-                            </Col>
-                          </Row>
-                          
-                          <Row gutter={24}>
-                            <Col span={12}>
-                              <div style={{ marginBottom: 16 }}>
-                                <Text strong>Mô tả gốc</Text>
-                                <br />
-                                <Text type="secondary" style={{ marginTop: 6, display: 'block', lineHeight: 1.6 }}>
-                                  {selected.metadata.originalDescription}
-                                </Text>
-                              </div>
-                            </Col>
-                            <Col span={12}>
-                              <div style={{ marginBottom: 16 }}>
-                                <Text strong>Ngày upload metadata</Text>
-                                <br />
-                                <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>
-                                  {selected.metadata.metadataUploadedAt ? 
-                                    new Date(selected.metadata.metadataUploadedAt).toLocaleString('vi-VN') : 'N/A'
-                                  }
-                                </Text>
-                              </div>
-                            </Col>
-                          </Row>
-                          
-                          <Row gutter={24}>
-                            <Col span={12}>
-                              <div style={{ marginBottom: 16 }}>
-                                <Text strong>Người upload metadata</Text>
-                                <br />
-                                <Text type="secondary" style={{ marginTop: 6, display: 'block' }}>
-                                  {selected.metadata.metadataUploadedBy}
-                                </Text>
-                              </div>
-                            </Col>
-                          </Row>
-                          
-                          <Divider />
-                          
-                          <div style={{ textAlign: 'center', marginTop: 16 }}>
-                            <Button 
-                              type="primary" 
-                              icon={<DownloadOutlined />}
-                              onClick={() => handleDownload(selected)}
-                            >
-                              Tải file từ IPFS
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ textAlign: 'center', padding: 32 }}>
-                          <Text type="secondary" style={{ fontSize: 14 }}>Không có metadata IPFS</Text>
-                          <br />
-                          <Text type="secondary">Hash file: {selected.ipfsHash || 'N/A'}</Text>
-                        </div>
-                      )}
-                    </div>
-                  )
-                },
-                {
-                  key: "3",
                   label: "Phân tích tài liệu",
                   children: (
                     <div>
@@ -680,13 +644,21 @@ const DocumentManagementPage = () => {
                           </Row>
                         </div>
                       ) : (
-                        <Text type="secondary">Chưa có kết quả phân tích. Nhấn nút "Phân tích tài liệu" để bắt đầu.</Text>
+                        <div style={{ textAlign: 'center', padding: 32 }}>
+                          <Text type="secondary">Chưa có kết quả phân tích</Text>
+                          <br />
+                          <Text type="secondary" style={{ fontSize: '12px' }}>
+                            Nhấn nút "Phân tích tài liệu" để bắt đầu phân tích
+                          </Text>
+                        </div>
                       )}
+                      
+
                     </div>
                   )
                 },
                 {
-                  key: "4",
+                  key: "3",
                   label: "Lịch sử thay đổi",
                   children: (
                     <div style={{ padding: '16px 0' }}>
@@ -837,6 +809,13 @@ const DocumentManagementPage = () => {
           </div>
         )}
       </Modal>
+      
+      {/* Online Document Viewer */}
+      <OnlineDocumentViewer
+        visible={onlineViewerOpen}
+        onCancel={() => setOnlineViewerOpen(false)}
+        document={selected}
+      />
     </Card>
   );
 };

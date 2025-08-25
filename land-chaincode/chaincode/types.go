@@ -5,7 +5,7 @@ import "time"
 // Land định nghĩa thông tin thửa đất và giấy chứng nhận
 type Land struct {
 	ID             string    `json:"id"`                  // Mã thửa đất
-	OwnerID        string    `json:"ownerId"`             // CCCD của chủ sở hữu
+	OwnerID        string    `json:"ownerId"`             // CCCD của chủ sử dụng
 	Area           float64   `json:"area"`                // Diện tích (m²)
 	Location       string    `json:"location"`            // Vị trí
 	LandUsePurpose string    `json:"landUsePurpose"`      // Mục đích sử dụng

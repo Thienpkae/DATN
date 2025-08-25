@@ -8,7 +8,7 @@ const documentService = {
     // Create document
     async createDocument(req, res) {
         try {
-            const { docID, docType, title, description, ipfsHash, metadataHash, fileType, fileSize, verified } = req.body;
+            const { docID, docType, title, description, ipfsHash, fileType, fileSize, verified } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
@@ -22,17 +22,8 @@ const documentService = {
 
             const { contract } = await connectToNetwork(org, userID);
 
-            // Prepare description with metadata if available
-            let finalDescription = description || '';
-            if (metadataHash) {
-                const metadataInfo = {
-                    originalDescription: description || '',
-                    metadataHash: metadataHash,
-                    metadataUploadedAt: new Date().toISOString(),
-                    metadataUploadedBy: userID
-                };
-                finalDescription = JSON.stringify(metadataInfo);
-            }
+            // Use description directly
+            const finalDescription = description || '';
 
             // Create document using existing function
             await contract.submitTransaction(
@@ -761,6 +752,7 @@ const documentService = {
             const { expectedCCCD, expectedLandParcelId } = req.query;
             
             console.log(`Analyzing document: ${docID}`);
+            console.log(`Using Gemini for analysis`);
             
             // Get document info first
             const userID = req.user.cccd;

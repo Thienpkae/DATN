@@ -434,12 +434,8 @@ func (s *LandRegistryChaincode) UpdateDocument(ctx contractapi.TransactionContex
 		return err
 	}
 
-	// Kiểm tra quyền chỉnh sửa cho Org3
-	mspID, err := GetCallerOrgMSP(ctx)
-	if err != nil {
-		return err
-	}
-	if mspID == "Org3MSP" && doc.UploadedBy != userID {
+	// Kiểm tra quyền chỉnh sửa - ai upload thì mới được thao tác
+	if doc.UploadedBy != userID {
 		return fmt.Errorf("người dùng %s không có quyền chỉnh sửa tài liệu %s", userID, docID)
 	}
 
@@ -479,12 +475,8 @@ func (s *LandRegistryChaincode) DeleteDocument(ctx contractapi.TransactionContex
 		return err
 	}
 
-	// Kiểm tra quyền xóa cho Org3
-	mspID, err := GetCallerOrgMSP(ctx)
-	if err != nil {
-		return err
-	}
-	if mspID == "Org3MSP" && doc.UploadedBy != userID {
+	// Kiểm tra quyền xóa - ai upload thì mới được thao tác
+	if doc.UploadedBy != userID {
 		return fmt.Errorf("người dùng %s không có quyền xóa tài liệu %s", userID, docID)
 	}
 
@@ -1016,7 +1008,7 @@ func (s *LandRegistryChaincode) ConfirmTransfer(ctx contractapi.TransactionConte
 	}
 	// Cập nhật giấy chứng nhận nếu có
 	if land.CertificateID != "" {
-		// Cập nhật thông tin chủ sở hữu trong land struct
+		// Cập nhật thông tin chủ sử dụng trong land struct
 		land.UpdatedAt = txTime
 		landJSON, err := json.Marshal(land)
 		if err != nil {
@@ -1059,9 +1051,6 @@ func (s *LandRegistryChaincode) ProcessTransaction(ctx contractapi.TransactionCo
 	if tx.Status != "PENDING" {
 		return fmt.Errorf("giao dịch %s không ở trạng thái PENDING", txID)
 	}
-
-	// Documents are now verified when linked to land parcel
-	// DocumentIDs only contains verified documents
 
 	missingDocs, err := CheckRequiredDocuments(ctx, txID, tx.Type)
 	if err != nil {
@@ -1163,7 +1152,7 @@ func (s *LandRegistryChaincode) ApproveTransferTransaction(ctx contractapi.Trans
 		return fmt.Errorf("lỗi khi lấy timestamp: %v", err)
 	}
 
-	// Cập nhật chủ sở hữu thửa đất
+	// Cập nhật chủ sử dụng thửa đất
 	land.OwnerID = tx.ToOwnerID
 	land.UpdatedAt = txTime
 	landJSON, err := json.Marshal(land)

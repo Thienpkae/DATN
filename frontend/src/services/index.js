@@ -284,7 +284,7 @@ export const ORGANIZATION_PERMISSIONS = {
     canView: ['all'] // Can view all data
   },
   ORG3: {
-    name: 'Công dân/Chủ sở hữu đất',
+    name: 'Công dân/chủ sử dụng đất',
     permissions: [
       'land_view', 'transaction_create', 'transaction_confirm',
       'document_create', 'document_view'

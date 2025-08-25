@@ -69,6 +69,7 @@ app.put('/api/users/:cccd', authenticateJWT, requireAdmin, userService.updateUse
 // User Routes (Profile Management - No Admin Required)
 app.get('/api/users/profile', authenticateJWT, userService.getProfile);
 app.put('/api/users/profile', authenticateJWT, userService.updateProfile);
+app.get('/api/users/current', authenticateJWT, userService.getCurrentUser);
 
 // Land Parcel Routes
 app.post('/api/land-parcels', authenticateJWT, checkOrg(['Org1']), landService.createLandParcel);
@@ -92,12 +93,12 @@ app.get('/api/documents/transaction/:txID', authenticateJWT, documentService.get
 app.get('/api/documents/uploader/:uploaderID', authenticateJWT, documentService.getDocumentsByUploader);
 app.get('/api/documents/history/:docID', authenticateJWT, documentService.getDocumentHistory);
 app.get('/api/documents', authenticateJWT, checkOrg(['Org1', 'Org2']), documentService.getAllDocuments);
+app.get('/api/documents/:docID/analyze', authenticateJWT, checkOrg(['Org1', 'Org2']), documentService.analyzeDocument);
 app.get('/api/documents/:docID', authenticateJWT, documentService.getDocument);
 app.put('/api/documents/:docID', authenticateJWT, documentService.updateDocument);
 app.delete('/api/documents/:docID', authenticateJWT, documentService.deleteDocument);
 app.post('/api/documents/:docID/verify', authenticateJWT, checkOrg(['Org2']), documentService.verifyDocument);
 app.post('/api/documents/:docID/reject', authenticateJWT, checkOrg(['Org2']), documentService.rejectDocument);
-app.get('/api/documents/:docID/analyze', authenticateJWT, checkOrg(['Org1', 'Org2']), documentService.analyzeDocument);
 
 // Transaction Routes
 app.post('/api/transactions/:txID/process', authenticateJWT, checkOrg(['Org2']), transactionService.processTransaction);

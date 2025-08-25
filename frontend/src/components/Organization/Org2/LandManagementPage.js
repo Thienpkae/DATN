@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Table, Button, Input, Select, Space, Tag, message, Drawer, Row, Col, Tabs, List, Typography, Tooltip } from 'antd';
-import { SearchOutlined, ReloadOutlined, HistoryOutlined, EyeOutlined, FileTextOutlined, ClearOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, HistoryOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons';
 import landService from '../../../services/landService';
 import { LAND_USE_PURPOSES, LEGAL_STATUSES } from '../../../services/index';
 
@@ -76,7 +76,7 @@ const LandManagementPage = () => {
       )
     },
     {
-      title: 'Chủ sở hữu',
+      title: 'chủ sử dụng',
       dataIndex: 'ownerId',
       key: 'ownerId',
       width: 140,
@@ -188,10 +188,6 @@ const LandManagementPage = () => {
             ))}
           </Select>
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
-          <Button icon={<ClearOutlined />} onClick={() => {
-            setFilters(defaultFilters);
-            loadList();
-          }}>Reset</Button>
           <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
         </Space>
       }
@@ -228,7 +224,7 @@ const LandManagementPage = () => {
                   <Text copyable>{selected.id}</Text>
                 </Col>
                 <Col span={12}>
-                  <Text strong>Chủ sở hữu:</Text>
+                  <Text strong>chủ sử dụng:</Text>
                   <br />
                   <Text copyable>{selected.ownerId}</Text>
                 </Col>

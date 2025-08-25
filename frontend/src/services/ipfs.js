@@ -111,7 +111,18 @@ export async function uploadJSONToPinata(jsonData, name = 'metadata.json') {
   }
 }
 
-// Upload document with file and metadata
+// Upload file to IPFS (simplified version)
+export async function uploadFileToIPFS(file, onProgress) {
+  try {
+    const fileUploadResult = await uploadFileToPinata(file, onProgress);
+    return fileUploadResult.ipfsHash;
+  } catch (error) {
+    console.error('Error uploading file to IPFS:', error);
+    throw new Error(`Lỗi khi upload file lên IPFS: ${error.message}`);
+  }
+}
+
+// Upload document with file and metadata (deprecated - use uploadFileToIPFS instead)
 export async function uploadDocumentToIPFS(file, documentMetadata, onProgress) {
   try {
     // First upload the file
@@ -232,6 +243,7 @@ export async function checkIPFSHashAccessibility(ipfsHash) {
 const ipfsService = {
   uploadFileToPinata,
   uploadJSONToPinata,
+  uploadFileToIPFS,
   uploadDocumentToIPFS,
   getPinataFileUrl,
   getPinataMetadataUrl,

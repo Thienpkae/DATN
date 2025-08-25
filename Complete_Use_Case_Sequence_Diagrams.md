@@ -1410,12 +1410,12 @@ sequenceDiagram
         DB -->> API: Kết quả kiểm tra người sử dụng đất
         deactivate DB
 
-        alt Chủ sở hữu không tồn tại
-            API -->> UI: Thông báo "Chủ sở hữu không tồn tại"
+        alt chủ sử dụng không tồn tại
+            API -->> UI: Thông báo "chủ sử dụng không tồn tại"
             activate UI
             UI -->> Staff: Hiển thị thông báo lỗi và yêu cầu đăng ký người sử dụng đất trước
             deactivate UI
-        else Chủ sở hữu tồn tại
+        else chủ sử dụng tồn tại
             alt Có mã GCN nhưng thiếu thông tin pháp lý
                 API -->> UI: Thông báo "Thiếu thông tin pháp lý"
                 activate UI
@@ -1431,7 +1431,7 @@ sequenceDiagram
 
                 activate SMS
                 API ->> SMS: Gửi thông báo cho người sử dụng đất
-                SMS -->> Chủ sở hữu: Nhận thông báo về thửa đất mới
+                SMS -->> chủ sử dụng: Nhận thông báo về thửa đất mới
                 deactivate SMS
 
                 API -->> UI: Trả về thông tin thửa đất đã tạo thành công
@@ -1450,7 +1450,7 @@ sequenceDiagram
 ### Các trường hợp ngoại lệ
 - Thông tin thửa đất không hợp lệ
 - Số thửa đã tồn tại trong hệ thống
-- Chủ sở hữu không tồn tại trong hệ thống
+- chủ sử dụng không tồn tại trong hệ thống
 - Lỗi tạo trên blockchain
 - Cán bộ không có quyền tạo thửa đất
 
@@ -1532,7 +1532,7 @@ sequenceDiagram
 
                 activate SMS
                 API ->> SMS: Gửi thông báo cho người sử dụng đất
-                SMS -->> Chủ sở hữu: Nhận thông báo về thay đổi thông tin thửa đất
+                SMS -->> chủ sử dụng: Nhận thông báo về thay đổi thông tin thửa đất
                 deactivate SMS
 
                 API -->> UI: Trả về thông tin đã cập nhật
@@ -1551,7 +1551,7 @@ sequenceDiagram
 ### Các trường hợp ngoại lệ
 - Thông tin cập nhật không hợp lệ
 - Thửa đất có giao dịch đang xử lý
-- Chủ sở hữu mới không tồn tại trong hệ thống
+- chủ sử dụng mới không tồn tại trong hệ thống
 - Lỗi cập nhật trên blockchain
 - Cán bộ không có quyền cập nhật thửa đất
 
@@ -1671,12 +1671,12 @@ sequenceDiagram
 
     API ->> API: Kiểm tra quyền xem của người dùng
 
-    alt Chủ sở hữu không tồn tại
+    alt chủ sử dụng không tồn tại
         API -->> UI: Thông báo "Người này không có trong hệ thống"
         activate UI
         UI -->> User: Hiển thị thông báo lỗi
         deactivate UI
-    else Chủ sở hữu tồn tại
+    else chủ sử dụng tồn tại
         alt Không có thửa đất nào
             API -->> UI: Thông báo "Chưa có thửa đất nào"
             activate UI

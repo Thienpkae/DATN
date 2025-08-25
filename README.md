@@ -1,5 +1,6 @@
 
-Dependencies: Set up Hyperledger Fabric environment: [Hyperledger Fabric Official Docs](https://hyperledger-fabric.readthedocs.io/en/latest/getting_started.html)
+Dependencies: Set up Hyperledger Fabric environment: [Hyperledger Fabric Official Docs](https://hyperledger-fabric.readthedocs.io/en/latest/getting_started.html) and MongoDB
+
 
 How to run project
 

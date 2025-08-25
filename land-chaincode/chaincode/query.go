@@ -49,7 +49,7 @@ func (s *LandRegistryChaincode) GetLand(ctx contractapi.TransactionContextInterf
 	return s.QueryLandByID(ctx, landID, userID)
 }
 
-// QueryLandsByOwner - Truy vấn tất cả thửa đất của một chủ sở hữu
+// QueryLandsByOwner - Truy vấn tất cả thửa đất của một chủ sử dụng
 func (s *LandRegistryChaincode) QueryLandsByOwner(ctx contractapi.TransactionContextInterface, ownerID, userID string) ([]*Land, error) {
 	mspID, err := GetCallerOrgMSP(ctx)
 	if err != nil {
@@ -69,7 +69,7 @@ func (s *LandRegistryChaincode) QueryLandsByOwner(ctx contractapi.TransactionCon
 		return nil, err
 	}
 
-	logDetails := fmt.Sprintf("Truy vấn thửa đất theo chủ sở hữu %s", ownerID)
+	logDetails := fmt.Sprintf("Truy vấn thửa đất theo chủ sử dụng %s", ownerID)
 	if err := RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_LANDS_BY_OWNER", userID, logDetails); err != nil {
 		fmt.Printf("Lỗi khi ghi log giao dịch: %v\n", err)
 	}
@@ -533,7 +533,7 @@ func (s *LandRegistryChaincode) GetTransaction(ctx contractapi.TransactionContex
 	return s.QueryTransactionByID(ctx, txID, userID)
 }
 
-// QueryTransactionsByOwner - Truy vấn tất cả giao dịch của một chủ sở hữu
+// QueryTransactionsByOwner - Truy vấn tất cả giao dịch của một chủ sử dụng
 func (s *LandRegistryChaincode) QueryTransactionsByOwner(ctx contractapi.TransactionContextInterface, ownerID, userID string) ([]*Transaction, error) {
 	mspID, err := GetCallerOrgMSP(ctx)
 	if err != nil {
@@ -553,7 +553,7 @@ func (s *LandRegistryChaincode) QueryTransactionsByOwner(ctx contractapi.Transac
 		return nil, err
 	}
 
-	logDetails := fmt.Sprintf("Truy vấn giao dịch theo chủ sở hữu %s", ownerID)
+	logDetails := fmt.Sprintf("Truy vấn giao dịch theo chủ sử dụng %s", ownerID)
 	if err := RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_TRANSACTIONS_BY_OWNER", userID, logDetails); err != nil {
 		fmt.Printf("Lỗi khi ghi log giao dịch: %v\n", err)
 	}
