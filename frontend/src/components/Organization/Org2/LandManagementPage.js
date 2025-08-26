@@ -121,14 +121,20 @@ const LandManagementPage = () => {
       key: 'legalStatus',
       width: 100,
       align: 'center',
-      render: v => (
-        <Tag
-          color={v === 'LUA' ? 'green' : v === 'HNK' ? 'blue' : v === 'CLN' ? 'orange' : 'default'}
-          style={{ fontWeight: 500 }}
-        >
-          {v}
-        </Tag>
-      )
+      render: v => {
+        const displayValue = v || 'Chưa có';
+        const color = v === 'LUA' ? 'green' : 
+                     v === 'HNK' ? 'blue' : 
+                     v === 'CLN' ? 'orange' : 
+                     v === 'ONT*' ? 'purple' :
+                     !v ? 'default' : 'default';
+        
+        return (
+          <Tag color={color} style={{ fontWeight: 500 }}>
+            {displayValue}
+          </Tag>
+        );
+      }
     },
     {
       title: 'Diện tích',

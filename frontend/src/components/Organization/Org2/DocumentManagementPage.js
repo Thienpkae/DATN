@@ -492,6 +492,16 @@ const DocumentManagementPage = () => {
       message.success('Xác thực tài liệu thành công');
       setVerifyModalOpen(false);
       setVerificationNotes('');
+      
+      // Cập nhật selected object với thông tin mới
+      const updatedDocument = {
+        ...selected,
+        verified: true,
+        verifiedBy: user?.userId || 'N/A',
+        verifiedAt: new Date().toISOString()
+      };
+      setSelected(updatedDocument);
+      
       loadList(); // Refresh list
     } catch (error) {
       message.error(error.message || 'Lỗi khi xác thực tài liệu');
@@ -512,6 +522,16 @@ const DocumentManagementPage = () => {
       message.success('Từ chối tài liệu thành công');
       setRejectModalOpen(false);
       setRejectionReason('');
+      
+      // Cập nhật selected object với thông tin mới
+      const updatedDocument = {
+        ...selected,
+        verified: false,
+        verifiedBy: '',
+        verifiedAt: '0001-01-01T00:00:00Z'
+      };
+      setSelected(updatedDocument);
+      
       loadList(); // Refresh list
     } catch (error) {
       message.error(error.message || 'Lỗi khi từ chối tài liệu');
@@ -525,7 +545,7 @@ const DocumentManagementPage = () => {
     { title: 'Tiêu đề', dataIndex: 'title', key: 'title' },
     { title: 'Loại', dataIndex: 'type', key: 'type', render: v => <Tag color="blue">{v}</Tag> },
     { title: 'Trạng thái', dataIndex: 'verified', key: 'verified', render: v => v ? <Tag color="green">Đã xác thực</Tag> : <Tag color="orange">Chờ xác thực</Tag> },
-    { title: 'Loại file', dataIndex: 'fileType', key: 'fileType', render: v => <Tag color="blue">{v}</Tag> },
+    { title: 'Loại file', dataIndex: 'fileType', key: 'fileType', render: v => <Tag color="blue">{documentService.getDisplayFileType(v)}</Tag> },
     { title: 'Kích thước', dataIndex: 'fileSize', key: 'fileSize', render: v => v ? `${(v / 1024).toFixed(2)} KB` : 'N/A' },
     { title: 'Người upload', dataIndex: 'uploadedBy', key: 'uploadedBy' },
     {
@@ -601,6 +621,18 @@ const DocumentManagementPage = () => {
         columns={columns}
         scroll={{ x: 1200 }}
         pagination={{ pageSize: 10, showSizeChanger: true }}
+        locale={{
+          emptyText: (
+            <div style={{ padding: '40px 0' }}>
+              <div style={{ fontSize: '16px', color: '#595959', marginBottom: '8px' }}>
+                Chưa có tài liệu nào cần xác thực
+              </div>
+              <div style={{ fontSize: '14px', color: '#8c8c8c' }}>
+                Các tài liệu được upload sẽ hiển thị ở đây để bạn xác thực
+              </div>
+            </div>
+          )
+        }}
       />
 
       {/* Create Document */}
@@ -746,7 +778,7 @@ const DocumentManagementPage = () => {
                           <div style={{ marginBottom: 16 }}>
                             <Text strong>Loại file</Text>
                             <br />
-                            <Tag color="blue" style={{ marginTop: 6 }}>{selected.fileType}</Tag>
+                            <Tag color="blue" style={{ marginTop: 6 }}>{documentService.getDisplayFileType(selected.fileType)}</Tag>
                           </div>
                         </Col>
                         <Col span={12}>

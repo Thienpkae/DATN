@@ -481,6 +481,63 @@ const documentService = {
     ];
   },
 
+  // Convert MIME type to display name
+  getDisplayFileType(mimeType) {
+    if (!mimeType) return 'Unknown';
+    
+    // Common MIME type mappings
+    const mimeToDisplayType = {
+      'application/pdf': 'PDF',
+      'application/msword': 'DOC',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+      'application/vnd.ms-excel': 'XLS',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX',
+      'application/vnd.ms-powerpoint': 'PPT',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PPTX',
+      'text/plain': 'TXT',
+      'text/csv': 'CSV',
+      'image/jpeg': 'JPG',
+      'image/jpg': 'JPG',
+      'image/png': 'PNG',
+      'image/gif': 'GIF',
+      'image/bmp': 'BMP',
+      'image/tiff': 'TIFF',
+      'application/zip': 'ZIP',
+      'application/x-rar-compressed': 'RAR',
+      'application/json': 'JSON',
+      'application/xml': 'XML',
+      'text/html': 'HTML',
+      'text/css': 'CSS',
+      'application/javascript': 'JS'
+    };
+
+    // Try exact match first
+    if (mimeToDisplayType[mimeType]) {
+      return mimeToDisplayType[mimeType];
+    }
+
+    // Try pattern matching for common cases
+    if (mimeType.includes('word')) return 'DOC/DOCX';
+    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'XLS/XLSX';
+    if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'PPT/PPTX';
+    if (mimeType.includes('pdf')) return 'PDF';
+    if (mimeType.startsWith('image/')) {
+      const subtype = mimeType.split('/')[1]?.toUpperCase();
+      return subtype || 'Image';
+    }
+    if (mimeType.startsWith('text/')) return 'Text';
+    if (mimeType.startsWith('audio/')) return 'Audio';
+    if (mimeType.startsWith('video/')) return 'Video';
+    
+    // Fallback: return the subtype or the whole mime type
+    const parts = mimeType.split('/');
+    if (parts.length === 2) {
+      return parts[1].toUpperCase();
+    }
+    
+    return mimeType;
+  },
+
   // Get current user information
   async getCurrentUser() {
     try {

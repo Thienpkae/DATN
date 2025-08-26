@@ -23,6 +23,7 @@ var validLandUsePurposes = map[string]bool{
 }
 
 var validLegalStatuses = map[string]bool{
+	"":     true, // Chưa có trạng thái pháp lý (đất chưa được cấp GCN)
 	"HNK":  true, // Đất trồng cây hàng năm khác
 	"LUA":  true, // Đất lúa nước còn lại
 	"ONT*": true, // Đất ở tại nông thôn
@@ -30,11 +31,11 @@ var validLegalStatuses = map[string]bool{
 }
 
 var requiredDocuments = map[string][]string{
-	"TRANSFER":       {"Hợp đồng chuyển nhượng", "Giấy chứng nhận QSDĐ", "Giấy tờ tùy thân"},
-	"SPLIT":          {"Đơn xin tách thửa", "Giấy chứng nhận QSDĐ", "Sơ đồ thửa đất"},
-	"MERGE":          {"Đơn xin hợp thửa", "Giấy chứng nhận QSDĐ", "Sơ đồ thửa đất"},
-	"CHANGE_PURPOSE": {"Đơn xin thay đổi mục đích sử dụng đất", "Giấy chứng nhận QSDĐ"},
-	"REISSUE":        {"Đơn xin cấp lại GCN", "Giấy tờ tùy thân"},
+	"TRANSFER":       {"Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo Mẫu số 09/ĐK", "Hợp đồng chuyển nhượng quyền sử dụng đất", "Giấy chứng nhận quyền sử dụng đất"},
+	"SPLIT":          {"Đơn đề nghị tách thửa đất, hợp thửa đất theo Mẫu số 21 ban hành kèm theo Nghị định số 151/2025/NĐ-CP", "Giấy chứng nhận quyền sử dụng đất", "Bản vẽ tách thửa đất, hợp thửa đất lập theo Mẫu số 22 ban hành kèm theo Nghị định số 151/2025/NĐ-CP"},
+	"MERGE":          {"Đơn đề nghị tách thửa đất, hợp thửa đất theo Mẫu số 21 ban hành kèm theo Nghị định số 151/2025/NĐ-CP", "Giấy chứng nhận quyền sử dụng đất", "Bản vẽ tách thửa đất, hợp thửa đất lập theo Mẫu số 22 ban hành kèm theo Nghị định số 151/2025/NĐ-CP"},
+	"CHANGE_PURPOSE": {"Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo Mẫu số 09/ĐK", "Giấy chứng nhận quyền sử dụng đất"},
+	"REISSUE":        {"Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo Mẫu số 18 ban hành kèm theo Nghị định số 151/2025/NĐ-CP", "Giấy chứng nhận quyền sử dụng đất", "Mảnh trích đo bản đồ địa chính thửa đất"},
 }
 
 // ValidateIPFSHash kiểm tra định dạng hash IPFS
@@ -287,7 +288,7 @@ func matchDocument(required, found string) bool {
 	// Kiểm tra chứa từ khóa chính
 	keywords := map[string][]string{
 		"hợp đồng chuyển nhượng":                {"hợp đồng", "chuyển nhượng", "hop dong", "chuyen nhuong"},
-		"giấy chứng nhận qsdđ":                  {"giấy chứng nhận", "gcn", "chứng nhận", "quyền sử dụng", "certificate"},
+		"giấy chứng nhận quyền sử dụng đất":                  {"giấy chứng nhận", "gcn", "chứng nhận", "quyền sử dụng", "certificate"},
 		"giấy tờ tùy thân":                      {"cccd", "cmnd", "tùy thân", "căn cước", "chứng minh"},
 		"đơn xin tách thửa":                     {"đơn", "tách", "thửa", "application", "split"},
 		"sơ đồ thửa đất":                        {"sơ đồ", "bản vẽ", "survey", "diagram"},

@@ -295,7 +295,7 @@ const DocumentManagementPage = () => {
         />
       )
     },
-    { title: 'Loại file', dataIndex: 'fileType', key: 'fileType' },
+    { title: 'Loại file', dataIndex: 'fileType', key: 'fileType', render: v => <Tag color="blue">{documentService.getDisplayFileType(v)}</Tag> },
     { title: 'Kích thước', dataIndex: 'fileSize', key: 'fileSize', render: v => v ? `${(v / 1024).toFixed(2)} KB` : 'N/A' },
     { title: 'Người upload', dataIndex: 'uploadedBy', key: 'uploadedBy' },
     {
@@ -383,6 +383,18 @@ const DocumentManagementPage = () => {
         columns={columns}
         scroll={{ x: 1200 }}
         pagination={{ pageSize: 10, showSizeChanger: true }}
+        locale={{
+          emptyText: (
+            <div style={{ padding: '40px 0' }}>
+              <div style={{ fontSize: '16px', color: '#595959', marginBottom: '8px' }}>
+                Bạn chưa sở hữu tài liệu nào
+              </div>
+              <div style={{ fontSize: '14px', color: '#8c8c8c' }}>
+                Hãy upload tài liệu đầu tiên của bạn bằng cách nhấn nút "Upload tài liệu"
+              </div>
+            </div>
+          )
+        }}
       />
 
 
@@ -447,7 +459,7 @@ const DocumentManagementPage = () => {
                           <div style={{ marginBottom: 16 }}>
                             <Text strong>Loại file</Text>
                             <br />
-                            <Tag color="blue" style={{ marginTop: 6 }}>{selected.fileType}</Tag>
+                            <Tag color="blue" style={{ marginTop: 6 }}>{documentService.getDisplayFileType(selected.fileType)}</Tag>
                           </div>
                         </Col>
                         <Col span={12}>

@@ -9,7 +9,8 @@ const transactionService = {
         txID: transferData.txID,
         landParcelId: transferData.landParcelID,
         fromOwnerId: transferData.fromOwnerID,
-        toOwnerId: transferData.toOwnerID
+        toOwnerId: transferData.toOwnerID,
+        documentIds: transferData.documentIds || []
       });
       return response.data;
     } catch (error) {
@@ -314,6 +315,16 @@ const transactionService = {
       'REISSUE': 'Cấp lại giấy chứng nhận'
     };
     return typeTexts[type] || type;
+  },
+
+  // Get lands by owner
+  async getLandsByOwner(ownerID) {
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.LAND.GET_BY_OWNER.replace(':ownerID', ownerID));
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Lỗi khi lấy danh sách thửa đất');
+    }
   }
 };
 

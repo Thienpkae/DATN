@@ -43,7 +43,7 @@ const transactionService = {
     // Create transfer request
     async createTransferRequest(req, res) {
         try {
-            const { txID, landParcelId, fromOwnerId, toOwnerId } = req.body;
+            const { txID, landParcelId, fromOwnerId, toOwnerId, documentIds } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
@@ -56,6 +56,22 @@ const transactionService = {
                 fromOwnerId,
                 toOwnerId
             );
+
+            // Link documents if provided
+            if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
+                for (const docID of documentIds) {
+                    try {
+                        await contract.submitTransaction(
+                            'LinkDocumentToTransaction',
+                            docID,
+                            txID
+                        );
+                    } catch (linkError) {
+                        console.warn(`Warning: Could not link document ${docID} to transaction ${txID}:`, linkError.message);
+                        // Continue with other documents instead of failing completely
+                    }
+                }
+            }
 
             // Get the created transaction to return as response data
             const transactionResult = await contract.evaluateTransaction(
@@ -74,7 +90,7 @@ const transactionService = {
 
             res.json({
                 success: true,
-                message: 'Yêu cầu chuyển nhượng đã được tạo thành công và thông báo đã được gửi',
+                message: `Yêu cầu chuyển nhượng đã được tạo thành công${documentIds?.length > 0 ? ` với ${documentIds.length} tài liệu đính kèm` : ''} và thông báo đã được gửi`,
                 data: JSON.parse(transactionResult.toString())
             });
         } catch (error) {
@@ -136,7 +152,7 @@ const transactionService = {
     // Create split request
     async createSplitRequest(req, res) {
         try {
-            const { txID, landParcelID, ownerID, newParcels } = req.body;
+            const { txID, landParcelID, ownerID, newParcels, documentIds } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
@@ -151,6 +167,21 @@ const transactionService = {
                 newParcelsStr
             );
 
+            // Link documents if provided
+            if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
+                for (const docID of documentIds) {
+                    try {
+                        await contract.submitTransaction(
+                            'LinkDocumentToTransaction',
+                            docID,
+                            txID
+                        );
+                    } catch (linkError) {
+                        console.warn(`Warning: Could not link document ${docID} to transaction ${txID}:`, linkError.message);
+                    }
+                }
+            }
+
             // Get the created transaction to return as response data
             const transactionResult = await contract.evaluateTransaction(
                 'QueryTransactionByID',
@@ -160,7 +191,7 @@ const transactionService = {
 
             res.json({
                 success: true,
-                message: 'Yêu cầu tách thửa đã được tạo thành công',
+                message: `Yêu cầu tách thửa đã được tạo thành công${documentIds?.length > 0 ? ` với ${documentIds.length} tài liệu đính kèm` : ''}`,
                 data: JSON.parse(transactionResult.toString())
             });
         } catch (error) {
@@ -176,7 +207,7 @@ const transactionService = {
     // Create merge request
     async createMergeRequest(req, res) {
         try {
-            const { txID, ownerID, parcelIDs, newParcel } = req.body;
+            const { txID, ownerID, parcelIDs, newParcel, documentIds } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
@@ -192,6 +223,21 @@ const transactionService = {
                 newParcelStr
             );
 
+            // Link documents if provided
+            if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
+                for (const docID of documentIds) {
+                    try {
+                        await contract.submitTransaction(
+                            'LinkDocumentToTransaction',
+                            docID,
+                            txID
+                        );
+                    } catch (linkError) {
+                        console.warn(`Warning: Could not link document ${docID} to transaction ${txID}:`, linkError.message);
+                    }
+                }
+            }
+
             // Get the created transaction to return as response data
             const transactionResult = await contract.evaluateTransaction(
                 'QueryTransactionByID',
@@ -201,7 +247,7 @@ const transactionService = {
 
             res.json({
                 success: true,
-                message: 'Yêu cầu hợp thửa đã được tạo thành công',
+                message: `Yêu cầu hợp thửa đã được tạo thành công${documentIds?.length > 0 ? ` với ${documentIds.length} tài liệu đính kèm` : ''}`,
                 data: JSON.parse(transactionResult.toString())
             });
         } catch (error) {
@@ -217,7 +263,7 @@ const transactionService = {
     // Create change purpose request
     async createChangePurposeRequest(req, res) {
         try {
-            const { txID, landParcelID, ownerID, newPurpose } = req.body;
+            const { txID, landParcelID, ownerID, newPurpose, documentIds } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
@@ -231,6 +277,21 @@ const transactionService = {
                 newPurpose
             );
 
+            // Link documents if provided
+            if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
+                for (const docID of documentIds) {
+                    try {
+                        await contract.submitTransaction(
+                            'LinkDocumentToTransaction',
+                            docID,
+                            txID
+                        );
+                    } catch (linkError) {
+                        console.warn(`Warning: Could not link document ${docID} to transaction ${txID}:`, linkError.message);
+                    }
+                }
+            }
+
             // Get the created transaction to return as response data
             const transactionResult = await contract.evaluateTransaction(
                 'QueryTransactionByID',
@@ -240,7 +301,7 @@ const transactionService = {
 
             res.json({
                 success: true,
-                message: 'Yêu cầu thay đổi mục đích sử dụng đã được tạo thành công',
+                message: `Yêu cầu thay đổi mục đích sử dụng đã được tạo thành công${documentIds?.length > 0 ? ` với ${documentIds.length} tài liệu đính kèm` : ''}`,
                 data: JSON.parse(transactionResult.toString())
             });
         } catch (error) {
@@ -256,7 +317,7 @@ const transactionService = {
     // Create reissue request
     async createReissueRequest(req, res) {
         try {
-            const { txID, landParcelID, ownerID } = req.body;
+            const { txID, landParcelID, ownerID, documentIds } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
@@ -269,6 +330,21 @@ const transactionService = {
                 ownerID
             );
 
+            // Link documents if provided
+            if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
+                for (const docID of documentIds) {
+                    try {
+                        await contract.submitTransaction(
+                            'LinkDocumentToTransaction',
+                            docID,
+                            txID
+                        );
+                    } catch (linkError) {
+                        console.warn(`Warning: Could not link document ${docID} to transaction ${txID}:`, linkError.message);
+                    }
+                }
+            }
+
             // Get the created transaction to return as response data
             const transactionResult = await contract.evaluateTransaction(
                 'QueryTransactionByID',
@@ -278,7 +354,7 @@ const transactionService = {
 
             res.json({
                 success: true,
-                message: 'Yêu cầu cấp lại GCN đã được tạo thành công',
+                message: `Yêu cầu cấp lại GCN đã được tạo thành công${documentIds?.length > 0 ? ` với ${documentIds.length} tài liệu đính kèm` : ''}`,
                 data: JSON.parse(transactionResult.toString())
             });
         } catch (error) {

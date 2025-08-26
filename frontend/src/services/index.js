@@ -123,6 +123,7 @@ export const LAND_USE_PURPOSES = {
 
 // Export legal statuses - EXACTLY match chaincode
 export const LEGAL_STATUSES = {
+  '': 'Chưa có (Đất chưa được cấp GCN)',
   HNK: 'Đất trồng cây hàng năm khác',
   LUA: 'Đất lúa nước còn lại',
   'ONT*': 'Đất ở tại nông thôn',
@@ -242,13 +243,32 @@ export const SUCCESS_TYPES = {
   SENT: 'sent'
 };
 
-// Export required documents for each transaction type - EXACTLY match chaincode
+// Export required documents for each transaction type - Cập nhật theo Nghị định 151/2025/NĐ-CP
 export const REQUIRED_DOCUMENTS = {
-  TRANSFER: ['Hợp đồng chuyển nhượng', 'Giấy chứng nhận QSDĐ', 'Giấy tờ tùy thân'],
-  SPLIT: ['Đơn xin tách thửa', 'Giấy chứng nhận QSDĐ', 'Sơ đồ thửa đất'],
-  MERGE: ['Đơn xin hợp thửa', 'Giấy chứng nhận QSDĐ', 'Sơ đồ thửa đất'],
-  CHANGE_PURPOSE: ['Đơn xin thay đổi mục đích sử dụng đất', 'Giấy chứng nhận QSDĐ'],
-  REISSUE: ['Đơn xin cấp lại GCN', 'Giấy tờ tùy thân']
+  TRANSFER: [
+    'Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo Mẫu số 09/ĐK',
+    'Hợp đồng chuyển nhượng quyền sử dụng đất',
+    'Giấy chứng nhận quyền sử dụng đất'
+  ],
+  SPLIT: [
+    'Đơn đề nghị tách thửa đất, hợp thửa đất theo Mẫu số 21 ban hành kèm theo Nghị định số 151/2025/NĐ-CP',
+    'Giấy chứng nhận quyền sử dụng đất',
+    'Bản vẽ tách thửa đất, hợp thửa đất lập theo Mẫu số 22 ban hành kèm theo Nghị định số 151/2025/NĐ-CP'
+  ],
+  MERGE: [
+    'Đơn đề nghị tách thửa đất, hợp thửa đất theo Mẫu số 21 ban hành kèm theo Nghị định số 151/2025/NĐ-CP',
+    'Giấy chứng nhận quyền sử dụng đất',
+    'Bản vẽ tách thửa đất, hợp thửa đất lập theo Mẫu số 22 ban hành kèm theo Nghị định số 151/2025/NĐ-CP'
+  ],
+  CHANGE_PURPOSE: [
+    'Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo Mẫu số 09/ĐK',
+    'Giấy chứng nhận quyền sử dụng đất'
+  ],
+  REISSUE: [
+    'Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo Mẫu số 18 ban hành kèm theo Nghị định số 151/2025/NĐ-CP',
+    'Giấy chứng nhận quyền sử dụng đất',
+    'Mảnh trích đo bản đồ địa chính thửa đất'
+  ]
 };
 
 // Export IPFS validation rules - EXACTLY match chaincode

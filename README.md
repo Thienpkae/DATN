@@ -57,7 +57,7 @@ Test Postman: [API](https://www.postman.com/research-administrator-81537314/work
 ```shell
 cd ../frontend
 
-npm install
+npm i
 
 npm start
 ```

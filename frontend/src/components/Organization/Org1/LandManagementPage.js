@@ -284,7 +284,15 @@ const LandManagementPage = () => {
     { title: 'Diện tích (m²)', dataIndex: 'area', key: 'area' },
     { title: 'Vị trí', dataIndex: 'location', key: 'location' },
     { title: 'Mục đích sử dụng', dataIndex: 'landUsePurpose', key: 'landUsePurpose', render: v => <Tag color="blue">{v}</Tag> },
-    { title: 'Trạng thái pháp lý', dataIndex: 'legalStatus', key: 'legalStatus', render: v => <Tag color={v === 'LUA' ? 'green' : v === 'HNK' ? 'blue' : 'default'}>{v}</Tag> },
+    { title: 'Trạng thái pháp lý', dataIndex: 'legalStatus', key: 'legalStatus', render: v => {
+      const displayValue = v || 'Chưa có';
+      const color = v === 'LUA' ? 'green' : 
+                   v === 'HNK' ? 'blue' : 
+                   v === 'CLN' ? 'orange' : 
+                   v === 'ONT*' ? 'purple' :
+                   !v ? 'default' : 'default';
+      return <Tag color={color}>{displayValue}</Tag>;
+    }},
     { title: 'Giấy chứng nhận', dataIndex: 'certificateId', key: 'certificateId', render: v => v ? <Tag color="green">{v}</Tag> : <Tag color="red">Chưa có</Tag> },
     {
       title: 'Thao tác', key: 'actions', fixed: 'right', render: (_, record) => (

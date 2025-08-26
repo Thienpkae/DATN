@@ -474,7 +474,22 @@ const documentService = {
                 userID
             );
 
-            const documents = JSON.parse(result.toString());
+            let documents = [];
+            const resultString = result.toString().trim();
+            
+            if (resultString && resultString !== 'null' && resultString !== '') {
+                try {
+                    documents = JSON.parse(resultString);
+                } catch (parseError) {
+                    console.warn('Could not parse documents result:', parseError);
+                    documents = [];
+                }
+            }
+
+            // Ensure documents is always an array
+            if (!Array.isArray(documents)) {
+                documents = [];
+            }
 
             res.json({
                 success: true,

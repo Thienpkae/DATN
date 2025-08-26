@@ -115,14 +115,20 @@ const LandManagementPage = () => {
       key: 'legalStatus',
       width: 100,
       align: 'center',
-      render: v => (
-        <Tag
-          color={v === 'LUA' ? 'green' : v === 'HNK' ? 'blue' : v === 'CLN' ? 'orange' : 'default'}
-          style={{ fontWeight: 500 }}
-        >
-          {v}
-        </Tag>
-      )
+      render: v => {
+        const displayValue = v || 'Chưa có';
+        const color = v === 'LUA' ? 'green' : 
+                     v === 'HNK' ? 'blue' : 
+                     v === 'CLN' ? 'orange' : 
+                     v === 'ONT*' ? 'purple' :
+                     !v ? 'default' : 'default';
+        
+        return (
+          <Tag color={color} style={{ fontWeight: 500 }}>
+            {displayValue}
+          </Tag>
+        );
+      }
     },
     {
       title: 'Diện tích',
@@ -234,11 +240,15 @@ const LandManagementPage = () => {
                 <Col span={12}>
                   <Text strong>Tình trạng pháp lý:</Text>
                   <br />
-                  <Tag color={selected.legalStatus === 'LUA' ? 'green' : selected.legalStatus === 'HNK' ? 'blue' : 'default'}>
-                    {selected.legalStatus}
+                  <Tag color={selected.legalStatus === 'LUA' ? 'green' : 
+                             selected.legalStatus === 'HNK' ? 'blue' : 
+                             selected.legalStatus === 'CLN' ? 'orange' : 
+                             selected.legalStatus === 'ONT*' ? 'purple' :
+                             !selected.legalStatus ? 'default' : 'default'}>
+                    {selected.legalStatus || 'Chưa có'}
                   </Tag>
                   <Text type="secondary" style={{ marginLeft: 8 }}>
-                    {LEGAL_STATUSES[selected.legalStatus]}
+                    {selected.legalStatus ? LEGAL_STATUSES[selected.legalStatus] : 'Chưa được cấp giấy chứng nhận'}
                   </Text>
                 </Col>
                 <Col span={12}>
@@ -324,7 +334,7 @@ const LandManagementPage = () => {
                             <div style={{ marginTop: 8 }}>
                               <div><strong>Diện tích:</strong> {item.land.area} m²</div>
                               <div><strong>Mục đích sử dụng đất:</strong> {item.land.landUsePurpose}</div>
-                              <div><strong>Pháp lý:</strong> {item.land.legalStatus}</div>
+                              <div><strong>Pháp lý:</strong> {item.land.legalStatus || 'Chưa có'}</div>
                             </div>
                           )}
                         </div>
