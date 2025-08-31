@@ -2,8 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tabs, List, Typography, Tooltip, Upload, Alert, Divider, InputNumber } from 'antd';
 import { PlusOutlined, EditOutlined, SearchOutlined, ReloadOutlined, HistoryOutlined, FileDoneOutlined, EyeOutlined, LinkOutlined, FileTextOutlined, UploadOutlined } from '@ant-design/icons';
 import landService from '../../../services/landService';
+import authService from '../../../services/auth';
 import documentService from '../../../services/documentService';
 import ipfsService from '../../../services/ipfs';
+import landTypeMatchService from '../../../services/landTypeMatchService';
 import { DocumentLinker, DocumentViewer } from '../../Common';
 import { LAND_USE_PURPOSES, LEGAL_STATUSES } from '../../../services/index';
 
@@ -33,6 +35,17 @@ const LandManagementPage = () => {
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [issueForm] = Form.useForm();
+
+  // Helper function để map mục đích sử dụng đất sang trạng thái pháp lý
+  const getLegalStatusByLandUse = (landUsePurpose) => {
+    const mapping = {
+      'BHK': 'HNK',      // Đất bằng trồng cây hàng năm khác → HNK
+      'LUC': 'LUA',      // Đất lúa → LUA
+      'ONT': 'ONT*',     // Đất ở tại nông thôn → ONT*
+      'LNQ': 'CLN',      // Đất lâm nghiệp → CLN
+    };
+    return mapping[landUsePurpose] || '';
+  };
   
   // Document linking states
   const [documentLinkerOpen, setDocumentLinkerOpen] = useState(false);
@@ -124,19 +137,7 @@ const LandManagementPage = () => {
     try {
       const values = await form.validateFields();
       const landId = values.id;
-      const validation = landService.validateLandData({
-        id: landId,
-        ownerID: values.ownerID,
-        area: values.area,
-        location: values.location,
-        landUsePurpose: values.landUsePurpose,
-        legalStatus: values.legalStatus,
-        legalInfo: values.legalInfo
-      });
-      if (!validation.isValid) {
-        message.warning(validation.errors.join('\n'));
-        return;
-      }
+
       setLoading(true);
       await landService.createLandParcel({
         id: landId,
@@ -144,8 +145,9 @@ const LandManagementPage = () => {
         area: Number(values.area),
         location: values.location,
         landUsePurpose: values.landUsePurpose,
-        legalStatus: values.legalStatus,
-        legalInfo: values.legalInfo
+        legalStatus: '', // Không có trạng thái pháp lý khi tạo mới
+        certificateId: '', // Không có mã GCN khi tạo mới
+        legalInfo: ''     // Không có thông tin pháp lý khi tạo mới
       });
       message.success('Tạo thửa đất thành công');
       setCreateOpen(false);
@@ -166,8 +168,8 @@ const LandManagementPage = () => {
         area: Number(values.area),
         location: values.location,
         landUsePurpose: values.landUsePurpose,
-        legalStatus: values.legalStatus,
-        legalInfo: values.legalInfo
+        legalStatus: '', // Không cho phép thay đổi trạng thái pháp lý
+        legalInfo: ''   // Không cho phép thay đổi thông tin pháp lý
       });
       message.success('Cập nhật thửa đất thành công');
       setEditOpen(false);
@@ -182,6 +184,7 @@ const LandManagementPage = () => {
   const onIssueCertificate = async () => {
     try {
       const values = await issueForm.validateFields();
+      const currentUser = authService.getCurrentUser();
       
       if (!certificateFile) {
         message.error('Vui lòng chọn file giấy chứng nhận');
@@ -190,14 +193,19 @@ const LandManagementPage = () => {
 
       setUploadingCertificate(true);
 
-      // Upload certificate file to IPFS
+      // Build certificate identifiers from form inputs
+      const normalizedSerial = String(values.serialNumber || '').trim();
+      const normalizedRegistry = String(values.registryNumber || '').trim();
+      const generatedDocId = `${normalizedSerial}-${normalizedRegistry}`;
+
+      // Upload certificate file to IPFS (metadata for reference only)
       const certificateMetadata = {
-        docID: `CERT_${values.landId}_${Date.now()}`,
+        docID: generatedDocId,
         docType: 'CERTIFICATE',
         title: `Giấy chứng nhận thửa đất ${values.landId}`,
-        description: `Giấy chứng nhận quyền sử dụng đất cho thửa đất ${values.landId}`,
+        description: `GCN: Số seri ${normalizedSerial} - Số vào sổ ${normalizedRegistry}`,
         organization: 'Org1',
-        uploadedBy: 'SYSTEM'
+        uploadedBy: currentUser?.userId || 'UNKNOWN'
       };
 
       const uploadResult = await ipfsService.uploadDocumentToIPFS(
@@ -216,15 +224,16 @@ const LandManagementPage = () => {
         metadataHash: uploadResult.metadataHash,
         fileType: certificateFile.type || certificateFile.name.split('.').pop().toUpperCase(),
         fileSize: certificateFile.size,
-        verified: true
+        status: 'VERIFIED'
       });
 
       console.log('Certificate document created:', createDocResult);
 
-      // Update land parcel with certificate ID and legal info
+      // Update land parcel with certificate ID, legal info and legal status
       await landService.updateLandParcel(values.landId, {
         certificateId: certificateMetadata.docID,
-        legalInfo: values.legalInfo
+        legalInfo: values.legalInfo,
+        legalStatus: values.legalStatus
       });
 
       message.success('Cấp giấy chứng nhận thành công');
@@ -303,8 +312,13 @@ const LandManagementPage = () => {
           <Tooltip title="Cấp giấy chứng nhận">
           <Button
               icon={<FileDoneOutlined />} 
-            onClick={() => {
-                issueForm.setFieldsValue({ landId: record.id });
+                          onClick={() => {
+                // Tự động điền trạng thái pháp lý theo mục đích sử dụng đất
+                const legalStatus = getLegalStatusByLandUse(record.landUsePurpose);
+                issueForm.setFieldsValue({ 
+                  landId: record.id,
+                  legalStatus: legalStatus
+                });
                 setIssueOpen(true);
               }}
               disabled={!!record.certificateId}
@@ -420,20 +434,7 @@ const LandManagementPage = () => {
                 </Form.Item>
               </Col>
             </Row>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item name="legalStatus" label="Trạng thái pháp lý" rules={[{ required: true, message: 'Bắt buộc' }]}>
-                  <Select placeholder="Chọn">
-                    {Object.entries(LEGAL_STATUSES).map(([key, value]) => (
-                      <Option key={key} value={key}>{key} - {value}</Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
-            <Form.Item name="legalInfo" label="Thông tin pháp lý">
-              <TextArea rows={4} />
-            </Form.Item>
+
           </Form>
         </Modal>
 
@@ -476,19 +477,14 @@ const LandManagementPage = () => {
                   </Select>
                 </Form.Item>
               </Col>
-              <Col span={12}>
-                <Form.Item name="legalStatus" label="Trạng thái pháp lý" rules={[{ required: true, message: 'Bắt buộc' }]}>
-                  <Select placeholder="Chọn">
-                    {Object.entries(LEGAL_STATUSES).map(([key, value]) => (
-                      <Option key={key} value={key}>{key} - {value}</Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
             </Row>
-            <Form.Item name="legalInfo" label="Thông tin pháp lý">
-              <TextArea rows={4} />
-            </Form.Item>
+            <Alert
+              message="Lưu ý"
+              description="Chỉ có thể cập nhật diện tích, vị trí và mục đích sử dụng đất. Để thay đổi trạng thái pháp lý, vui lòng sử dụng chức năng cấp GCN."
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
           </Form>
         </Modal>
 
@@ -510,6 +506,39 @@ const LandManagementPage = () => {
           <Form layout="vertical" form={issueForm}>
             <Form.Item name="landId" label="Mã thửa đất">
               <Input disabled />
+            </Form.Item>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item 
+                  name="serialNumber" 
+                  label="Số seri GCN"
+                  rules={[{ required: true, message: 'Vui lòng nhập Số seri' }]}
+                >
+                  <Input placeholder="Nhập Số seri trên GCN" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item 
+                  name="registryNumber" 
+                  label="Số vào sổ cấp GCN"
+                  rules={[{ required: true, message: 'Vui lòng nhập Số vào sổ cấp GCN' }]}
+                >
+                  <Input placeholder="Nhập Số vào sổ cấp GCN" />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Form.Item 
+              name="legalStatus" 
+              label="Trạng thái pháp lý"
+              rules={[{ required: true, message: 'Vui lòng chọn trạng thái pháp lý' }]}
+            >
+              <Select placeholder="Chọn trạng thái pháp lý" allowClear>
+                {Object.entries(LEGAL_STATUSES).map(([key, value]) => (
+                  <Option key={key} value={key}>{key} - {value}</Option>
+                ))}
+              </Select>
             </Form.Item>
 
             <Form.Item 

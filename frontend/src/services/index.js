@@ -127,7 +127,9 @@ export const LEGAL_STATUSES = {
   HNK: 'Đất trồng cây hàng năm khác',
   LUA: 'Đất lúa nước còn lại',
   'ONT*': 'Đất ở tại nông thôn',
-  CLN: 'Đất trồng cây lâu năm'
+  CLN: 'Đất trồng cây lâu năm',
+  'Đang tranh chấp': 'Đất đang tranh chấp',
+  'Đang thế chấp': 'Đất đang thế chấp'
 };
 
 // Export notification types

@@ -1,18 +1,18 @@
 # Complete Use Case Sequence Diagrams
-## Hệ thống Quản lý Đất đai Blockchain
+## Hệ thống Quản lý Đất đai Blockchain - Theo SRS Tinh Gọn
 
 ---
 
-## 📋 **MODULE 1: XÁC THỰC (AUTHENTICATION)**
+## 📋 **MODULE 1: XÁC THỰC VÀ QUẢN LÝ TÀI KHOẢN**
 
-### **Task 1.1: Đăng ký và Xác thực**
+### **Task 1.1: Đăng ký và Tạo tài khoản**
 
 ---
 
-## UC-01: Đăng ký tài khoản công dân
+## UC-01: Đăng ký tài khoản
 
 ### Mô tả ngắn gọn
-Công dân đăng ký tài khoản mới với xác thực qua OTP
+Công dân đăng ký tài khoản mới với xác thực OTP
 
 ### Sequence Diagram
 ```mermaid
@@ -29,23 +29,23 @@ sequenceDiagram
     UI -->> Citizen: Hiển thị form đăng ký
     deactivate UI
 
-    Citizen ->> UI: Nhập thông tin cá nhân (CCCD, họ tên, SĐT, mật khẩu)
+    Citizen ->> UI: Nhập thông tin (CCCD, họ tên, SĐT, mật khẩu)
     activate UI
     Citizen ->> UI: Nhấn "Đăng ký"
     UI ->> API: Gửi thông tin đăng ký
     deactivate UI
 
     activate API
-    API ->> API: Validate thông tin (CCCD, SĐT, mật khẩu)
-    API ->> API: Gán tổ chức mặc định Org3 – Công dân
+    API ->> API: Validate thông tin (CCCD 12 chữ số, SĐT, mật khẩu)
+    API ->> API: Tự động gán tổ chức mặc định Org3 – Công dân
 
     activate DB
     API ->> DB: Kiểm tra CCCD và SĐT đã tồn tại
     DB -->> API: Kết quả kiểm tra
     deactivate DB
 
-    alt Thông tin không hợp lệ hoặc đã tồn tại
-        API -->> UI: Thông báo lỗi
+    alt CCCD hoặc SĐT đã tồn tại
+        API -->> UI: Thông báo lỗi "CCCD/SĐT đã được sử dụng"
         activate UI
         UI -->> Citizen: Hiển thị thông báo lỗi
         deactivate UI
@@ -53,7 +53,7 @@ sequenceDiagram
         API ->> API: Mã hóa mật khẩu
 
         activate DB
-        API ->> DB: Tạo tài khoản mới (trạng thái: chờ kích hoạt)
+        API ->> DB: Tạo tài khoản với trạng thái "chờ kích hoạt"
         DB -->> API: Xác nhận tạo tài khoản
         deactivate DB
 
@@ -62,10 +62,10 @@ sequenceDiagram
         CA -->> API: Trả về certificate
         deactivate CA
 
-        API ->> API: Sinh mã OTP 6 chữ số
+        API ->> API: Sinh mã OTP 6 chữ số (hiệu lực 5 phút)
 
         activate DB
-        API ->> DB: Lưu OTP (hiệu lực 5 phút)
+        API ->> DB: Lưu OTP với thời gian hết hạn
         DB -->> API: Xác nhận lưu OTP
         deactivate DB
 
@@ -74,30 +74,63 @@ sequenceDiagram
         SMS -->> Citizen: Nhận OTP qua tin nhắn
         deactivate SMS
 
-        API -->> UI: Thông báo đăng ký thành công
+        API -->> UI: Thông báo đăng ký thành công, yêu cầu nhập OTP
         activate UI
-        UI -->> Citizen: Hiển thị thông báo đăng ký thành công
+        UI -->> Citizen: Hiển thị form nhập OTP
         deactivate UI
+
+        Citizen ->> UI: Nhập mã OTP 6 chữ số
+        activate UI
+        Citizen ->> UI: Nhấn "Xác thực"
+        UI ->> API: Gửi OTP để xác thực
+        deactivate UI
+
+        activate API
+        API ->> API: Kiểm tra tính hợp lệ của OTP
+
+        activate DB
+        API ->> DB: Kiểm tra OTP có tồn tại và còn hạn không
+        DB -->> API: Kết quả kiểm tra OTP
+        deactivate DB
+
+        alt OTP hợp lệ
+            activate DB
+            API ->> DB: Kích hoạt tài khoản và xóa OTP đã sử dụng
+            DB -->> API: Xác nhận kích hoạt
+            deactivate DB
+
+            API -->> UI: Thông báo đăng ký và kích hoạt thành công
+            activate UI
+            UI -->> Citizen: Hiển thị thông báo thành công và chuyển đến đăng nhập
+            deactivate UI
+        else OTP không hợp lệ hoặc hết hạn
+            API -->> UI: Thông báo lỗi OTP
+            activate UI
+            UI -->> Citizen: Hiển thị lỗi và tùy chọn gửi lại OTP
+            deactivate UI
+        end
     end
 
     deactivate API
 ```
 
 ### Các trường hợp ngoại lệ
-- CCCD hoặc SĐT đã tồn tại trong hệ thống
-- Thông tin không hợp lệ
-- Lỗi gửi SMS
+- CCCD đã tồn tại: Hệ thống thông báo "CCCD đã được sử dụng cho tài khoản khác"
+- Số điện thoại đã tồn tại: Hệ thống thông báo "Số điện thoại đã được đăng ký"
+- OTP hết hạn: Hệ thống yêu cầu gửi lại OTP mới
+- OTP sai: Hệ thống thông báo lỗi và yêu cầu nhập lại (tối đa 3 lần)
+- Lỗi gửi SMS: Hệ thống thông báo lỗi và cho phép thử lại
 
 ### Quy tắc nghiệp vụ
 - CCCD phải đúng 12 chữ số, duy nhất trong hệ thống
-- SĐT phải đúng định dạng, duy nhất trong hệ thống
-- Mật khẩu tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt
-- OTP có hiệu lực trong 5 phút
-- Tài khoản ban đầu có trạng thái "chờ kích hoạt"
+- Mỗi CCCD và số điện thoại chỉ đăng ký được một tài khoản
+- Mã OTP có hiệu lực trong 5 phút
+- Mật khẩu phải đủ mạnh để bảo mật
+- Tài khoản chỉ được kích hoạt sau khi xác thực OTP thành công
 
 ---
 
-## UC-02: Admin tạo tài khoản cán bộ
+## UC-02: Tạo tài khoản cán bộ
 
 ### Mô tả ngắn gọn
 Admin tạo tài khoản cho cán bộ trong tổ chức của mình
@@ -143,7 +176,7 @@ sequenceDiagram
         UI -->> Admin: Hiển thị thông báo lỗi
         deactivate UI
     else Thông tin hợp lệ
-        API ->> API: Tạo mật khẩu tạm thời
+        API ->> API: Tạo mật khẩu tạm thời (hiệu lực 7 ngày)
         API ->> API: Mã hóa mật khẩu tạm
 
         activate DB
@@ -177,97 +210,10 @@ sequenceDiagram
 - Lỗi gửi SMS thông tin đăng nhập
 
 ### Quy tắc nghiệp vụ
-- Chỉ Admin mới có quyền tạo tài khoản cho Org1 và Org2
+- Chỉ Admin của tổ chức mới có quyền tạo tài khoản cho tổ chức đó
 - Tài khoản được kích hoạt ngay khi tạo
-- Mật khẩu tạm có hiệu lực 7 ngày
 - Cán bộ phải đổi mật khẩu ở lần đăng nhập đầu tiên
-- Thông tin đăng nhập được gửi qua SMS
-
----
-
-## UC-03: Xác thực OTP
-
-### Mô tả ngắn gọn
-Gửi và xác thực mã OTP để kích hoạt tài khoản
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Người dùng
-    participant UI as Giao diện xác thực OTP
-    participant API as Backend API
-    participant DB as MongoDB
-    participant SMS as SMS Service
-
-    activate API
-    API ->> API: Tạo mã OTP ngẫu nhiên 6 chữ số
-    API ->> API: Lưu OTP và thời gian hết hạn (5 phút)
-
-    activate SMS
-    API ->> SMS: Gửi OTP qua SMS đến số điện thoại
-    SMS -->> User: Nhận OTP qua tin nhắn
-    deactivate SMS
-
-    User ->> UI: Truy cập trang xác thực OTP
-    activate UI
-    UI -->> User: Hiển thị form nhập OTP
-    deactivate UI
-
-    User ->> UI: Nhập mã OTP 6 chữ số
-    activate UI
-    User ->> UI: Nhấn "Xác nhận"
-    UI ->> API: Gửi OTP để xác thực
-    deactivate UI
-
-    activate API
-    API ->> API: Kiểm tra tính hợp lệ của OTP
-
-    activate DB
-    API ->> DB: Kiểm tra OTP có tồn tại và còn hạn không
-    DB -->> API: Kết quả kiểm tra OTP
-    deactivate DB
-
-    alt OTP hợp lệ
-        activate DB
-        API ->> DB: Xác minh số điện thoại và kích hoạt tài khoản
-        API ->> DB: Xóa OTP đã sử dụng
-        DB -->> API: Xác nhận cập nhật
-        deactivate DB
-
-        API ->> API: Ghi nhận việc xác minh
-        API -->> UI: Thông báo xác thực thành công
-        activate UI
-        UI -->> User: Hiển thị thông báo kích hoạt thành công
-        deactivate UI
-    else OTP không hợp lệ
-        alt OTP sai
-            API -->> UI: Thông báo lỗi "Mã OTP không đúng"
-            activate UI
-            UI -->> User: Hiển thị thông báo lỗi
-            deactivate UI
-        else OTP hết hạn
-            API -->> UI: Thông báo lỗi "Mã OTP đã hết hạn"
-            activate UI
-            UI -->> User: Hiển thị thông báo lỗi và tùy chọn gửi lại
-            deactivate UI
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- OTP sai hoặc không tồn tại
-- OTP đã hết hạn (quá 5 phút)
-- Nhập sai OTP quá 3 lần (khóa tài khoản 15 phút)
-- Tài khoản đã được kích hoạt trước đó
-
-### Quy tắc nghiệp vụ
-- OTP có 6 chữ số
-- OTP có hiệu lực trong 5 phút
-- OTP chỉ được sử dụng một lần
-- Tối đa 3 lần nhập sai OTP
-- Sau khi kích hoạt, tài khoản có thể đăng nhập
+- Mật khẩu tạm có hiệu lực 7 ngày
 
 ---
 
@@ -275,15 +221,15 @@ sequenceDiagram
 
 ---
 
-## UC-04: Đăng nhập hệ thống
+## UC-03: Đăng nhập hệ thống
 
 ### Mô tả ngắn gọn
-Đăng nhập vào hệ thống
+Xác thực danh tính và truy cập vào hệ thống
 
 ### Sequence Diagram
 ```mermaid
 sequenceDiagram
-    actor User as Người dùng đã có tài khoản
+    actor User as Tất cả người dùng
     participant UI as Giao diện đăng nhập
     participant API as Backend API
     participant DB as MongoDB
@@ -301,6 +247,7 @@ sequenceDiagram
     deactivate UI
 
     activate API
+    activate DB
     API ->> DB: Kiểm tra tài khoản có tồn tại không
     DB -->> API: Kết quả kiểm tra tài khoản
     deactivate DB
@@ -319,6 +266,7 @@ sequenceDiagram
             UI -->> User: Hiển thị thông báo lỗi
             deactivate UI
         else Mật khẩu đúng
+            activate DB
             API ->> DB: Kiểm tra tài khoản có bị khóa không
             DB -->> API: Kết quả kiểm tra trạng thái
             deactivate DB
@@ -334,7 +282,7 @@ sequenceDiagram
                 CA -->> API: Trả về certificate
                 deactivate CA
 
-                API ->> API: Tạo phiên đăng nhập và token
+                API ->> API: Tạo phiên đăng nhập và token (hiệu lực 8 giờ)
                 activate DB
                 API ->> DB: Ghi lại thời gian đăng nhập
                 DB -->> API: Xác nhận ghi log
@@ -352,29 +300,26 @@ sequenceDiagram
 ```
 
 ### Các trường hợp ngoại lệ
-- Tài khoản không tồn tại
-- Mật khẩu không đúng
-- Tài khoản bị khóa
-- Tài khoản chưa kích hoạt
-- Sai mật khẩu quá 5 lần (khóa 30 phút)
+- CCCD không tồn tại: Hệ thống thông báo "Tài khoản không tồn tại"
+- Mật khẩu sai: Hệ thống thông báo "Mật khẩu không đúng"
+- Tài khoản bị khóa: Hệ thống thông báo "Tài khoản đã bị khóa"
 
 ### Quy tắc nghiệp vụ
-- Mỗi người chỉ được đăng nhập một phiên tại một thời điểm
+- Nhập sai mật khẩu 5 lần sẽ khóa tài khoản 30 phút
 - Phiên đăng nhập có hiệu lực 8 giờ
-- Sai mật khẩu 5 lần sẽ khóa tài khoản 30 phút
-- Tự động đăng xuất sau 8 giờ không hoạt động
+- Mỗi người chỉ được đăng nhập một phiên tại một thời điểm
 
 ---
 
-## UC-05: Đăng xuất hệ thống
+## UC-04: Đăng xuất hệ thống
 
 ### Mô tả ngắn gọn
-Đăng xuất khỏi hệ thống
+Kết thúc phiên làm việc và bảo mật tài khoản
 
 ### Sequence Diagram
 ```mermaid
 sequenceDiagram
-    actor User as Người dùng đã đăng nhập
+    actor User as Tất cả người dùng
     participant UI as Giao diện hệ thống
     participant API as Backend API
     participant DB as MongoDB
@@ -400,23 +345,20 @@ sequenceDiagram
 
     API -->> UI: Xác nhận đăng xuất thành công
     activate UI
-    UI -->> User: Xóa token khỏi localStorage
-    UI -->> User: Chuyển về trang đăng nhập
+    UI -->> User: Xóa token khỏi localStorage và chuyển về trang đăng nhập
     deactivate UI
 
     deactivate API
 ```
 
 ### Các trường hợp ngoại lệ
-- Mất kết nối mạng
-- Token đã hết hạn
-- Lỗi hệ thống
+- Mất kết nối: Hệ thống tự động đăng xuất sau thời gian timeout
+- Lỗi hệ thống: Phiên vẫn được kết thúc để đảm bảo bảo mật
 
 ### Quy tắc nghiệp vụ
 - Tự động đăng xuất sau 8 giờ không hoạt động
 - Xóa hoàn toàn thông tin phiên trong bộ nhớ
 - Không thể khôi phục phiên sau khi đăng xuất
-- Mọi hoạt động đều được ghi log
 
 ---
 
@@ -424,15 +366,15 @@ sequenceDiagram
 
 ---
 
-## UC-06: Thay đổi mật khẩu
+## UC-05: Đổi mật khẩu
 
 ### Mô tả ngắn gọn
-Thay đổi mật khẩu tài khoản
+Cập nhật mật khẩu mới để tăng cường bảo mật
 
 ### Sequence Diagram
 ```mermaid
 sequenceDiagram
-    actor User as Người dùng đã đăng nhập
+    actor User as Tất cả người dùng
     participant UI as Giao diện thay đổi mật khẩu
     participant API as Backend API
     participant DB as MongoDB
@@ -443,10 +385,9 @@ sequenceDiagram
     UI -->> User: Hiển thị form thay đổi mật khẩu
     deactivate UI
 
-    User ->> UI: Nhập mật khẩu hiện tại
-    User ->> UI: Nhập mật khẩu mới và xác nhận
+    User ->> UI: Nhập mật khẩu hiện tại, mật khẩu mới và xác nhận
     activate UI
-    User ->> UI: Nhấn "Thay đổi mật khẩu"
+    User ->> UI: Nhấn "Đổi mật khẩu"
     UI ->> API: Gửi thông tin thay đổi mật khẩu
     deactivate UI
 
@@ -468,12 +409,12 @@ sequenceDiagram
             deactivate UI
         else Mật khẩu mới đủ mạnh
             activate DB
-            API ->> DB: Kiểm tra mật khẩu mới có trùng với mật khẩu cũ không
+            API ->> DB: Kiểm tra mật khẩu mới có trùng với 3 mật khẩu gần nhất không
             DB -->> API: Kết quả kiểm tra
             deactivate DB
 
             alt Mật khẩu mới trùng cũ
-                API -->> UI: Thông báo "Mật khẩu mới không được trùng với mật khẩu cũ"
+                API -->> UI: Thông báo "Mật khẩu mới phải khác 3 mật khẩu gần nhất"
                 activate UI
                 UI -->> User: Hiển thị thông báo lỗi
                 deactivate UI
@@ -502,27 +443,27 @@ sequenceDiagram
 ```
 
 ### Các trường hợp ngoại lệ
-- Mật khẩu hiện tại không đúng
-- Mật khẩu mới không đủ mạnh
-- Mật khẩu mới trùng với mật khẩu cũ
+- Mật khẩu hiện tại sai: Hệ thống thông báo "Mật khẩu hiện tại không đúng"
+- Mật khẩu mới không đủ mạnh: Hệ thống yêu cầu tạo mật khẩu mạnh hơn
+- Mật khẩu mới trùng cũ: Hệ thống yêu cầu chọn mật khẩu khác
 
 ### Quy tắc nghiệp vụ
-- Mật khẩu mới phải khác mật khẩu cũ
+- Mật khẩu mới phải khác 3 mật khẩu gần nhất
 - Độ dài tối thiểu 8 ký tự, có số và ký tự đặc biệt
-- Thông báo qua SMS khi thay đổi mật khẩu
+- Thông báo qua SMS khi thay đổi
 - Tất cả phiên khác bị đăng xuất
 
 ---
 
-## UC-07: Quên mật khẩu
+## UC-06: Quên mật khẩu
 
 ### Mô tả ngắn gọn
-Khôi phục mật khẩu khi quên
+Khôi phục quyền truy cập tài khoản khi quên mật khẩu
 
 ### Sequence Diagram
 ```mermaid
 sequenceDiagram
-    actor User as Người dùng quên mật khẩu
+    actor User as Tất cả người dùng
     participant UI as Giao diện quên mật khẩu
     participant API as Backend API
     participant DB as MongoDB
@@ -530,27 +471,27 @@ sequenceDiagram
 
     User ->> UI: Truy cập trang quên mật khẩu
     activate UI
-    UI -->> User: Hiển thị form nhập CCCD hoặc SĐT
+    UI -->> User: Hiển thị form nhập CCCD và SĐT
     deactivate UI
 
-    User ->> UI: Nhập CCCD hoặc số điện thoại
+    User ->> UI: Nhập CCCD và số điện thoại
     activate UI
-    User ->> UI: Nhấn "Gửi mã đặt lại"
+    User ->> UI: Nhấn "Gửi mã khôi phục"
     UI ->> API: Gửi thông tin để tìm tài khoản
     deactivate UI
 
     activate API
     activate DB
-    API ->> DB: Kiểm tra thông tin có trong hệ thống không
+    API ->> DB: Kiểm tra CCCD có tồn tại và khớp với số điện thoại không
     DB -->> API: Kết quả kiểm tra tài khoản
     deactivate DB
 
-    alt CCCD/SĐT không tồn tại
-        API -->> UI: Thông báo "Thông tin không tồn tại"
+    alt CCCD và SĐT không khớp
+        API -->> UI: Thông báo "Thông tin không chính xác"
         activate UI
         UI -->> User: Hiển thị thông báo lỗi
         deactivate UI
-    else Tài khoản tồn tại
+    else Thông tin hợp lệ
         activate DB
         API ->> DB: Kiểm tra trạng thái tài khoản
         DB -->> API: Kết quả kiểm tra trạng thái
@@ -562,127 +503,60 @@ sequenceDiagram
             UI -->> User: Hiển thị thông báo lỗi
             deactivate UI
         else Tài khoản không bị khóa
+            API ->> API: Sinh mã OTP và tạo link khôi phục (hiệu lực 5 phút)
+
             activate DB
-            API ->> DB: Kiểm tra số lần yêu cầu trong 1 giờ
-            DB -->> API: Kết quả kiểm tra số lần yêu cầu
+            API ->> DB: Lưu mã OTP với thời gian hết hạn
+            DB -->> API: Xác nhận lưu mã
             deactivate DB
 
-            alt Đã yêu cầu quá 3 lần trong 1 giờ
-                API -->> UI: Thông báo "Đã yêu cầu quá 3 lần trong 1 giờ"
+            activate SMS
+            API ->> SMS: Gửi OTP qua SMS đến số điện thoại
+            SMS -->> User: Nhận OTP qua tin nhắn
+            deactivate SMS
+
+            API -->> UI: Thông báo đã gửi mã thành công
+            activate UI
+            UI -->> User: Hiển thị form nhập OTP và mật khẩu mới
+            deactivate UI
+
+            User ->> UI: Nhập OTP và mật khẩu mới
+            activate UI
+            User ->> UI: Nhấn "Đặt lại mật khẩu"
+            UI ->> API: Gửi OTP và mật khẩu mới
+            deactivate UI
+
+            activate API
+            API ->> API: Kiểm tra tính hợp lệ của OTP
+
+            activate DB
+            API ->> DB: Kiểm tra OTP có còn hạn không
+            DB -->> API: Kết quả kiểm tra OTP
+            deactivate DB
+
+            alt OTP sai hoặc hết hạn
+                API -->> UI: Thông báo lỗi "OTP không hợp lệ"
                 activate UI
                 UI -->> User: Hiển thị thông báo lỗi
                 deactivate UI
-            else Chưa vượt quá giới hạn
-                API ->> API: Sinh mã xác thực đặt lại mật khẩu
-                API ->> API: Tạo link đặt lại có thời hạn 15 phút
+            else OTP hợp lệ
+                API ->> API: Kiểm tra mật khẩu mới có đủ mạnh không
 
-                activate DB
-                API ->> DB: Lưu mã với thời gian hết hạn (15 phút)
-                DB -->> API: Xác nhận lưu mã
-                deactivate DB
-
-                activate SMS
-                API ->> SMS: Gửi mã qua SMS đến số điện thoại
-                SMS -->> User: Nhận mã qua tin nhắn
-                deactivate SMS
-
-                API -->> UI: Thông báo đã gửi mã thành công
-                activate UI
-                UI -->> User: Hiển thị thông báo "Đã gửi mã đặt lại"
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- CCCD/SĐT không tồn tại trong hệ thống
-- Tài khoản bị khóa
-- Đã yêu cầu quá 3 lần trong 1 giờ
-- Lỗi gửi SMS
-
-### Quy tắc nghiệp vụ
-- Chỉ được yêu cầu đặt lại 3 lần trong 1 giờ
-- Mã có hiệu lực trong 15 phút
-- Tài khoản bị khóa không thể đặt lại mật khẩu
-- Thông báo qua SMS đến số điện thoại đã đăng ký
-
----
-
-## UC-08: Đặt lại mật khẩu
-
-### Mô tả ngắn gọn
-Đặt mật khẩu mới sau khi quên
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Người dùng đã nhận mã đặt lại
-    participant UI as Giao diện đặt lại mật khẩu
-    participant API as Backend API
-    participant DB as MongoDB
-
-    User ->> UI: Truy cập trang đặt lại mật khẩu
-    activate UI
-    UI -->> User: Hiển thị form đặt lại mật khẩu
-    deactivate UI
-
-    User ->> UI: Nhập mã xác thực nhận được
-    User ->> UI: Nhập mật khẩu mới và xác nhận
-    activate UI
-    User ->> UI: Nhấn "Đặt lại mật khẩu"
-    UI ->> API: Gửi mã xác thực và mật khẩu mới
-    deactivate UI
-
-    activate API
-    API ->> API: Kiểm tra mã xác thực có đúng không
-
-    activate DB
-    API ->> DB: Kiểm tra mã có còn hạn không
-    DB -->> API: Kết quả kiểm tra mã
-    deactivate DB
-
-    alt Mã xác thực sai
-        API -->> UI: Thông báo "Mã xác thực không đúng"
-        activate UI
-        UI -->> User: Hiển thị thông báo lỗi
-        deactivate UI
-    else Mã xác thực đúng
-        alt Mã hết hạn
-            API -->> UI: Thông báo "Mã đã hết hạn"
-            activate UI
-            UI -->> User: Hiển thị thông báo lỗi và yêu cầu làm lại từ đầu
-            deactivate UI
-        else Mã còn hạn
-            API ->> API: Kiểm tra mật khẩu mới có đủ mạnh không
-
-            alt Mật khẩu không đủ mạnh
-                API -->> UI: Thông báo "Mật khẩu không đủ mạnh"
-                activate UI
-                UI -->> User: Hiển thị thông báo lỗi và yêu cầu tạo mật khẩu mạnh hơn
-                deactivate UI
-            else Mật khẩu đủ mạnh
-                API ->> API: Kiểm tra mật khẩu mới có khác mật khẩu cũ không
-
-                alt Mật khẩu mới trùng mật khẩu cũ
-                    API -->> UI: Thông báo "Mật khẩu mới phải khác mật khẩu cũ"
+                alt Mật khẩu mới không đủ mạnh
+                    API -->> UI: Thông báo "Mật khẩu mới không đủ mạnh"
                     activate UI
                     UI -->> User: Hiển thị thông báo lỗi
                     deactivate UI
-                else Mật khẩu mới khác mật khẩu cũ
+                else Mật khẩu mới đủ mạnh
                     API ->> API: Mã hóa mật khẩu mới
-
                     activate DB
-                    API ->> DB: Lưu mật khẩu mới
+                    API ->> DB: Lưu mật khẩu mới và xóa OTP đã sử dụng
                     DB -->> API: Xác nhận cập nhật
                     deactivate DB
 
-                    API ->> API: Vô hiệu hóa mã xác thực đã sử dụng
-                    API -->> UI: Thông báo đặt lại thành công
+                    API -->> UI: Thông báo khôi phục thành công
                     activate UI
-                    UI -->> User: Hiển thị thông báo đặt lại thành công
+                    UI -->> User: Hiển thị thông báo thành công và chuyển về đăng nhập
                     deactivate UI
                 end
             end
@@ -693,754 +567,266 @@ sequenceDiagram
 ```
 
 ### Các trường hợp ngoại lệ
-- Mã đặt lại không tồn tại hoặc hết hạn
-- Mật khẩu mới không đủ mạnh
-- Mã đặt lại đã được sử dụng
+- CCCD và số điện thoại không khớp: Hệ thống thông báo "Thông tin không chính xác"
+- OTP sai: Hệ thống yêu cầu nhập lại
+- OTP hết hạn: Hệ thống yêu cầu gửi lại
+- Mật khẩu mới không đủ mạnh: Hệ thống yêu cầu tạo mật khẩu mạnh hơn
 
 ### Quy tắc nghiệp vụ
-- Mã chỉ được sử dụng một lần
+- OTP có hiệu lực trong 5 phút
+- Tối đa 5 lần nhập sai OTP
 - Mật khẩu mới phải khác mật khẩu cũ
-- Sau khi đặt lại thành công, mã sẽ bị vô hiệu
-- Tất cả phiên đăng nhập hiện tại bị đăng xuất
+- Độ dài tối thiểu 8 ký tự, có số và ký tự đặc biệt
 
 ---
 
-## UC-09: Gửi lại OTP
+### **Task 1.4: Quản lý tài khoản**
+
+---
+
+## UC-07: Cập nhật thông tin tài khoản
 
 ### Mô tả ngắn gọn
-Gửi lại mã OTP khi không nhận được hoặc hết hạn
+Admin quản lý và cập nhật thông tin tài khoản người dùng trong tổ chức
 
 ### Sequence Diagram
 ```mermaid
 sequenceDiagram
-    actor User as Người dùng
-    participant UI as Giao diện gửi lại OTP
-    participant API as Backend API
-    participant DB as MongoDB
-    participant SMS as SMS Service
-
-    %% Bước 1: Yêu cầu gửi lại OTP
-    User ->> UI: Nhấn "Gửi lại OTP"
-    UI ->> API: Yêu cầu gửi lại OTP
-
-    %% Bước 2: Kiểm tra điều kiện
-    API ->> DB: Kiểm tra tài khoản tồn tại và chưa kích hoạt
-    API ->> DB: Kiểm tra số lần gửi lại OTP trong 1 giờ
-    
-    alt Tài khoản không tồn tại hoặc đã kích hoạt hoặc đã gửi quá 3 lần
-        API ->> UI: Trả về lỗi
-        UI ->> User: Hiển thị thông báo lỗi
-    end
-
-    %% Bước 3: Gửi OTP mới
-    API ->> API: Vô hiệu hóa OTP cũ
-    API ->> API: Sinh OTP mới 6 chữ số
-    API ->> DB: Lưu OTP mới với thời gian hết hạn (5 phút)
-    API ->> SMS: Gửi OTP mới qua SMS
-    SMS -->> User: Nhận OTP mới qua tin nhắn
-
-    %% Bước 4: Kết quả
-    API ->> UI: Trả về kết quả thành công
-    UI ->> User: Hiển thị thông báo "Đã gửi lại OTP"
-    Note over User, UI: Chuyển về trang nhập OTP
-```
-
-### Các trường hợp ngoại lệ
-- Tài khoản không tồn tại
-- Tài khoản đã được kích hoạt
-- Đã gửi quá 3 lần trong 1 giờ
-- Lỗi gửi SMS
-
-### Quy tắc nghiệp vụ
-- Chỉ gửi lại cho tài khoản chưa kích hoạt
-- Tối đa 3 lần gửi lại trong 1 giờ
-- Phải chờ 60 giây giữa các lần gửi
-- OTP mới sẽ thay thế hoàn toàn OTP cũ
-
----
-
-### **Tiến độ Module 1 - HOÀN THÀNH:**
-- ✅ UC-01: Đăng ký tài khoản công dân
-- ✅ UC-02: Admin tạo tài khoản cán bộ
-- ✅ UC-03: Xác minh mã OTP
-- ✅ UC-04: Đăng nhập hệ thống
-- ✅ UC-05: Đăng xuất hệ thống
-- ✅ UC-06: Thay đổi mật khẩu
-- ✅ UC-07: Quên mật khẩu
-- ✅ UC-08: Đặt lại mật khẩu
-- ✅ UC-09: Gửi lại OTP
-
-**🎉 Module 1 - XÁC THỰC (AUTHENTICATION) ĐÃ HOÀN THÀNH!**
-
-**Tiếp theo: Module 2 - Quản lý người dùng (UC-10 đến UC-14)**
-
-## 👥 **MODULE 2: QUẢN LÝ NGƯỜI DÙNG (ADMIN MANAGEMENT)**
-
-### **Task 2.1: Xem và Quản lý người dùng**
-
----
-
-## UC-10: Xem danh sách người dùng
-
-### Mô tả ngắn gọn
-Hiển thị danh sách người dùng trong tổ chức
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Admin as Quản trị viên tổ chức
-    participant UI as Giao diện quản lý người dùng
-    participant API as Backend API
-    participant DB as MongoDB
-
-    Admin ->> UI: Truy cập trang quản lý người dùng
-    activate UI
-    UI -->> Admin: Hiển thị trang quản lý người dùng
-    deactivate UI
-
-    activate API
-    API ->> API: Xác định tổ chức của Admin
-    activate DB
-    API ->> DB: Tải danh sách người dùng thuộc tổ chức
-    DB -->> API: Trả về danh sách người dùng
-    deactivate DB
-
-    API ->> API: Xử lý dữ liệu hiển thị
-    API -->> UI: Trả về danh sách người dùng
-    deactivate API
-
-    activate UI
-    UI -->> Admin: Hiển thị thông tin: CCCD, họ tên, SĐT, trạng thái
-    UI -->> Admin: Hiển thị tính năng tìm kiếm theo tên hoặc CCCD
-    UI -->> Admin: Hiển thị bộ lọc theo trạng thái
-    UI -->> Admin: Hiển thị số lượng tổng và phân trang
-    deactivate UI
-
-    Admin ->> UI: Sử dụng tính năng tìm kiếm hoặc lọc
-    activate UI
-    UI ->> API: Gửi yêu cầu tìm kiếm/lọc
-    deactivate UI
-
-    activate API
-    activate DB
-    API ->> DB: Tìm kiếm/lọc người dùng theo điều kiện
-    DB -->> API: Trả về kết quả tìm kiếm
-    deactivate DB
-
-    API -->> UI: Trả về kết quả tìm kiếm
-    deactivate API
-
-    activate UI
-    UI -->> Admin: Hiển thị kết quả tìm kiếm
-    deactivate UI
-```
-
-### Các trường hợp ngoại lệ
-- Không có người dùng nào thỏa mãn điều kiện tìm kiếm
-- Lỗi kết nối database
-- Admin không có quyền xem danh sách người dùng
-
-### Quy tắc nghiệp vụ
-- Chỉ Admin mới có quyền xem danh sách người dùng
-- Hiển thị tối đa 20 người dùng/trang
-- Có thể lọc theo tổ chức, trạng thái, ngày tạo
-- Có thể tìm kiếm theo CCCD, họ tên, email
-- Hiển thị tổng số kết quả và thông tin phân trang
-
----
-
-## UC-11: Xem thông tin người dùng
-
-### Mô tả ngắn gọn
-Xem chi tiết thông tin của một người dùng trong tổ chức
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Admin as Quản trị viên tổ chức
-    participant UI as Giao diện quản lý người dùng
-    participant API as Backend API
-    participant DB as MongoDB
-
-    Admin ->> UI: Chọn người dùng từ danh sách hoặc tìm kiếm
-    activate UI
-    UI -->> Admin: Hiển thị form tìm kiếm người dùng
-    deactivate UI
-
-    Admin ->> UI: Nhập CCCD hoặc ID người dùng
-    activate UI
-    Admin ->> UI: Nhấn "Xem thông tin"
-    UI ->> API: Gửi yêu cầu thông tin người dùng
-    deactivate UI
-
-    activate API
-    API ->> API: Kiểm tra người dùng thuộc tổ chức của Admin
-
-    activate DB
-    API ->> DB: Tải thông tin chi tiết người dùng
-    DB -->> API: Trả về thông tin người dùng
-    deactivate DB
-
-    alt Người dùng không thuộc tổ chức
-        API -->> UI: Thông báo "Người dùng không thuộc tổ chức"
-        activate UI
-        UI -->> Admin: Hiển thị thông báo lỗi
-        deactivate UI
-    else Người dùng thuộc tổ chức
-        activate DB
-        API ->> DB: Tải lịch sử đăng nhập gần đây
-        API ->> DB: Tải các hoạt động quan trọng
-        DB -->> API: Trả về lịch sử hoạt động
-        deactivate DB
-
-        API -->> UI: Trả về thông tin chi tiết người dùng
-        deactivate API
-
-        activate UI
-        UI -->> Admin: Hiển thị thông tin cá nhân: CCCD, họ tên, SĐT
-        UI -->> Admin: Hiển thị thông tin tài khoản: ngày tạo, trạng thái
-        UI -->> Admin: Hiển thị lịch sử đăng nhập gần đây
-        UI -->> Admin: Hiển thị các hoạt động quan trọng
-        deactivate UI
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Người dùng không tồn tại
-- Admin không có quyền xem thông tin người dùng
-- Lỗi kết nối database
-
-### Quy tắc nghiệp vụ
-- Chỉ Admin mới có quyền xem thông tin chi tiết người dùng
-- Hiển thị đầy đủ thông tin cá nhân và trạng thái tài khoản
-- Hiển thị lịch sử hoạt động gần đây
-- Cung cấp các tùy chọn quản lý tài khoản
-
----
-
-## UC-12: Cập nhật thông tin người dùng
-
-### Mô tả ngắn gọn
-Chỉnh sửa thông tin tài khoản người dùng trong tổ chức
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Admin as Quản trị viên tổ chức
-    participant UI as Giao diện cập nhật người dùng
-    participant API as Backend API
-    participant DB as MongoDB
-
-    Admin ->> UI: Chọn người dùng cần cập nhật
-    activate UI
-    UI -->> Admin: Hiển thị thông tin hiện tại của người dùng
-    deactivate UI
-
-    Admin ->> UI: Nhấn "Cập nhật thông tin"
-    activate UI
-    UI -->> Admin: Hiển thị form cập nhật thông tin
-    deactivate UI
-
-    Admin ->> UI: Chỉnh sửa thông tin: họ tên, SĐT
-    activate UI
-    Admin ->> UI: Nhấn "Lưu thay đổi"
-    UI ->> API: Gửi thông tin cập nhật
-    deactivate UI
-
-    activate API
-    API ->> API: Kiểm tra người dùng thuộc tổ chức của Admin
-
-    alt Người dùng không thuộc tổ chức
-        API -->> UI: Thông báo "Người dùng không thuộc tổ chức"
-        activate UI
-        UI -->> Admin: Hiển thị thông báo lỗi
-        deactivate UI
-    else Người dùng thuộc tổ chức
-        API ->> API: Kiểm tra tính hợp lệ của thông tin mới
-
-        alt Thông tin không hợp lệ
-            API -->> UI: Thông báo "Thông tin không hợp lệ"
-            activate UI
-            UI -->> Admin: Hiển thị thông báo lỗi và yêu cầu nhập lại
-            deactivate UI
-        else Thông tin hợp lệ
-            activate DB
-            API ->> DB: Kiểm tra SĐT mới có trùng với người dùng khác không
-            DB -->> API: Kết quả kiểm tra trùng lặp
-            deactivate DB
-
-            alt SĐT đã tồn tại
-                API -->> UI: Thông báo "Số điện thoại đã tồn tại"
-                activate UI
-                UI -->> Admin: Hiển thị thông báo lỗi trùng lặp
-                deactivate UI
-            else SĐT không trùng
-                activate DB
-                API ->> DB: Lưu thay đổi và ghi log
-                DB -->> API: Xác nhận cập nhật
-                deactivate DB
-
-                API ->> API: Gửi thông báo cho người dùng về thay đổi
-                API ->> API: Cập nhật thời gian sửa đổi cuối
-
-                API -->> UI: Thông báo cập nhật thành công
-                deactivate API
-
-                activate UI
-                UI -->> Admin: Hiển thị thông báo cập nhật thành công
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Thông tin không hợp lệ (SĐT, email)
-- SĐT hoặc email trùng với người dùng khác
-- Admin không có quyền cập nhật thông tin
-- Lỗi cập nhật database
-
-### Quy tắc nghiệp vụ
-- Chỉ Admin mới có quyền cập nhật thông tin người dùng
-- Không thể thay đổi CCCD (thông tin định danh)
-- SĐT và email phải duy nhất trong hệ thống
-- Ghi log mọi thay đổi thông tin người dùng
-- Thông báo cho người dùng về thay đổi thông tin
-
----
-
-## UC-13: Khóa/Mở khóa tài khoản
-
-### Mô tả ngắn gọn
-Khóa hoặc mở khóa tài khoản người dùng trong tổ chức
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Admin as Quản trị viên tổ chức
+    actor Admin as Admin
     participant UI as Giao diện quản lý người dùng
     participant API as Backend API
     participant DB as MongoDB
     participant SMS as SMS Service
 
-    Admin ->> UI: Chọn người dùng cần thay đổi trạng thái
+    Admin ->> UI: Truy cập "Quản lý người dùng"
     activate UI
-    UI -->> Admin: Hiển thị thông tin người dùng
+    UI -->> Admin: Hiển thị danh sách người dùng trong tổ chức
     deactivate UI
 
-    Admin ->> UI: Chọn hành động khóa hoặc mở khóa
+    Admin ->> UI: Tìm và chọn tài khoản cần cập nhật
     activate UI
-    UI -->> Admin: Hiển thị form nhập lý do
+    UI -->> Admin: Hiển thị thông tin chi tiết tài khoản
     deactivate UI
 
-    Admin ->> UI: Nhập lý do cho hành động
+    Admin ->> UI: Chọn "Cập nhật thông tin"
     activate UI
-    Admin ->> UI: Nhấn "Xác nhận thay đổi"
-    UI ->> API: Gửi yêu cầu thay đổi trạng thái
+    UI -->> Admin: Hiển thị form chỉnh sửa (họ tên, SĐT, trạng thái)
     deactivate UI
 
-    activate API
-    API ->> API: Kiểm tra người dùng thuộc tổ chức của Admin
-
-    alt Người dùng không thuộc tổ chức
-        API -->> UI: Thông báo "Người dùng không thuộc tổ chức"
-        activate UI
-        UI -->> Admin: Hiển thị thông báo lỗi
-        deactivate UI
-    else Người dùng thuộc tổ chức
-        alt Tài khoản admin không thể bị khóa
-            API -->> UI: Thông báo "Tài khoản admin không thể bị khóa"
-            activate UI
-            UI -->> Admin: Hiển thị thông báo lỗi
-            deactivate UI
-        else Có thể thay đổi trạng thái
-            activate DB
-            API ->> DB: Kiểm tra người dùng đang trong giao dịch
-            DB -->> API: Kết quả kiểm tra
-            deactivate DB
-
-            alt Người dùng đang trong giao dịch
-                API -->> UI: Thông báo cảnh báo "Người dùng đang trong giao dịch"
-                activate UI
-                UI -->> Admin: Hiển thị cảnh báo
-                deactivate UI
-            else Có thể thay đổi trạng thái
-                activate DB
-                API ->> DB: Cập nhật trạng thái tài khoản
-                DB -->> API: Xác nhận cập nhật
-                deactivate DB
-
-                alt Hành động là khóa tài khoản
-                    activate DB
-                    API ->> DB: Đăng xuất tất cả phiên của người dùng
-                    DB -->> API: Xác nhận đăng xuất
-                    deactivate DB
-                end
-
-                activate SMS
-                API ->> SMS: Gửi thông báo cho người dùng
-                SMS -->> Người dùng: Nhận thông báo về thay đổi trạng thái
-                deactivate SMS
-
-                API -->> UI: Thông báo thay đổi trạng thái thành công
-                deactivate API
-
-                activate UI
-                UI -->> Admin: Hiển thị thông báo thành công
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Admin không có quyền khóa/mở khóa tài khoản
-- Không thể khóa tài khoản Admin khác
-- Lỗi cập nhật trạng thái
-- Lỗi gửi thông báo SMS
-
-### Quy tắc nghiệp vụ
-- Chỉ Admin mới có quyền khóa/mở khóa tài khoản
-- Không thể khóa tài khoản Admin khác
-- Khi khóa tài khoản, tất cả phiên đăng nhập bị vô hiệu
-- Thông báo cho người dùng về việc khóa/mở khóa tài khoản
-- Ghi log đầy đủ mọi hành động khóa/mở khóa
-
----
-
-## UC-14: Xóa tài khoản người dùng
-
-### Mô tả ngắn gọn
-Admin xóa tài khoản người dùng khỏi hệ thống
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Admin as Admin hệ thống
-    participant UI as Giao diện quản lý người dùng
-    participant API as Backend API
-    participant DB as MongoDB
-    participant Blockchain as Hyperledger Fabric
-
-    %% Bước 1: Chọn xóa tài khoản
-    Admin ->> UI: Nhấn nút "Xóa tài khoản"
-    UI ->> Admin: Hiển thị cảnh báo và xác nhận xóa
-    
-    Admin ->> UI: Nhập lý do xóa tài khoản
-    Admin ->> UI: Xác nhận xóa tài khoản
-
-    %% Bước 2: Kiểm tra điều kiện xóa
-    UI ->> API: Gửi yêu cầu xóa tài khoản
-    API ->> DB: Kiểm tra tài khoản có giao dịch đang xử lý không
-    API ->> DB: Kiểm tra tài khoản có tài liệu đang chờ xác minh không
-    
-    alt Tài khoản có giao dịch hoặc tài liệu đang xử lý
-        API ->> UI: Trả về lỗi "Không thể xóa tài khoản đang có giao dịch"
-        UI ->> Admin: Hiển thị thông báo lỗi
-    end
-
-    %% Bước 3: Thực hiện xóa
-    API ->> DB: Đánh dấu tài khoản là "đã xóa" (soft delete)
-    DB -->> API: Xác nhận đánh dấu xóa thành công
-    
-    API ->> DB: Vô hiệu hóa tất cả phiên đăng nhập
-    API ->> Blockchain: Vô hiệu hóa identity trên blockchain
-
-    %% Bước 4: Ghi log
-    API ->> DB: Ghi log xóa tài khoản
-    Note over API, DB: Ghi: thời gian, Admin thực hiện, lý do xóa
-
-    %% Bước 5: Kết quả
-    API ->> UI: Trả về kết quả xóa thành công
-    UI ->> Admin: Hiển thị thông báo xóa thành công
-    UI ->> Admin: Chuyển về trang danh sách người dùng
-```
-
-### Các trường hợp ngoại lệ
-- Tài khoản có giao dịch đang xử lý
-- Tài khoản có tài liệu đang chờ xác minh
-- Admin không có quyền xóa tài khoản
-- Không thể xóa tài khoản Admin khác
-- Lỗi xóa identity trên blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ Admin mới có quyền xóa tài khoản
-- Không thể xóa tài khoản Admin khác
-- Không thể xóa tài khoản có giao dịch đang xử lý
-- Sử dụng soft delete (đánh dấu xóa, không xóa thực)
-- Vô hiệu hóa identity trên blockchain
-- Ghi log đầy đủ mọi hành động xóa tài khoản
-
----
-
-### **Tiến độ Module 2 - HOÀN THÀNH:**
-- ✅ UC-10: Xem danh sách người dùng
-- ✅ UC-11: Xem thông tin người dùng
-- ✅ UC-12: Cập nhật thông tin người dùng
-- ✅ UC-13: Khóa/Mở khóa tài khoản
-- ✅ UC-14: Xóa tài khoản người dùng
-
-**🎉 Module 2 - QUẢN LÝ NGƯỜI DÙNG (ADMIN MANAGEMENT) ĐÃ HOÀN THÀNH!**
-
-**Tiếp theo: Module 3 - Quản lý hồ sơ cá nhân (UC-15, UC-16)**
-
-## 👤 **MODULE 3: QUẢN LÝ HỒ SƠ CÁ NHÂN (PROFILE MANAGEMENT)**
-
-### **Task 3.1: Quản lý thông tin cá nhân**
-
----
-
-## UC-15: Cập nhật thông tin cá nhân
-
-### Mô tả ngắn gọn
-Chỉnh sửa thông tin cá nhân của người dùng
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Toàn bộ người dùng đã đăng nhập
-    participant UI as Giao diện chỉnh sửa hồ sơ
-    participant API as Backend API
-    participant DB as MongoDB
-    participant SMS as SMS Service
-
-    User ->> UI: Truy cập trang thông tin cá nhân
+    Admin ->> UI: Chỉnh sửa thông tin và nhấn "Cập nhật"
     activate UI
-    UI -->> User: Hiển thị thông tin cá nhân hiện tại
-    deactivate UI
-
-    User ->> UI: Nhấn "Chỉnh sửa thông tin"
-    activate UI
-    UI -->> User: Hiển thị form chỉnh sửa thông tin
-    deactivate UI
-
-    User ->> UI: Chỉnh sửa thông tin: họ tên, số điện thoại
-    activate UI
-    User ->> UI: Xác nhận thay đổi
-    UI ->> API: Gửi thông tin cập nhật
+    UI ->> API: Gửi thông tin đã chỉnh sửa
     deactivate UI
 
     activate API
-    API ->> API: Kiểm tra tính hợp lệ của thông tin mới
-
-    alt Thông tin không hợp lệ
-        API -->> UI: Thông báo "Thông tin không hợp lệ"
-        activate UI
-        UI -->> User: Hiển thị thông báo lỗi và yêu cầu nhập lại
-        deactivate UI
-    else Thông tin hợp lệ
-        activate DB
-        API ->> DB: Kiểm tra số điện thoại có trùng với người khác không
-        DB -->> API: Kết quả kiểm tra trùng lặp
-        deactivate DB
-
-        alt Số điện thoại đã tồn tại
-            API -->> UI: Thông báo "Số điện thoại đã tồn tại"
-            activate UI
-            UI -->> User: Hiển thị thông báo trùng lặp
-            deactivate UI
-        else Số điện thoại không trùng
-            activate DB
-            API ->> DB: Lưu thông tin mới
-            DB -->> API: Xác nhận lưu thành công
-            deactivate DB
-
-            API ->> API: Gửi thông báo xác nhận thay đổi
-            API ->> API: Cập nhật thời gian sửa đổi
-
-            activate SMS
-            API ->> SMS: Gửi thông báo cập nhật thông tin
-            SMS -->> User: Nhận thông báo qua SMS
-            deactivate SMS
-
-            API -->> UI: Thông báo cập nhật thành công
-            deactivate API
-
-            activate UI
-            UI -->> User: Hiển thị thông báo cập nhật thành công
-            deactivate UI
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Token không hợp lệ hoặc hết hạn
-- Lỗi kết nối database
-- Không tìm thấy thông tin người dùng
-
-### Quy tắc nghiệp vụ
-- Người dùng chỉ có thể xem thông tin cá nhân của mình
-- CCCD không thể chỉnh sửa (thông tin định danh)
-- Hiển thị đầy đủ thông tin cá nhân và trạng thái tài khoản
-- Cung cấp tùy chọn chỉnh sửa cho thông tin có thể thay đổi
-
----
-
-## UC-16: Cập nhật thông tin cá nhân
-
-### Mô tả ngắn gọn
-Người dùng cập nhật thông tin cá nhân của mình
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Người dùng
-    participant UI as Giao diện chỉnh sửa hồ sơ
-    participant API as Backend API
-    participant DB as MongoDB
-    participant SMS as SMS Service
-
-    %% Bước 1: Chọn chỉnh sửa thông tin
-    User ->> UI: Nhấn nút "Chỉnh sửa thông tin"
-    UI ->> User: Hiển thị form chỉnh sửa thông tin
-
-    %% Bước 2: Nhập thông tin mới
-    User ->> UI: Chỉnh sửa thông tin cần cập nhật
-    Note over User, UI: Họ tên, SĐT, email (không thể sửa CCCD)
-    User ->> UI: Nhấn "Lưu thay đổi"
-
-    %% Bước 3: Validate thông tin
-    UI ->> API: Gửi thông tin cập nhật
-    API ->> API: Xác thực JWT token
+    API ->> API: Kiểm tra quyền Admin với tài khoản này
     API ->> API: Validate thông tin mới
-    
-    alt Thông tin không hợp lệ
-        API ->> UI: Trả về lỗi validation
-        UI ->> User: Hiển thị thông báo lỗi
+
+    activate DB
+    API ->> DB: Kiểm tra SĐT mới có bị trùng không (nếu thay đổi)
+    DB -->> API: Kết quả kiểm tra trùng lặp
+    deactivate DB
+
+    alt Không có quyền hoặc thông tin không hợp lệ
+        API -->> UI: Thông báo lỗi chi tiết
+        activate UI
+        UI -->> Admin: Hiển thị thông báo lỗi
+        deactivate UI
+    else Có quyền và thông tin hợp lệ
+        activate DB
+        API ->> DB: Lưu thông tin mới
+        API ->> DB: Ghi lại lịch sử thay đổi (ai, khi nào, thay đổi gì)
+        DB -->> API: Xác nhận cập nhật
+        deactivate DB
+
+        activate SMS
+        API ->> SMS: Gửi thông báo thay đổi cho người dùng
+        SMS -->> User: Nhận thông báo thay đổi qua SMS
+        deactivate SMS
+
+        API -->> UI: Thông báo cập nhật thành công
+        activate UI
+        UI -->> Admin: Hiển thị thông báo thành công
+        deactivate UI
     end
 
-    %% Bước 4: Kiểm tra trùng lặp
-    API ->> DB: Kiểm tra SĐT và email mới có trùng với người dùng khác không
-    
-    alt Thông tin trùng lặp
-        API ->> UI: Trả về lỗi trùng lặp
-        UI ->> User: Hiển thị thông báo lỗi
-    end
-
-    %% Bước 5: Cập nhật thông tin
-    API ->> DB: Cập nhật thông tin cá nhân
-    DB -->> API: Xác nhận cập nhật thành công
-    API ->> DB: Ghi log thay đổi thông tin
-
-    %% Bước 6: Thông báo cập nhật
-    API ->> SMS: Gửi thông báo cập nhật thông tin
-    SMS -->> User: Nhận thông báo qua SMS
-
-    %% Bước 7: Kết quả
-    API ->> UI: Trả về kết quả cập nhật thành công
-    UI ->> User: Hiển thị thông báo cập nhật thành công
-    UI ->> User: Cập nhật hiển thị thông tin cá nhân
+    deactivate API
 ```
 
 ### Các trường hợp ngoại lệ
-- Thông tin không hợp lệ (SĐT, email)
-- SĐT hoặc email trùng với người dùng khác
-- Token không hợp lệ hoặc hết hạn
-- Lỗi cập nhật database
-- Lỗi gửi thông báo SMS
+- Số điện thoại đã được sử dụng: Hệ thống thông báo "Số điện thoại đã được đăng ký"
+- Thông tin không hợp lệ: Hệ thống yêu cầu nhập lại
+- Không có quyền quản lý tài khoản: Hệ thống từ chối thay đổi
 
 ### Quy tắc nghiệp vụ
-- Người dùng chỉ có thể cập nhật thông tin cá nhân của mình
-- Không thể thay đổi CCCD (thông tin định danh)
-- SĐT và email phải duy nhất trong hệ thống
-- Ghi log mọi thay đổi thông tin cá nhân
-- Thông báo qua SMS khi cập nhật thông tin thành công
+- CCCD không được phép thay đổi
+- Số điện thoại phải duy nhất trong hệ thống
+- Chỉ Admin mới có quyền cập nhật thông tin tài khoản
+- Ghi lại đầy đủ thông tin: ai thay đổi, khi nào, thay đổi gì
+- Thông báo ngay cho người dùng về thay đổi
 
 ---
 
-### **Tiến độ Module 3 - HOÀN THÀNH:**
-- ✅ UC-15: Cập nhật thông tin cá nhân
-
-**🎉 Module 3 - QUẢN LÝ HỒ SƠ CÁ NHÂN (PROFILE MANAGEMENT) ĐÃ HOÀN THÀNH!**
-
-**Tiếp theo: Module 4 - Quản lý thửa đất (UC-16 đến UC-22)**
-
-## 🏠 **MODULE 4: QUẢN LÝ THỬA ĐẤT (LAND MANAGEMENT)**
-
-### **Task 4.1: Tạo và Cập nhật thửa đất**
-
----
-
-## UC-16: Tạo thửa đất mới
+## UC-08: Khóa/Mở khóa tài khoản
 
 ### Mô tả ngắn gọn
-Đăng ký thông tin thửa đất mới vào hệ thống
+Kiểm soát trạng thái hoạt động tài khoản
 
 ### Sequence Diagram
 ```mermaid
 sequenceDiagram
-    actor Staff as Cán bộ Sở Tài nguyên & Môi trường (Org1)
-    participant UI as Giao diện tạo thửa đất
+    actor Admin as Admin
+    participant UI as Giao diện quản lý người dùng
     participant API as Backend API
     participant DB as MongoDB
-    participant Blockchain as Hyperledger Fabric
     participant SMS as SMS Service
 
-    Staff ->> UI: Truy cập trang "Tạo thửa đất mới"
+    Admin ->> UI: Truy cập "Quản lý người dùng"
     activate UI
-    UI -->> Staff: Hiển thị form tạo thửa đất
+    UI -->> Admin: Hiển thị danh sách người dùng trong tổ chức
     deactivate UI
 
-    Staff ->> UI: Nhập thông tin thửa đất: ID, người sử dụng đất (CCCD), vị trí, mục đích sử dụng, trạng thái pháp lý, diện tích
+    Admin ->> UI: Tìm và chọn tài khoản cần quản lý
     activate UI
-    Staff ->> UI: Nhập thông tin giấy chứng nhận: mã GCN (IPFS hash), thông tin pháp lý
-    Staff ->> UI: Nhấn "Tạo thửa đất"
-    UI ->> API: Gửi thông tin thửa đất
+    UI -->> Admin: Hiển thị thông tin tài khoản và trạng thái hiện tại
+    deactivate UI
+
+    Admin ->> UI: Chọn "Khóa" hoặc "Mở khóa"
+    activate UI
+    UI -->> Admin: Hiển thị dialog xác nhận với form nhập lý do
+    deactivate UI
+
+    Admin ->> UI: Nhập lý do và xác nhận thực hiện
+    activate UI
+    UI ->> API: Gửi yêu cầu khóa/mở khóa với lý do
     deactivate UI
 
     activate API
-    API ->> API: Kiểm tra tính hợp lệ của thông tin theo quy tắc nghiệp vụ
+    API ->> API: Kiểm tra quyền của Admin với tài khoản này
+    API ->> API: Validate lý do thực hiện
+
+    alt Không có quyền hoặc lý do không hợp lệ
+        API -->> UI: Thông báo lỗi quyền hoặc lý do
+        activate UI
+        UI -->> Admin: Hiển thị thông báo lỗi
+        deactivate UI
+    else Có quyền và lý do hợp lệ
+        activate DB
+        API ->> DB: Thay đổi trạng thái tài khoản
+        API ->> DB: Ghi lại lịch sử với lý do (ai, khi nào, làm gì, tại sao)
+        DB -->> API: Xác nhận thay đổi
+        deactivate DB
+
+        activate SMS
+        API ->> SMS: Gửi thông báo cho người bị ảnh hưởng
+        SMS -->> User: Nhận thông báo thay đổi trạng thái tài khoản
+        deactivate SMS
+
+        API -->> UI: Thông báo thực hiện thành công
+        activate UI
+        UI -->> Admin: Hiển thị thông báo thành công và cập nhật danh sách
+        deactivate UI
+    end
+
+    deactivate API
+```
+
+### Các trường hợp ngoại lệ
+- Không có quyền: Hệ thống từ chối thao tác
+- Tài khoản không thuộc tổ chức: Hệ thống thông báo lỗi
+- Lý do không hợp lệ: Hệ thống yêu cầu nhập lý do
+
+### Quy tắc nghiệp vụ
+- Admin chỉ quản lý được tài khoản trong tổ chức của mình
+- Phải có lý do khi khóa/mở khóa
+- Ghi lại đầy đủ thông tin: ai, khi nào, làm gì, tại sao
+- Thông báo ngay cho người bị ảnh hưởng
+
+---
+
+## 📋 **MODULE 2: QUẢN LÝ THỬA ĐẤT**
+
+### **Task 2.1: Tạo và Cập nhật thửa đất**
+
+---
+
+## UC-09: Tạo thửa đất mới
+
+### Mô tả ngắn gọn
+Ghi nhận quyền sử dụng đất hợp pháp vào blockchain
+
+### Sequence Diagram
+```mermaid
+sequenceDiagram
+    actor Officer as Cán bộ Sở TN&MT (Org1)
+    participant UI as Giao diện quản lý thửa đất
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+    participant SMS as SMS Service
+
+    Officer ->> UI: Truy cập "Quản lý thửa đất" > "Tạo thửa đất mới"
+    activate UI
+    UI -->> Officer: Hiển thị form tạo thửa đất
+    deactivate UI
+
+    Officer ->> UI: Nhập thông tin thửa đất (ID, CCCD chủ sử dụng, vị trí, mục đích, trạng thái, diện tích)
+    Officer ->> UI: Nhập thông tin GCN (tùy chọn): mã GCN, thông tin pháp lý
+    activate UI
+    Officer ->> UI: Nhấn "Tạo thửa đất"
+    UI ->> API: Gửi thông tin thửa đất mới
+    deactivate UI
+
+    activate API
+    API ->> API: Validate thông tin theo quy tắc nghiệp vụ
+    API ->> API: Kiểm tra ID thửa đất có duy nhất không
+
+    activate DB
+    API ->> DB: Kiểm tra ID thửa đất đã tồn tại
+    DB -->> API: Kết quả kiểm tra ID
+    deactivate DB
+
+    activate DB
+    API ->> DB: Kiểm tra chủ sử dụng đất có tồn tại trong hệ thống
+    DB -->> API: Thông tin chủ sử dụng đất
+    deactivate DB
 
     alt ID thửa đất đã tồn tại
         API -->> UI: Thông báo "Thửa đất đã tồn tại"
         activate UI
-        UI -->> Staff: Hiển thị thông báo lỗi
+        UI -->> Officer: Hiển thị thông báo lỗi
         deactivate UI
-    else ID thửa đất chưa tồn tại
-        activate DB
-        API ->> DB: Kiểm tra người sử dụng đất có tồn tại không
-        DB -->> API: Kết quả kiểm tra người sử dụng đất
-        deactivate DB
-
-        alt chủ sử dụng không tồn tại
-            API -->> UI: Thông báo "chủ sử dụng không tồn tại"
+    else Chủ sử dụng không tồn tại
+        API -->> UI: Thông báo "Chủ sử dụng đất không có tài khoản trong hệ thống"
+        activate UI
+        UI -->> Officer: Hiển thị thông báo yêu cầu đăng ký trước
+        deactivate UI
+    else Thông tin hợp lệ
+        alt Có mã GCN nhưng thiếu thông tin pháp lý
+            API -->> UI: Thông báo "Yêu cầu bổ sung thông tin pháp lý"
             activate UI
-            UI -->> Staff: Hiển thị thông báo lỗi và yêu cầu đăng ký người sử dụng đất trước
+            UI -->> Officer: Hiển thị thông báo lỗi
             deactivate UI
-        else chủ sử dụng tồn tại
-            alt Có mã GCN nhưng thiếu thông tin pháp lý
-                API -->> UI: Thông báo "Thiếu thông tin pháp lý"
-                activate UI
-                UI -->> Staff: Hiển thị thông báo lỗi và yêu cầu bổ sung
-                deactivate UI
-            else Thông tin đầy đủ
-                API ->> API: Tạo thửa đất với thông tin cơ bản và danh sách tài liệu rỗng
+        else Thông tin đầy đủ và hợp lệ
+            activate Blockchain
+            API ->> Blockchain: Tạo thửa đất mới với thông tin cơ bản và danh sách tài liệu rỗng
+            Blockchain -->> API: Xác nhận lưu trữ thành công trên blockchain
+            deactivate Blockchain
 
-                activate Blockchain
-                API ->> Blockchain: Lưu thông tin thửa đất vào blockchain
-                Blockchain -->> API: Xác nhận lưu thành công
-                deactivate Blockchain
+            activate DB
+            API ->> DB: Lưu thông tin thửa đất vào database
+            DB -->> API: Xác nhận lưu database
+            deactivate DB
 
-                activate SMS
-                API ->> SMS: Gửi thông báo cho người sử dụng đất
-                SMS -->> chủ sử dụng: Nhận thông báo về thửa đất mới
-                deactivate SMS
+            activate SMS
+            API ->> SMS: Gửi thông báo tạo thửa đất cho chủ sử dụng
+            SMS -->> Chủ sử dụng: Nhận thông báo về thửa đất mới
+            deactivate SMS
 
-                API -->> UI: Trả về thông tin thửa đất đã tạo thành công
-                deactivate API
-
-                activate UI
-                UI -->> Staff: Hiển thị thông báo tạo thửa đất thành công
-                deactivate UI
-            end
+            API -->> UI: Thông báo tạo thửa đất thành công
+            activate UI
+            UI -->> Officer: Hiển thị thông tin thửa đất đã tạo và thông báo thành công
+            deactivate UI
         end
     end
 
@@ -1448,453 +834,311 @@ sequenceDiagram
 ```
 
 ### Các trường hợp ngoại lệ
-- Thông tin thửa đất không hợp lệ
-- Số thửa đã tồn tại trong hệ thống
-- chủ sử dụng không tồn tại trong hệ thống
-- Lỗi tạo trên blockchain
-- Cán bộ không có quyền tạo thửa đất
+- ID thửa đất đã tồn tại: Hệ thống thông báo "Thửa đất đã tồn tại"
+- Chủ sử dụng không tồn tại: Hệ thống yêu cầu đăng ký người sử dụng đất trước
+- Thông tin không hợp lệ: Hệ thống hiển thị lỗi chi tiết để sửa
+- Có mã GCN nhưng thiếu thông tin pháp lý: Hệ thống yêu cầu bổ sung
 
 ### Quy tắc nghiệp vụ
-- Chỉ cán bộ Org1 và Org2 mới có quyền tạo thửa đất
-- Số thửa phải duy nhất trong hệ thống
-- Thông tin thửa đất được lưu trên blockchain
-- Ghi log đầy đủ mọi thao tác tạo thửa đất
-- Thông báo cho người sử dụng đất về thửa đất mới
+- Mỗi thửa đất có ID duy nhất trong toàn hệ thống
+- Diện tích phải lớn hơn 0 và được ghi bằng mét vuông
+- Mục đích sử dụng phải thuộc danh mục: Đất ở, Đất nông nghiệp, Đất thương mại, Đất công nghiệp, Đất phi nông nghiệp
+- Trạng thái pháp lý phải thuộc: Có giấy chứng nhận, Chưa có GCN, Đang tranh chấp, Đang thế chấp
+- Nếu có mã GCN thì phải có thông tin pháp lý
+- Thông tin được lưu trữ bất biến trên blockchain
 
 ---
 
-## UC-17: Cập nhật thông tin thửa đất
+## UC-10: Cập nhật thông tin thửa đất
 
 ### Mô tả ngắn gọn
-Chỉnh sửa thông tin thửa đất
+Cập nhật thông tin thửa đất khi có thay đổi
 
 ### Sequence Diagram
 ```mermaid
 sequenceDiagram
-    actor Staff as Cán bộ Sở Tài nguyên & Môi trường (Org1)
-    participant UI as Giao diện cập nhật thửa đất
+    actor Officer as Cán bộ Sở TN&MT (Org1)
+    participant UI as Giao diện quản lý thửa đất
     participant API as Backend API
     participant DB as MongoDB
-    participant Blockchain as Hyperledger Fabric
+    participant Blockchain as Fabric Network
     participant SMS as SMS Service
 
-    Staff ->> UI: Tìm kiếm thửa đất cần cập nhật
+    Officer ->> UI: Tìm kiếm thửa đất cần cập nhật
     activate UI
-    UI -->> Staff: Hiển thị danh sách thửa đất
+    UI -->> Officer: Hiển thị danh sách kết quả tìm kiếm
     deactivate UI
 
-    Staff ->> UI: Chọn thửa đất cần cập nhật
+    Officer ->> UI: Chọn thửa đất và nhấn "Chỉnh sửa"
     activate UI
-    UI -->> Staff: Hiển thị thông tin hiện tại của thửa đất
+    UI -->> Officer: Hiển thị form cập nhật thông tin thửa đất
     deactivate UI
 
-    Staff ->> UI: Nhấn "Cập nhật thông tin"
+    Officer ->> UI: Chỉnh sửa thông tin (diện tích, vị trí, mục đích sử dụng, trạng thái pháp lý)
+    Officer ->> UI: Cập nhật thông tin GCN (tùy chọn): mã GCN, thông tin pháp lý
     activate UI
-    UI -->> Staff: Hiển thị form cập nhật thông tin thửa đất
-    deactivate UI
-
-    Staff ->> UI: Chỉnh sửa thông tin: diện tích, vị trí, mục đích sử dụng, trạng thái pháp lý
-    activate UI
-    Staff ->> UI: Cập nhật thông tin giấy chứng nhận: mã GCN (IPFS hash), thông tin pháp lý
-    Staff ->> UI: Nhấn "Lưu thay đổi"
+    Officer ->> UI: Nhấn "Cập nhật"
     UI ->> API: Gửi thông tin cập nhật
     deactivate UI
 
     activate API
-    API ->> API: Kiểm tra quyền chỉnh sửa và trạng thái thửa đất
+    API ->> API: Kiểm tra quyền chỉnh sửa của cán bộ
 
-    alt Thửa đất đang tranh chấp hoặc thế chấp
-        API -->> UI: Thông báo "Không thể cập nhật thửa đất đang tranh chấp/thế chấp"
+    activate DB
+    API ->> DB: Lấy thông tin thửa đất hiện tại
+    DB -->> API: Thông tin thửa đất và trạng thái
+    deactivate DB
+
+    alt Thửa đất không tồn tại
+        API -->> UI: Thông báo "Thửa đất không tìm thấy"
         activate UI
-        UI -->> Staff: Hiển thị thông báo lỗi
+        UI -->> Officer: Hiển thị thông báo lỗi
         deactivate UI
-    else Thửa đất có thể cập nhật
-        API ->> API: Kiểm tra tính hợp lệ của thông tin mới
-
-        alt Thông tin không hợp lệ
-            API -->> UI: Thông báo "Thông tin không hợp lệ"
-            activate UI
-            UI -->> Staff: Hiển thị thông báo lỗi và yêu cầu sửa lại
-            deactivate UI
-        else Thông tin hợp lệ
-            alt Có mã GCN nhưng thiếu thông tin pháp lý
-                API -->> UI: Thông báo "Thiếu thông tin pháp lý"
-                activate UI
-                UI -->> Staff: Hiển thị thông báo lỗi và yêu cầu bổ sung
-                deactivate UI
-            else Thông tin đầy đủ
-                activate Blockchain
-                API ->> Blockchain: Lưu thông tin cập nhật vào blockchain
-                Blockchain -->> API: Xác nhận cập nhật thành công
-                deactivate Blockchain
-
-                API ->> API: Ghi lại lịch sử thay đổi
-
-                activate SMS
-                API ->> SMS: Gửi thông báo cho người sử dụng đất
-                SMS -->> chủ sử dụng: Nhận thông báo về thay đổi thông tin thửa đất
-                deactivate SMS
-
-                API -->> UI: Trả về thông tin đã cập nhật
-                deactivate API
-
-                activate UI
-                UI -->> Staff: Hiển thị thông báo cập nhật thành công
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Thông tin cập nhật không hợp lệ
-- Thửa đất có giao dịch đang xử lý
-- chủ sử dụng mới không tồn tại trong hệ thống
-- Lỗi cập nhật trên blockchain
-- Cán bộ không có quyền cập nhật thửa đất
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ Org1 và Org2 mới có quyền cập nhật thửa đất
-- Không thể cập nhật thửa đất đang có giao dịch xử lý
-- Số thửa không thể thay đổi (thông tin định danh)
-- Thông tin được cập nhật trên blockchain
-- Ghi log đầy đủ mọi thay đổi thông tin thửa đất
-
----
-
-### **Task 4.2: Tìm kiếm và Tra cứu**
-
----
-
-## UC-18: Tìm kiếm thửa đất
-
-### Mô tả ngắn gọn
-Tìm kiếm thửa đất theo nhiều tiêu chí
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Toàn bộ người dùng đã đăng nhập
-    participant UI as Giao diện tìm kiếm thửa đất
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    User ->> UI: Truy cập trang tìm kiếm thửa đất
-    activate UI
-    UI -->> User: Hiển thị form tìm kiếm
-    deactivate UI
-
-    User ->> UI: Nhập tiêu chí tìm kiếm: ID thửa đất, từ khóa, bộ lọc
-    activate UI
-    User ->> UI: Nhấn "Tìm kiếm"
-    UI ->> API: Gửi yêu cầu tìm kiếm với tiêu chí
-    deactivate UI
-
-    activate API
-    API ->> Blockchain: Tìm kiếm trong cơ sở dữ liệu blockchain
-    Blockchain -->> API: Trả về kết quả tìm kiếm
-    deactivate Blockchain
-
-    API ->> API: Lọc kết quả theo quyền truy cập của người dùng
-
-    alt Không tìm thấy kết quả
-        API -->> UI: Thông báo "Không tìm thấy thửa đất phù hợp"
+    else Thửa đất đang tranh chấp hoặc thế chấp
+        API -->> UI: Thông báo "Thửa đất đang tranh chấp/thế chấp, không thể cập nhật"
         activate UI
-        UI -->> User: Hiển thị thông báo không có kết quả
+        UI -->> Officer: Hiển thị thông báo từ chối
         deactivate UI
-    else Có kết quả tìm kiếm
-        API ->> API: Sắp xếp kết quả theo các tiêu chí
-        API ->> API: Hỗ trợ phân trang nếu có nhiều kết quả
-
-        API -->> UI: Trả về danh sách kết quả tìm kiếm
-        deactivate API
-
+    else Thông tin cập nhật không hợp lệ
+        API -->> UI: Thông báo lỗi chi tiết
         activate UI
-        UI -->> User: Hiển thị danh sách kết quả phù hợp
-        UI -->> User: Cho phép sắp xếp theo các tiêu chí
-        UI -->> User: Hỗ trợ phân trang nếu có nhiều kết quả
+        UI -->> Officer: Hiển thị các lỗi cần sửa
         deactivate UI
-
-        User ->> UI: Chọn xem chi tiết thửa đất
+    else Có mã GCN nhưng thiếu thông tin pháp lý
+        API -->> UI: Thông báo "Yêu cầu bổ sung thông tin pháp lý"
         activate UI
-        UI -->> User: Hiển thị thông tin chi tiết thửa đất
+        UI -->> Officer: Hiển thị thông báo lỗi
         deactivate UI
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Không tìm thấy thửa đất nào thỏa mãn tiêu chí
-- Lỗi kết nối blockchain
-- Token không hợp lệ
-
-### Quy tắc nghiệp vụ
-- Tất cả người dùng đã đăng nhập đều có thể tìm kiếm thửa đất
-- Hiển thị tối đa 10 thửa đất/trang
-- Có thể tìm kiếm theo nhiều tiêu chí kết hợp
-- Hiển thị tổng số kết quả và thông tin phân trang
-- Kết quả tìm kiếm được sắp xếp theo thời gian tạo mới nhất
-
----
-
-## UC-19: Xem thửa đất theo người sử dụng đất
-
-### Mô tả ngắn gọn
-Hiển thị tất cả thửa đất của một người sử dụng đất
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Toàn bộ người dùng đã đăng nhập
-    participant UI as Giao diện xem thửa đất theo người sử dụng đất
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    User ->> UI: Truy cập trang xem thửa đất theo người sử dụng đất
-    activate UI
-    UI -->> User: Hiển thị form nhập CCCD người sử dụng đất
-    deactivate UI
-
-    User ->> UI: Nhập CCCD của người sử dụng đất cần xem
-    activate UI
-    User ->> UI: Nhấn "Xem thửa đất"
-    UI ->> API: Gửi yêu cầu xem thửa đất theo người sử dụng đất
-    deactivate UI
-
-    activate API
-    API ->> Blockchain: Tìm kiếm tất cả thửa đất thuộc sở hữu
-    Blockchain -->> API: Trả về danh sách thửa đất
-    deactivate Blockchain
-
-    API ->> API: Kiểm tra quyền xem của người dùng
-
-    alt chủ sử dụng không tồn tại
-        API -->> UI: Thông báo "Người này không có trong hệ thống"
-        activate UI
-        UI -->> User: Hiển thị thông báo lỗi
-        deactivate UI
-    else chủ sử dụng tồn tại
-        alt Không có thửa đất nào
-            API -->> UI: Thông báo "Chưa có thửa đất nào"
-            activate UI
-            UI -->> User: Hiển thị thông báo không có thửa đất
-            deactivate UI
-        else Có thửa đất
-            API ->> API: Tính toán thông tin tổng hợp
-            API -->> UI: Trả về danh sách thửa đất và thông tin tổng hợp
-            deactivate API
-
-            activate UI
-            UI -->> User: Hiển thị thông tin: ID, vị trí, diện tích, mục đích sử dụng, trạng thái pháp lý
-            UI -->> User: Hiển thị trạng thái: có GCN, chưa có GCN, đang tranh chấp, đang thế chấp
-            UI -->> User: Hiển thị thông tin tổng hợp: số lượng, tổng diện tích
-            deactivate UI
-
-            User ->> UI: Chọn xem chi tiết từng thửa đất
-            activate UI
-            UI -->> User: Hiển thị thông tin chi tiết thửa đất
-            deactivate UI
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Người dùng không có thửa đất nào
-- Lỗi kết nối blockchain
-- Token không hợp lệ
-
-### Quy tắc nghiệp vụ
-- Người dùng chỉ có thể xem thửa đất thuộc sở hữu của mình
-- Hiển thị tối đa 10 thửa đất/trang
-- Hiển thị đầy đủ thông tin thửa đất và trạng thái
-- Cung cấp tùy chọn xem chi tiết từng thửa đất
-- Hiển thị tổng số thửa đất sở hữu
-
----
-
-## UC-20: Xem tất cả thửa đất
-
-### Mô tả ngắn gọn
-Hiển thị tất cả thửa đất trong hệ thống
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Staff as Cán bộ Sở Tài nguyên & Môi trường (Org1)
-    participant UI as Giao diện xem tất cả thửa đất
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Staff ->> UI: Truy cập trang xem tất cả thửa đất
-    activate UI
-    UI -->> Staff: Hiển thị danh sách tất cả thửa đất
-    deactivate UI
-
-    activate API
-    API ->> Blockchain: Lấy tất cả thửa đất từ blockchain
-    Blockchain -->> API: Trả về danh sách thửa đất
-    deactivate Blockchain
-
-    API ->> API: Sắp xếp theo thời gian tạo mới nhất
-
-    alt Không có thửa đất nào
-        API -->> UI: Thông báo "Chưa có thửa đất nào trong hệ thống"
-        activate UI
-        UI -->> Staff: Hiển thị thông báo không có thửa đất
-        deactivate UI
-    else Có thửa đất
-        API -->> UI: Trả về danh sách tất cả thửa đất
-        deactivate API
-
-        activate UI
-        UI -->> Staff: Hiển thị thông tin: ID, vị trí, diện tích, mục đích sử dụng, trạng thái pháp lý
-        UI -->> Staff: Hiển thị trạng thái: có GCN, chưa có GCN, đang tranh chấp, đang thế chấp
-        UI -->> Staff: Hiển thị thông tin tổng hợp: số lượng, tổng diện tích
-        deactivate UI
-
-        Staff ->> UI: Chọn xem chi tiết từng thửa đất
-        activate UI
-        UI -->> Staff: Hiển thị thông tin chi tiết thửa đất
-        deactivate UI
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Không có thửa đất nào trong hệ thống
-- Lỗi kết nối blockchain
-- Cán bộ không có quyền xem tất cả thửa đất
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ Org1 và Org2 mới có quyền xem tất cả thửa đất
-- Hiển thị tối đa 20 thửa đất/trang
-- Hiển thị đầy đủ thông tin thửa đất và người sử dụng đất
-- Cung cấp tùy chọn quản lý cho từng thửa đất
-- Hiển thị tổng số thửa đất trong hệ thống
-
----
-
-## UC-21: Xem chi tiết thửa đất
-
-### Mô tả ngắn gọn
-Xem thông tin chi tiết của một thửa đất
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Toàn bộ người dùng đã đăng nhập
-    participant UI as Giao diện xem chi tiết thửa đất
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    User ->> UI: Chọn thửa đất cần xem chi tiết
-    activate UI
-    UI -->> User: Hiển thị trang chi tiết thửa đất
-    deactivate UI
-
-    activate API
-    API ->> Blockchain: Lấy thông tin chi tiết thửa đất
-    Blockchain -->> API: Trả về thông tin thửa đất
-    deactivate Blockchain
-
-    API ->> API: Kiểm tra quyền xem của người dùng
-
-    alt Người dùng không có quyền xem thửa đất này
-        API -->> UI: Thông báo "Bạn không có quyền xem thửa đất này"
-        activate UI
-        UI -->> User: Hiển thị thông báo lỗi
-        deactivate UI
-    else Người dùng có quyền xem
-        API -->> UI: Trả về thông tin chi tiết thửa đất
-        deactivate API
-
-        activate UI
-        UI -->> User: Hiển thị thông tin: ID, vị trí, diện tích, mục đích sử dụng, trạng thái pháp lý
-        UI -->> User: Hiển thị trạng thái: có GCN, chưa có GCN, đang tranh chấp, đang thế chấp
-        UI -->> User: Hiển thị thông tin người sử dụng đất
-        UI -->> User: Hiển thị thông tin giấy chứng nhận (nếu có)
-        deactivate UI
-
-        User ->> UI: Chọn xem lịch sử thửa đất
-        activate UI
-        UI -->> User: Hiển thị lịch sử thay đổi và giao dịch
-        deactivate UI
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Thửa đất không tồn tại
-- Người dùng không có quyền xem thửa đất
-- Lỗi kết nối blockchain
-- Token không hợp lệ
-
-### Quy tắc nghiệp vụ
-- Cán bộ có thể xem chi tiết tất cả thửa đất
-- Công dân chỉ có thể xem chi tiết thửa đất thuộc sở hữu
-- Hiển thị thông tin từ blockchain
-- Cung cấp tùy chọn quản lý cho người dùng có quyền
-- Hiển thị đầy đủ thông tin thửa đất và trạng thái
-
----
-
-## UC-22: Xem lịch sử thửa đất
-
-### Mô tả ngắn gọn
-Xem lịch sử thay đổi và giao dịch của thửa đất
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Toàn bộ người dùng đã đăng nhập
-    participant UI as Giao diện xem lịch sử thửa đất
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    User ->> UI: Chọn xem lịch sử thửa đất
-    activate UI
-    UI -->> User: Hiển thị trang lịch sử thửa đất
-    deactivate UI
-
-    activate API
-    API ->> Blockchain: Lấy lịch sử thay đổi thửa đất
-    Blockchain -->> API: Trả về lịch sử thửa đất
-    deactivate Blockchain
-
-    API ->> API: Kiểm tra quyền xem lịch sử của người dùng
-
-    alt Người dùng không có quyền xem lịch sử thửa đất này
-        API -->> UI: Thông báo "Bạn không có quyền xem lịch sử thửa đất này"
-        activate UI
-        UI -->> User: Hiển thị thông báo lỗi
-        deactivate UI
-    else Người dùng có quyền xem
-        API ->> Blockchain: Lấy transaction logs liên quan đến thửa đất
-        Blockchain -->> API: Trả về danh sách giao dịch
+    else Thông tin hợp lệ
+        activate Blockchain
+        API ->> Blockchain: Lưu thông tin cập nhật vào blockchain
+        Blockchain -->> API: Xác nhận cập nhật thành công
         deactivate Blockchain
 
-        API ->> API: Tổng hợp lịch sử thay đổi và giao dịch
-        API ->> API: Sắp xếp theo thời gian (mới nhất trước)
+        activate DB
+        API ->> DB: Cập nhật thông tin trong database và ghi lại lịch sử thay đổi
+        DB -->> API: Xác nhận cập nhật và ghi log
+        deactivate DB
 
-        alt Không có lịch sử nào
-            API -->> UI: Thông báo "Chưa có lịch sử nào cho thửa đất này"
+        activate SMS
+        API ->> SMS: Gửi thông báo thay đổi cho chủ sử dụng đất
+        SMS -->> Chủ sử dụng: Nhận thông báo về thay đổi thửa đất
+        deactivate SMS
+
+        API -->> UI: Thông báo cập nhật thành công
+        activate UI
+        UI -->> Officer: Hiển thị thông tin đã cập nhật và thông báo thành công
+        deactivate UI
+    end
+
+    deactivate API
+```
+
+### Các trường hợp ngoại lệ
+- Thửa đất không tồn tại: Hệ thống thông báo "Thửa đất không tìm thấy"
+- Thửa đất đang tranh chấp/thế chấp: Hệ thống từ chối cập nhật
+- Thông tin không hợp lệ: Hệ thống yêu cầu sửa lại
+- Có mã GCN nhưng thiếu thông tin pháp lý: Hệ thống yêu cầu bổ sung
+
+### Quy tắc nghiệp vụ
+- Không được thay đổi ID thửa đất và người sử dụng đất
+- Có thể cập nhật: diện tích, vị trí, mục đích sử dụng, trạng thái pháp lý
+- Nếu có mã GCN thì phải có thông tin pháp lý
+- Thửa đất đang tranh chấp hoặc thế chấp không thể cập nhật
+- Mọi thay đổi phải được ghi lại lịch sử bất biến
+
+---
+
+### **Task 2.2: Tìm kiếm và Xem thông tin thửa đất**
+
+---
+
+## UC-11: Tìm kiếm thửa đất
+
+### Mô tả ngắn gọn
+Tra cứu thông tin thửa đất nhanh chóng và chính xác theo nhiều tiêu chí
+
+### Sequence Diagram
+```mermaid
+sequenceDiagram
+    actor User as Tất cả người dùng
+    participant UI as Giao diện tìm kiếm thửa đất
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+
+    User ->> UI: Truy cập "Tìm kiếm thửa đất"
+    activate UI
+    UI -->> User: Hiển thị form tìm kiếm với các bộ lọc
+    deactivate UI
+
+    User ->> UI: Nhập tiêu chí tìm kiếm (ID thửa đất, từ khóa, bộ lọc)
+    User ->> UI: Chọn bộ lọc (vị trí, mục đích sử dụng, trạng thái pháp lý, người sử dụng đất)
+    activate UI
+    User ->> UI: Nhấn "Tìm kiếm"
+    UI ->> API: Gửi tiêu chí tìm kiếm
+    deactivate UI
+
+    activate API
+    API ->> API: Validate tiêu chí tìm kiếm
+    API ->> API: Xác định quyền truy cập của người dùng
+
+    alt Tiêu chí tìm kiếm không hợp lệ
+        API -->> UI: Thông báo "Tiêu chí tìm kiếm không hợp lệ"
+        activate UI
+        UI -->> User: Hiển thị thông báo lỗi và yêu cầu nhập lại
+        deactivate UI
+    else Tiêu chí hợp lệ
+        activate Blockchain
+        API ->> Blockchain: Tìm kiếm trong cơ sở dữ liệu blockchain
+        Blockchain -->> API: Danh sách thửa đất phù hợp
+        deactivate Blockchain
+
+        API ->> API: Lọc kết quả theo quyền truy cập của người dùng
+        API ->> API: Giới hạn kết quả tối đa 100 bản ghi
+
+        alt Không tìm thấy kết quả
+            API -->> UI: Thông báo "Không tìm thấy thửa đất phù hợp"
+            activate UI
+            UI -->> User: Hiển thị thông báo không có kết quả
+            deactivate UI
+        else Có kết quả
+            API -->> UI: Danh sách thửa đất phù hợp với thống kê
+            activate UI
+            UI -->> User: Hiển thị kết quả tìm kiếm với phân trang và sắp xếp
+            deactivate UI
+
+            User ->> UI: Chọn xem chi tiết thửa đất
+            activate UI
+            UI ->> API: Yêu cầu xem chi tiết thửa đất
+            deactivate UI
+        end
+    end
+
+    deactivate API
+```
+
+### Các trường hợp ngoại lệ
+- Không tìm thấy kết quả: Hệ thống thông báo "Không tìm thấy thửa đất phù hợp"
+- Tiêu chí tìm kiếm không hợp lệ: Hệ thống yêu cầu nhập lại
+- Lỗi truy vấn: Hệ thống thông báo lỗi và cho phép thử lại
+
+### Quy tắc nghiệp vụ
+- Người dùng chỉ xem được thửa đất được phép theo quyền hạn
+- Kết quả tìm kiếm được giới hạn 100 bản ghi
+- Hỗ trợ tìm kiếm theo từ khóa và bộ lọc nâng cao
+- Org3 chỉ xem được thửa đất thuộc quyền sử dụng
+- Tích hợp các chức năng: xem theo người sử dụng, xem tất cả, xem theo tiêu chí
+
+---
+
+## UC-12: Xem chi tiết thửa đất
+
+### Mô tả ngắn gọn
+Xem đầy đủ thông tin và trạng thái hiện tại của thửa đất
+
+### Sequence Diagram
+```mermaid
+sequenceDiagram
+    actor User as Tất cả người dùng
+    participant UI as Giao diện chi tiết thửa đất
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+
+    User ->> UI: Chọn thửa đất để xem chi tiết (từ tìm kiếm hoặc danh sách)
+    activate UI
+    UI ->> API: Yêu cầu xem chi tiết thửa đất với ID
+    deactivate UI
+
+    activate API
+    API ->> API: Kiểm tra quyền truy cập của người dùng với thửa đất này
+
+    alt Không có quyền xem
+        API -->> UI: Thông báo "Không có quyền truy cập"
+        activate UI
+        UI -->> User: Hiển thị thông báo từ chối truy cập
+        deactivate UI
+    else Có quyền xem
+        activate Blockchain
+        API ->> Blockchain: Tải thông tin chi tiết từ blockchain
+        Blockchain -->> API: Thông tin đầy đủ của thửa đất
+        deactivate Blockchain
+
+        activate DB
+        API ->> DB: Lấy thông tin bổ sung và lịch sử
+        DB -->> API: Thông tin người sử dụng và metadata
+        deactivate DB
+
+        alt Thửa đất không tồn tại
+            API -->> UI: Thông báo "Thửa đất không tìm thấy"
+            activate UI
+            UI -->> User: Hiển thị thông báo lỗi
+            deactivate UI
+        else Thửa đất tồn tại
+            API -->> UI: Thông tin chi tiết thửa đất đầy đủ
+            activate UI
+            UI -->> User: Hiển thị thông tin chi tiết đầy đủ
+            deactivate UI
+        end
+    end
+
+    deactivate API
+```
+
+### Các trường hợp ngoại lệ
+- Thửa đất không tồn tại: Hệ thống thông báo "Thửa đất không tìm thấy"
+- Không có quyền xem: Hệ thống từ chối truy cập
+- Lỗi tải dữ liệu: Hệ thống thông báo lỗi
+
+### Quy tắc nghiệp vụ
+- Thông tin được lấy trực tiếp từ blockchain
+- Org3 chỉ xem được thửa đất thuộc quyền sử dụng
+- Thông tin giấy chứng nhận chỉ hiển thị khi có GCN
+
+---
+
+## UC-13: Xem lịch sử thay đổi thửa đất
+
+### Mô tả ngắn gọn
+Theo dõi quá trình thay đổi thông tin thuộc tính của thửa đất theo thời gian
+
+### Sequence Diagram
+```mermaid
+sequenceDiagram
+    actor User as Tất cả người dùng
+    participant UI as Giao diện chi tiết thửa đất
+    participant API as Backend API
+    participant Blockchain as Fabric Network
+
+    User ->> UI: Chọn tab "Lịch sử thay đổi"
+    activate UI
+    UI ->> API: Yêu cầu xem lịch sử thay đổi thửa đất
+    deactivate UI
+
+    activate API
+    API ->> API: Kiểm tra quyền truy cập lịch sử thửa đất
+
+    alt Không có quyền xem lịch sử
+        API -->> UI: Thông báo "Không có quyền xem lịch sử"
+        activate UI
+        UI -->> User: Hiển thị thông báo từ chối truy cập
+        deactivate UI
+    else Có quyền xem
+        activate Blockchain
+        API ->> Blockchain: Truy vấn lịch sử thay đổi thông tin thuộc tính từ blockchain
+        Blockchain -->> API: Danh sách các thay đổi với timestamp
+        deactivate Blockchain
+
+        alt Chưa có thay đổi nào
+            API -->> UI: Thông báo "Chưa có thay đổi nào"
             activate UI
             UI -->> User: Hiển thị thông báo không có lịch sử
             deactivate UI
-        else Có lịch sử
-            API -->> UI: Trả về lịch sử thửa đất
-            deactivate API
-
+        else Có lịch sử thay đổi
+            API -->> UI: Danh sách lịch sử thay đổi theo thời gian
             activate UI
-            UI -->> User: Hiển thị lịch sử: thời gian, loại thay đổi, người thực hiện, chi tiết thay đổi
-            UI -->> User: Hiển thị danh sách giao dịch: thời gian, loại giao dịch, trạng thái, người thực hiện
+            UI -->> User: Hiển thị timeline lịch sử thay đổi
             deactivate UI
         end
     end
@@ -1903,373 +1147,409 @@ sequenceDiagram
 ```
 
 ### Các trường hợp ngoại lệ
-- Thửa đất không tồn tại
-- Người dùng không có quyền xem lịch sử
-- Lỗi kết nối blockchain
-- Không có lịch sử nào cho thửa đất
+- Thửa đất không có lịch sử thay đổi: Hệ thống thông báo "Chưa có thay đổi nào"
+- Không có quyền xem lịch sử: Hệ thống từ chối truy cập
+- Lỗi truy vấn blockchain: Hệ thống thông báo lỗi
 
 ### Quy tắc nghiệp vụ
-- Cán bộ có thể xem lịch sử tất cả thửa đất
-- Công dân chỉ có thể xem lịch sử thửa đất thuộc sở hữu
-- Hiển thị cả lịch sử thay đổi và giao dịch từ blockchain
-- Sắp xếp theo thời gian (mới nhất trước)
-- Hiển thị tối đa 20 bản ghi/trang
-- Ghi log đầy đủ mọi thay đổi thửa đất trên blockchain
+- Lịch sử thay đổi được lưu trữ bất biến trên blockchain
+- Org3 chỉ xem được lịch sử thửa đất thuộc quyền sở hữu
+- Chỉ hiển thị các thay đổi thông tin thuộc tính được phép xem
+- Mỗi lần thay đổi đều có timestamp và người thực hiện
 
 ---
 
-### **Tiến độ Module 4 - HOÀN THÀNH:**
-- ✅ UC-17: Tạo thửa đất mới
-- ✅ UC-18: Cập nhật thông tin thửa đất
-- ✅ UC-19: Tìm kiếm thửa đất
-- ✅ UC-20: Xem thửa đất theo người sử dụng đất
-- ✅ UC-21: Xem tất cả thửa đất
-- ✅ UC-22: Xem chi tiết thửa đất
-- ✅ UC-23: Xem lịch sử thửa đất
-
-**🎉 Module 4 - QUẢN LÝ THỬA ĐẤT (LAND MANAGEMENT) ĐÃ HOÀN THÀNH!**
-
-**Tiếp theo: Module 5 - Quản lý tài liệu (UC-24 đến UC-38)**
-
-## 📄 **MODULE 5: QUẢN LÝ TÀI LIỆU (DOCUMENT MANAGEMENT)**
-
-### **Task 5.1: Tạo và Upload tài liệu**
+### **Task 2.3: Cấp giấy chứng nhận**
 
 ---
 
-## UC-23: Upload tài liệu mới
+## UC-14: Cấp giấy chứng nhận quyền sử dụng đất
 
 ### Mô tả ngắn gọn
-Công dân upload tài liệu mới lên hệ thống
+Cấp giấy chứng nhận quyền sử dụng đất cho thửa đất đã đủ điều kiện
 
 ### Sequence Diagram
 ```mermaid
 sequenceDiagram
-    actor Citizen as Công dân
-    participant UI as Giao diện upload tài liệu
+    actor Officer as Cán bộ Sở TN&MT (Org1)
+    participant UI as Giao diện quản lý GCN
     participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
     participant IPFS as IPFS Storage
-    participant Blockchain as Hyperledger Fabric
+    participant SMS as SMS Service
 
-    Citizen ->> UI: Truy cập chức năng upload tài liệu
+    Officer ->> UI: Truy cập "Quản lý GCN" > "Cấp GCN mới"
     activate UI
-    UI -->> Citizen: Hiển thị biểu mẫu upload
+    UI -->> Officer: Hiển thị danh sách thửa đất đủ điều kiện cấp GCN
     deactivate UI
 
-    Citizen ->> UI: Chọn file tài liệu và nhập thông tin: tiêu đề, mô tả, loại tài liệu
+    Officer ->> UI: Lựa chọn thửa đất đủ điều kiện cấp GCN
     activate UI
-    Citizen ->> UI: Xác nhận upload
+    UI -->> Officer: Hiển thị form cấp GCN với thông tin thửa đất
+    deactivate UI
+
+    Officer ->> UI: Nhập thông tin GCN (Số seri, Số vào sổ cấp GCN, nội dung pháp lý)
+    Officer ->> UI: Đính kèm bản điện tử giấy chứng nhận (file PDF)
+    activate UI
+    Officer ->> UI: Nhấn "Cấp GCN"
+    UI ->> API: Gửi thông tin GCN và file đính kèm
+    deactivate UI
+
+    activate API
+    API ->> API: Validate thông tin GCN và file đính kèm
+
+    activate DB
+    API ->> DB: Kiểm tra thửa đất và trạng thái hiện tại
+    DB -->> API: Thông tin thửa đất và trạng thái GCN
+    deactivate DB
+
+    alt Thửa đất đã có GCN
+        API -->> UI: Thông báo "Thửa đất đã có giấy chứng nhận"
+        activate UI
+        UI -->> Officer: Hiển thị thông báo lỗi
+        deactivate UI
+    else Hồ sơ chưa đầy đủ
+        API -->> UI: Thông báo "Yêu cầu bổ sung hồ sơ trước khi cấp GCN"
+        activate UI
+        UI -->> Officer: Hiển thị danh sách tài liệu còn thiếu
+        deactivate UI
+    else File GCN không hợp lệ
+        API -->> UI: Thông báo "File GCN phải là PDF hợp lệ"
+        activate UI
+        UI -->> Officer: Hiển thị thông báo lỗi file
+        deactivate UI
+    else Thông tin hợp lệ và đầy đủ
+        activate IPFS
+        API ->> IPFS: Upload bản điện tử giấy chứng nhận
+        IPFS -->> API: Trả về IPFS hash của file GCN
+        deactivate IPFS
+
+        alt Lỗi lưu trữ IPFS
+            API -->> UI: Thông báo "Lỗi lưu trữ file, vui lòng thử lại"
+            activate UI
+            UI -->> Officer: Hiển thị thông báo lỗi và cho phép thử lại
+            deactivate UI
+        else Upload IPFS thành công
+            API ->> API: Tạo mã GCN theo định dạng "Số seri - Số vào sổ"
+
+            activate Blockchain
+            API ->> Blockchain: Ghi nhận GCN và gắn vào thửa đất tương ứng
+            Blockchain -->> API: Xác nhận cập nhật blockchain
+            deactivate Blockchain
+
+            activate DB
+            API ->> DB: Cập nhật thông tin pháp lý và trạng thái thửa đất sau cấp GCN
+            DB -->> API: Xác nhận cập nhật database
+            deactivate DB
+
+            activate SMS
+            API ->> SMS: Gửi thông báo cấp GCN cho chủ sử dụng đất
+            SMS -->> Chủ sử dụng: Nhận thông báo đã được cấp GCN
+            deactivate SMS
+
+            API -->> UI: Thông báo cấp GCN thành công
+            activate UI
+            UI -->> Officer: Hiển thị thông tin GCN đã cấp và thông báo thành công
+            deactivate UI
+        end
+    end
+
+    deactivate API
+```
+
+### Các trường hợp ngoại lệ
+- Thửa đất đã có GCN: Hệ thống thông báo "Thửa đất đã có giấy chứng nhận"
+- Hồ sơ chưa đầy đủ: Hệ thống yêu cầu bổ sung trước khi cấp
+- File GCN không hợp lệ: Hệ thống yêu cầu tải lên file PDF hợp lệ
+- Lỗi lưu trữ IPFS: Hệ thống thông báo lỗi và yêu cầu thử lại
+
+### Quy tắc nghiệp vụ
+- Chỉ cán bộ Sở TN&MT (Org1) có thẩm quyền cấp GCN
+- Một thửa đất chỉ có một giấy chứng nhận hợp lệ tại một thời điểm
+- Mã GCN phải duy nhất, cấu trúc theo "Số seri - Số vào sổ cấp GCN" theo quy định quản lý hồ sơ
+- Hồ sơ cấp GCN phải kèm bản điện tử giấy chứng nhận và nội dung pháp lý liên quan
+- Trạng thái và thông tin pháp lý của thửa đất phải được cập nhật ngay sau khi cấp GCN
+
+---
+
+## 📋 **MODULE 3: QUẢN LÝ TÀI LIỆU**
+
+### **Task 3.1: Tạo và Quản lý tài liệu**
+
+---
+
+## UC-15: Tạo tài liệu
+
+### Mô tả ngắn gọn
+Tạo và tải lên tài liệu mới vào hệ thống
+
+### Sequence Diagram
+```mermaid
+sequenceDiagram
+    actor User as Tất cả người dùng
+    participant UI as Giao diện quản lý tài liệu
+    participant API as Backend API
+    participant DB as MongoDB
+    participant IPFS as IPFS Storage
+    participant Blockchain as Fabric Network
+
+    User ->> UI: Truy cập "Quản lý tài liệu" > "Tạo tài liệu mới"
+    activate UI
+    UI -->> User: Hiển thị form tạo tài liệu
+    deactivate UI
+
+    User ->> UI: Chọn file tài liệu từ máy tính
+    User ->> UI: Nhập thông tin (tên tài liệu, loại, mô tả)
+    activate UI
+    User ->> UI: Nhấn "Tạo tài liệu"
     UI ->> API: Gửi file và thông tin tài liệu
     deactivate UI
 
     activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra định dạng và kích thước file
+    API ->> API: Kiểm tra định dạng file (PDF, DOCX, JPG, PNG)
+    API ->> API: Kiểm tra kích thước file (tối đa 10MB)
 
-    alt File không hợp lệ
-        API -->> UI: Thông báo lỗi định dạng
+    alt File không đúng định dạng
+        API -->> UI: Thông báo "Định dạng file không được hỗ trợ"
         activate UI
-        UI -->> Citizen: Hiển thị thông báo lỗi
+        UI -->> User: Hiển thị thông báo lỗi
+        deactivate UI
+    else File quá lớn
+        API -->> UI: Thông báo "Kích thước file vượt quá giới hạn"
+        activate UI
+        UI -->> User: Hiển thị thông báo lỗi
         deactivate UI
     else File hợp lệ
         activate IPFS
-        API ->> IPFS: Upload nội dung tài liệu
+        API ->> IPFS: Mã hóa và tải file lên IPFS
+        IPFS -->> API: Trả về IPFS hash
+        deactivate IPFS
+
+        alt Lỗi tải lên IPFS
+            API -->> UI: Thông báo "Lỗi tải lên, vui lòng thử lại"
+            activate UI
+            UI -->> User: Hiển thị thông báo lỗi và cho phép thử lại
+            deactivate UI
+        else Upload IPFS thành công
+            API ->> API: Tạo metadata tài liệu với thông tin người tạo
+
+            activate Blockchain
+            API ->> Blockchain: Lưu metadata tài liệu lên blockchain
+            Blockchain -->> API: Xác nhận lưu trữ thành công
+            deactivate Blockchain
+
+            activate DB
+            API ->> DB: Lưu thông tin tài liệu vào database
+            DB -->> API: Xác nhận lưu database
+            deactivate DB
+
+            API -->> UI: Thông báo tạo tài liệu thành công
+            activate UI
+            UI -->> User: Hiển thị thông tin tài liệu đã tạo và thông báo thành công
+            deactivate UI
+        end
+    end
+
+    deactivate API
+```
+
+### Các trường hợp ngoại lệ
+- File không đúng định dạng: Hệ thống thông báo "Định dạng file không được hỗ trợ"
+- File quá lớn: Hệ thống thông báo "Kích thước file vượt quá giới hạn"
+- Lỗi tải lên IPFS: Hệ thống thông báo lỗi và cho phép thử lại
+
+### Quy tắc nghiệp vụ
+- Chỉ hỗ trợ file PDF, DOCX, JPG, PNG
+- Kích thước file tối đa 10MB
+- Metadata được lưu bất biến trên blockchain
+- File được mã hóa trước khi lưu trữ
+
+---
+
+## UC-16: Xem chi tiết tài liệu
+
+### Mô tả ngắn gọn
+Hiển thị thông tin chi tiết và nội dung tài liệu
+
+### Sequence Diagram
+```mermaid
+sequenceDiagram
+    actor User as Tất cả người dùng
+    participant UI as Giao diện chi tiết tài liệu
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+    participant IPFS as IPFS Storage
+
+    User ->> UI: Chọn tài liệu để xem chi tiết (từ tìm kiếm hoặc danh sách)
+    activate UI
+    UI ->> API: Yêu cầu xem chi tiết tài liệu với mã tài liệu
+    deactivate UI
+
+    activate API
+    API ->> API: Kiểm tra quyền truy cập của người dùng với tài liệu này
+
+    alt Không có quyền xem
+        API -->> UI: Thông báo "Không có quyền truy cập"
+        activate UI
+        UI -->> User: Hiển thị thông báo từ chối truy cập
+        deactivate UI
+    else Có quyền xem
+        activate Blockchain
+        API ->> Blockchain: Tải thông tin metadata từ blockchain
+        Blockchain -->> API: Metadata đầy đủ của tài liệu
+        deactivate Blockchain
+
+        activate DB
+        API ->> DB: Lấy thông tin bổ sung và lịch sử truy cập
+        DB -->> API: Thông tin người tạo và thống kê truy cập
+        deactivate DB
+
+        alt Tài liệu không tồn tại
+            API -->> UI: Thông báo "Tài liệu không tìm thấy"
+            activate UI
+            UI -->> User: Hiển thị thông báo lỗi
+            deactivate UI
+        else Tài liệu tồn tại
+            activate IPFS
+            API ->> IPFS: Lấy file từ IPFS và giải mã
+            IPFS -->> API: Nội dung file đã giải mã
+            deactivate IPFS
+
+            alt File bị lỗi hoặc không thể mở
+                API -->> UI: Thông báo "Không thể mở tài liệu"
+                activate UI
+                UI -->> User: Hiển thị thông báo lỗi file
+                deactivate UI
+            else File mở thành công
+                activate DB
+                API ->> DB: Ghi lại lịch sử truy cập
+                DB -->> API: Xác nhận ghi log
+                deactivate DB
+
+                API -->> UI: Thông tin chi tiết tài liệu và nội dung
+                activate UI
+                UI -->> User: Hiển thị thông tin chi tiết bao gồm:
+                Note over UI: - Thông tin metadata: tên, loại, người tạo, ngày tạo
+                Note over UI: - Nội dung file trong viewer bảo mật
+                Note over UI: - Tùy chọn tải xuống (nếu có quyền)
+                Note over UI: - Các tab: Chi tiết, Lịch sử thay đổi
+                deactivate UI
+            end
+        end
+    end
+
+    deactivate API
+```
+
+### Các trường hợp ngoại lệ
+- Tài liệu không tồn tại: Hệ thống thông báo "Tài liệu không tìm thấy"
+- Không có quyền xem: Hệ thống từ chối truy cập
+- File bị lỗi: Hệ thống thông báo "Không thể mở tài liệu"
+
+### Quy tắc nghiệp vụ
+- Chỉ xem được tài liệu có quyền truy cập
+- Mọi lần xem đều được ghi log
+- Tài liệu được hiển thị trong viewer bảo mật
+
+---
+
+### **Task 3.2: Liên kết tài liệu**
+
+---
+
+## UC-17: Liên kết tài liệu bổ sung cho thửa đất
+
+### Mô tả ngắn gọn
+Liên kết tài liệu bổ sung với thửa đất; tài liệu được liên kết sẽ tự động được xác thực
+
+### Sequence Diagram
+```mermaid
+sequenceDiagram
+    actor Officer as Cán bộ Sở TN&MT (Org1)
+    participant UI as Giao diện chi tiết thửa đất
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+    participant IPFS as IPFS Storage
+    participant SMS as SMS Service
+
+    Note over Officer, UI: Cán bộ Org1 đang xem chi tiết thửa đất (UC-12)
+
+    Officer ->> UI: Chuyển sang tab "Tài liệu liên quan"
+    activate UI
+    UI -->> Officer: Hiển thị danh sách tài liệu hiện tại và các tùy chọn
+    deactivate UI
+
+    Officer ->> UI: Chọn "Thêm tài liệu mới" hoặc "Liên kết tài liệu có sẵn"
+    activate UI
+    UI -->> Officer: Hiển thị form tương ứng
+    deactivate UI
+
+    alt Tạo tài liệu mới
+        Officer ->> UI: Tải lên file và nhập metadata
+        activate UI
+        UI ->> API: Gửi file và thông tin tài liệu mới
+        deactivate UI
+
+        activate API
+        activate IPFS
+        API ->> IPFS: Upload file lên IPFS
         IPFS -->> API: Trả về IPFS hash
         deactivate IPFS
 
         activate Blockchain
-        API ->> Blockchain: Lưu metadata tài liệu: tiêu đề, mô tả, loại, IPFS hash, người upload
-        Blockchain -->> API: Xác nhận lưu metadata thành công
+        API ->> Blockchain: Lưu metadata tài liệu
+        Blockchain -->> API: Xác nhận tạo tài liệu
         deactivate Blockchain
-
-        API -->> UI: Thông báo upload thành công
-        deactivate API
-
+    else Liên kết tài liệu có sẵn
+        Officer ->> UI: Chọn tài liệu từ danh sách có sẵn
         activate UI
-        UI -->> Citizen: Hiển thị thông tin tài liệu đã upload
-        UI -->> Citizen: Hiển thị trạng thái: chờ xác minh
+        UI ->> API: Gửi yêu cầu liên kết tài liệu
         deactivate UI
+
+        activate API
     end
 
-    deactivate API
-```
+    API ->> API: Kiểm tra quyền Org1 của cán bộ
 
-### Các trường hợp ngoại lệ
-- File không đúng định dạng cho phép
-- File quá lớn (vượt quá giới hạn)
-- Thông tin tài liệu không đầy đủ
-- Lỗi kết nối IPFS hoặc blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ công dân mới có quyền upload tài liệu
-- Hỗ trợ các định dạng: PDF, JPG, PNG
-- Kích thước file tối đa: 10MB
-- Tài liệu mới upload có trạng thái "chờ xác minh"
-- Nội dung tài liệu được lưu trên IPFS, metadata trên blockchain
-
----
-
-## UC-24: Xem danh sách tài liệu
-
-### Mô tả ngắn gọn
-Hiển thị danh sách tài liệu theo quyền truy cập
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Toàn bộ người dùng đã đăng nhập
-    participant UI as Giao diện xem danh sách tài liệu
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    User ->> UI: Truy cập chức năng xem danh sách tài liệu
-    activate UI
-    UI -->> User: Hiển thị danh sách tài liệu
-    deactivate UI
-
-    activate API
-    API ->> Blockchain: Truy vấn danh sách tài liệu
-    Blockchain -->> API: Trả về danh sách tài liệu
-    deactivate Blockchain
-
-    API ->> API: Lọc tài liệu theo quyền người dùng
-
-    alt Không có tài liệu nào
-        API -->> UI: Thông báo "Chưa có tài liệu nào"
+    alt Không có quyền Org1
+        API -->> UI: Thông báo "Không có quyền thực hiện"
         activate UI
-        UI -->> User: Hiển thị thông báo không có tài liệu
+        UI -->> Officer: Hiển thị thông báo từ chối
         deactivate UI
-    else Có tài liệu
-        API ->> API: Sắp xếp theo thời gian tạo mới nhất
-        API -->> UI: Trả về danh sách tài liệu
-        deactivate API
+    else Có quyền Org1
+        activate DB
+        API ->> DB: Kiểm tra tài liệu chưa được liên kết với thửa đất này
+        DB -->> API: Kết quả kiểm tra liên kết
+        deactivate DB
 
-        activate UI
-        UI -->> User: Hiển thị thông tin: tiêu đề, loại, trạng thái, ngày upload, người upload
-        UI -->> User: Hiển thị trạng thái: chờ xác minh, đã xác minh, bị từ chối
-        deactivate UI
-
-        User ->> UI: Chọn xem chi tiết tài liệu
-        activate UI
-        UI -->> User: Hiển thị thông tin chi tiết tài liệu
-        deactivate UI
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Không có tài liệu nào
-- Lỗi kết nối blockchain
-- Token không hợp lệ
-
-### Quy tắc nghiệp vụ
-- Công dân chỉ xem tài liệu do mình upload
-- Cán bộ có thể xem tất cả tài liệu trong hệ thống
-- Hiển thị tối đa 10 tài liệu/trang
-- Sắp xếp theo thời gian upload mới nhất
-
----
-
-## UC-25: Xem chi tiết tài liệu
-
-### Mô tả ngắn gọn
-Xem thông tin chi tiết và nội dung tài liệu
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Toàn bộ người dùng đã đăng nhập
-    participant UI as Giao diện xem chi tiết tài liệu
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-    participant IPFS as IPFS Storage
-
-    User ->> UI: Chọn tài liệu cần xem chi tiết
-    activate UI
-    UI -->> User: Hiển thị trang chi tiết tài liệu
-    deactivate UI
-
-    activate API
-    API ->> Blockchain: Lấy metadata tài liệu
-    Blockchain -->> API: Trả về metadata tài liệu
-    deactivate Blockchain
-
-    API ->> API: Kiểm tra quyền xem của người dùng
-
-    alt Người dùng không có quyền xem tài liệu này
-        API -->> UI: Thông báo "Bạn không có quyền xem tài liệu này"
-        activate UI
-        UI -->> User: Hiển thị thông báo lỗi
-        deactivate UI
-    else Người dùng có quyền xem
-        activate IPFS
-        API ->> IPFS: Lấy nội dung tài liệu
-        IPFS -->> API: Trả về nội dung tài liệu
-        deactivate IPFS
-
-        API -->> UI: Trả về metadata và nội dung tài liệu
-        deactivate API
-
-        activate UI
-        UI -->> User: Hiển thị thông tin: tiêu đề, mô tả, loại, trạng thái, ngày upload, người upload
-        UI -->> User: Hiển thị nội dung tài liệu
-        UI -->> User: Hiển thị trạng thái: chờ xác minh, đã xác minh, bị từ chối
-        deactivate UI
-
-        User ->> UI: Chọn xem lịch sử tài liệu
-        activate UI
-        UI -->> User: Hiển thị lịch sử thay đổi và xác minh
-        deactivate UI
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Tài liệu không tồn tại
-- Người dùng không có quyền xem tài liệu
-- Lỗi kết nối IPFS hoặc blockchain
-- Nội dung tài liệu bị mất hoặc hỏng
-
-### Quy tắc nghiệp vụ
-- Công dân chỉ xem tài liệu do mình upload
-- Cán bộ có thể xem tất cả tài liệu
-- Hiển thị đầy đủ metadata và nội dung tài liệu
-- Cung cấp tùy chọn quản lý cho người dùng có quyền
-
----
-
-### **Task 5.2: Xác minh và Quản lý tài liệu**
-
----
-
-## UC-26: Xác minh tài liệu
-
-### Mô tả ngắn gọn
-Cán bộ xác minh tính hợp lệ của tài liệu
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Staff as Cán bộ thẩm định
-    participant UI as Giao diện xác minh tài liệu
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Staff ->> UI: Chọn tài liệu có trạng thái "chờ xác minh"
-    activate UI
-    UI -->> Staff: Hiển thị thông tin tài liệu và biểu mẫu xác minh
-    deactivate UI
-
-    Staff ->> UI: Xem xét nội dung và thông tin tài liệu
-    activate UI
-    Staff ->> UI: Nhập nhận xét xác minh
-    Staff ->> UI: Xác nhận xác minh
-    UI ->> API: Gửi kết quả xác minh
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền xác minh của cán bộ
-
-    alt Cán bộ không có quyền xác minh
-        API -->> UI: Thông báo "Bạn không có quyền xác minh tài liệu"
-        activate UI
-        UI -->> Staff: Hiển thị thông báo lỗi
-        deactivate UI
-    else Cán bộ có quyền xác minh
-        activate Blockchain
-        API ->> Blockchain: Cập nhật trạng thái tài liệu thành "đã xác minh"
-        Blockchain -->> API: Xác nhận cập nhật thành công
-        deactivate Blockchain
-
-        API ->> Blockchain: Ghi nhận thông tin xác minh: người xác minh, thời gian, nhận xét
-        Blockchain -->> API: Xác nhận ghi nhận thành công
-        deactivate Blockchain
-
-        API -->> UI: Thông báo xác minh thành công
-        deactivate API
-
-        activate UI
-        UI -->> Staff: Hiển thị thông báo thành công
-        UI -->> Staff: Tài liệu đã được xác minh và có thể liên kết với thửa đất
-        deactivate UI
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Tài liệu không ở trạng thái "chờ xác minh"
-- Cán bộ không có quyền xác minh tài liệu
-- Lỗi cập nhật trên blockchain
-- Thông tin xác minh không đầy đủ
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ thẩm định mới có quyền xác minh tài liệu
-- Chỉ tài liệu có trạng thái "chờ xác minh" mới được xác minh
-- Tài liệu đã xác minh có thể được liên kết với thửa đất
-- Ghi nhận đầy đủ thông tin người xác minh và thời gian
-
----
-
-## UC-27: Từ chối tài liệu
-
-### Mô tả ngắn gọn
-Cán bộ từ chối tài liệu không hợp lệ
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Staff as Cán bộ thẩm định
-    participant UI as Giao diện xác minh tài liệu
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Staff ->> UI: Chọn tài liệu có trạng thái "chờ xác minh"
-    activate UI
-    UI -->> Staff: Hiển thị thông tin tài liệu và biểu mẫu từ chối
-    deactivate UI
-
-    Staff ->> UI: Xem xét nội dung tài liệu
-    activate UI
-    Staff ->> UI: Nhập lý do từ chối
-    Staff ->> UI: Xác nhận từ chối
-    UI ->> API: Gửi yêu cầu từ chối tài liệu
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền từ chối của cán bộ
-
-    alt Cán bộ không có quyền từ chối
-        API -->> UI: Thông báo "Bạn không có quyền từ chối tài liệu"
-        activate UI
-        UI -->> Staff: Hiển thị thông báo lỗi
-        deactivate UI
-    else Cán bộ có quyền từ chối
-        alt Lý do từ chối không được nhập
-            API -->> UI: Thông báo "Vui lòng nhập lý do từ chối"
+        alt Tài liệu đã liên kết
+            API -->> UI: Thông báo "Tài liệu đã liên kết trước đó"
             activate UI
-            UI -->> Staff: Hiển thị thông báo lỗi
+            UI -->> Officer: Hiển thị thông báo trùng lặp
             deactivate UI
-        else Lý do từ chối hợp lệ
+        else Tài liệu chưa liên kết
             activate Blockchain
-            API ->> Blockchain: Cập nhật trạng thái tài liệu thành "bị từ chối"
-            Blockchain -->> API: Xác nhận cập nhật thành công
+            API ->> Blockchain: Thêm mã tài liệu vào danh sách tài liệu liên quan của thửa đất
+            API ->> Blockchain: Tự động đánh dấu tài liệu đã được xác thực
+            Blockchain -->> API: Xác nhận cập nhật blockchain
             deactivate Blockchain
 
-            API ->> Blockchain: Ghi nhận thông tin từ chối: người từ chối, thời gian, lý do từ chối
-            Blockchain -->> API: Xác nhận ghi nhận thành công
-            deactivate Blockchain
+            activate DB
+            API ->> DB: Cập nhật thông tin liên kết và ghi log
+            DB -->> API: Xác nhận cập nhật database
+            deactivate DB
 
-            API -->> UI: Thông báo từ chối thành công
-            deactivate API
+            activate SMS
+            API ->> SMS: Gửi thông báo cho chủ sử dụng thửa đất
+            SMS -->> Chủ sử dụng: Nhận thông báo có tài liệu mới được liên kết
+            deactivate SMS
 
+            API -->> UI: Thông báo liên kết thành công
             activate UI
-            UI -->> Staff: Hiển thị thông báo thành công
-            UI -->> Staff: Tài liệu đã bị từ chối và không thể sử dụng
+            UI -->> Officer: Hiển thị thông báo thành công và cập nhật danh sách
             deactivate UI
         end
     end
@@ -2278,163 +1558,285 @@ sequenceDiagram
 ```
 
 ### Các trường hợp ngoại lệ
-- Tài liệu không ở trạng thái "chờ xác minh"
-- Cán bộ không có quyền từ chối tài liệu
-- Lý do từ chối không được nhập
-- Lỗi cập nhật trên blockchain
+- Không có quyền Org1: Hệ thống từ chối truy cập
+- Tài liệu không hợp lệ: Hệ thống thông báo lỗi
+- Tài liệu đã liên kết: Hệ thống thông báo đã liên kết trước đó
+- Lỗi lưu trữ IPFS: Hệ thống thông báo và cho phép thử lại
 
 ### Quy tắc nghiệp vụ
-- Chỉ cán bộ thẩm định mới có quyền từ chối tài liệu
-- Phải nhập lý do từ chối cụ thể
-- Tài liệu bị từ chối không thể được sử dụng
-- Ghi nhận đầy đủ thông tin từ chối
-
----
-
-### **Task 5.3: Liên kết tài liệu**
-
----
-
-## UC-28: Liên kết tài liệu với thửa đất
-
-### Mô tả ngắn gọn
-Liên kết tài liệu đã xác minh với thửa đất cụ thể
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Toàn bộ người dùng đã đăng nhập
-    participant UI as Giao diện liên kết tài liệu
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    User ->> UI: Chọn tài liệu đã xác minh
-    activate UI
-    UI -->> User: Hiển thị danh sách thửa đất có thể liên kết
-    deactivate UI
-
-    User ->> UI: Chọn thửa đất cần liên kết
-    activate UI
-    User ->> UI: Xác nhận liên kết
-    UI ->> API: Gửi yêu cầu liên kết tài liệu với thửa đất
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực quyền truy cập
-    API ->> Blockchain: Kiểm tra tài liệu đã được xác minh chưa
-
-    alt Tài liệu chưa được xác minh
-        API -->> UI: Thông báo "Tài liệu chưa được xác minh"
-        activate UI
-        UI -->> User: Hiển thị thông báo lỗi
-        deactivate UI
-    else Tài liệu đã được xác minh
-        API ->> Blockchain: Kiểm tra quyền liên kết với thửa đất
-
-        alt Không có quyền liên kết
-            API -->> UI: Thông báo "Bạn không có quyền liên kết với thửa đất này"
-            activate UI
-            UI -->> User: Hiển thị thông báo lỗi
-            deactivate UI
-        else Có quyền liên kết
-            alt Tài liệu đã được liên kết với thửa đất khác
-                API -->> UI: Thông báo "Tài liệu đã được liên kết với thửa đất khác"
-                activate UI
-                UI -->> User: Hiển thị thông báo lỗi
-                deactivate UI
-            else Tài liệu chưa được liên kết
-                activate Blockchain
-                API ->> Blockchain: Liên kết tài liệu với thửa đất
-                Blockchain -->> API: Xác nhận liên kết thành công
-                deactivate Blockchain
-
-                API -->> UI: Thông báo liên kết thành công
-                deactivate API
-
-                activate UI
-                UI -->> User: Hiển thị thông báo thành công
-                UI -->> User: Tài liệu đã được liên kết với thửa đất
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Tài liệu chưa được xác minh
-- Người dùng không có quyền liên kết với thửa đất
-- Tài liệu đã được liên kết với thửa đất khác
-- Thửa đất không tồn tại
-
-### Quy tắc nghiệp vụ
-- Chỉ tài liệu đã xác minh mới được liên kết
-- Công dân chỉ liên kết với thửa đất thuộc sở hữu
-- Cán bộ có thể liên kết với bất kỳ thửa đất nào
+- Chỉ Org1 được phép liên kết tài liệu với thửa đất
+- Liên kết xong tài liệu tự động ở trạng thái đã xác thực
 - Một tài liệu có thể liên kết với nhiều thửa đất
+- Liên kết được lưu bất biến và có timestamp
 
 ---
 
-## UC-29: Liên kết tài liệu với giao dịch
+## UC-18: Liên kết tài liệu bổ sung cho giao dịch
 
 ### Mô tả ngắn gọn
-Liên kết tài liệu đã xác minh với giao dịch cụ thể
+Công dân đính kèm tài liệu bổ sung vào hồ sơ giao dịch theo yêu cầu của cán bộ Org2
 
 ### Sequence Diagram
 ```mermaid
 sequenceDiagram
-    actor User as Toàn bộ người dùng đã đăng nhập
-    participant UI as Giao diện liên kết tài liệu
+    actor Citizen as Công dân (Org3)
+    participant UI as Giao diện chi tiết giao dịch
     participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+    participant SMS as SMS Service
 
-    User ->> UI: Chọn tài liệu đã xác minh
+    Note over Citizen, UI: Công dân đang xem chi tiết giao dịch (UC-29)
+    Note over Citizen, UI: Cán bộ Org2 đã yêu cầu bổ sung tài liệu
+
+    Citizen ->> UI: Chọn "Đính kèm/Liên kết tài liệu"
     activate UI
-    UI -->> User: Hiển thị danh sách giao dịch có thể liên kết
+    UI -->> Citizen: Hiển thị danh sách tài liệu thuộc sở hữu
     deactivate UI
 
-    User ->> UI: Chọn giao dịch cần liên kết
+    Citizen ->> UI: Chọn tài liệu thuộc sở hữu (có thể tạo mới trước đó - UC-15)
     activate UI
-    User ->> UI: Xác nhận liên kết
+    Citizen ->> UI: Nhấn "Liên kết tài liệu"
     UI ->> API: Gửi yêu cầu liên kết tài liệu với giao dịch
     deactivate UI
 
     activate API
-    API ->> API: Xác thực quyền truy cập
-    API ->> Blockchain: Kiểm tra tài liệu đã được xác minh chưa
+    API ->> API: Kiểm tra quyền sở hữu tài liệu của người dùng
+    API ->> API: Kiểm tra quyền của người dùng với giao dịch
 
-    alt Tài liệu chưa được xác minh
-        API -->> UI: Thông báo "Tài liệu chưa được xác minh"
+    alt Không phải tài liệu của người dùng
+        API -->> UI: Thông báo "Không có quyền với tài liệu này"
         activate UI
-        UI -->> User: Hiển thị thông báo lỗi
+        UI -->> Citizen: Hiển thị thông báo từ chối
         deactivate UI
-    else Tài liệu đã được xác minh
-        API ->> Blockchain: Kiểm tra quyền liên kết với giao dịch
+    else Không phải bên liên quan giao dịch
+        API -->> UI: Thông báo "Không có quyền với giao dịch này"
+        activate UI
+        UI -->> Citizen: Hiển thị thông báo từ chối
+        deactivate UI
+    else Có quyền với cả tài liệu và giao dịch
+        activate DB
+        API ->> DB: Kiểm tra tài liệu chưa liên kết trùng lặp với giao dịch
+        DB -->> API: Kết quả kiểm tra trùng lặp
+        deactivate DB
 
-        alt Không có quyền liên kết
-            API -->> UI: Thông báo "Bạn không có quyền liên kết với giao dịch này"
+        alt Tài liệu đã liên kết
+            API -->> UI: Thông báo "Tài liệu đã được liên kết trước đó"
             activate UI
-            UI -->> User: Hiển thị thông báo lỗi
+            UI -->> Citizen: Hiển thị thông báo trùng lặp
             deactivate UI
-        else Có quyền liên kết
-            alt Tài liệu đã được liên kết với giao dịch khác
-                API -->> UI: Thông báo "Tài liệu đã được liên kết với giao dịch khác"
+        else Tài liệu chưa liên kết
+            activate Blockchain
+            API ->> Blockchain: Thêm mã tài liệu vào danh sách tài liệu của giao dịch
+            Blockchain -->> API: Xác nhận cập nhật blockchain
+            deactivate Blockchain
+
+            activate DB
+            API ->> DB: Cập nhật thông tin liên kết và ghi log
+            DB -->> API: Xác nhận cập nhật database
+            deactivate DB
+
+            activate SMS
+            API ->> SMS: Gửi thông báo cho Org2 về tài liệu bổ sung
+            SMS -->> Cán bộ Org2: Nhận thông báo có tài liệu bổ sung cần thẩm định
+            deactivate SMS
+
+            API -->> UI: Thông báo liên kết thành công
+            activate UI
+            UI -->> Citizen: Hiển thị thông báo thành công và cập nhật danh sách tài liệu
+            deactivate UI
+        end
+    end
+
+    deactivate API
+```
+
+### Các trường hợp ngoại lệ
+- Không phải tài liệu của người dùng: Hệ thống từ chối thao tác
+- Không phải bên liên quan giao dịch: Hệ thống từ chối
+- Tài liệu đã liên kết: Hệ thống thông báo trùng lặp
+- Lỗi hệ thống: Hệ thống thông báo và cho phép thử lại
+
+### Quy tắc nghiệp vụ
+- Chỉ Org3 được phép liên kết tài liệu bổ sung vào giao dịch của mình
+- Chức năng này chỉ được kích hoạt sau khi Org2 yêu cầu bổ sung tài liệu
+- Tài liệu bổ sung có thể chưa được xác minh; Org2 sẽ xác minh các tài liệu bổ sung
+- Mỗi liên kết được ghi log với timestamp
+
+---
+
+### **Task 3.3: Cập nhật và Xóa tài liệu**
+
+---
+
+## UC-19: Cập nhật tài liệu
+
+### Mô tả ngắn gọn
+Cập nhật thông tin mô tả và phân loại tài liệu
+
+### Sequence Diagram
+```mermaid
+sequenceDiagram
+    actor User as Tất cả người dùng
+    participant UI as Giao diện cập nhật tài liệu
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+
+    User ->> UI: Chọn tài liệu cần cập nhật (từ danh sách tài liệu của mình)
+    activate UI
+    UI -->> User: Hiển thị form cập nhật thông tin tài liệu
+    deactivate UI
+
+    User ->> UI: Chỉnh sửa thông tin (tên, mô tả, loại)
+    activate UI
+    User ->> UI: Nhấn "Cập nhật"
+    UI ->> API: Gửi thông tin đã chỉnh sửa
+    deactivate UI
+
+    activate API
+    API ->> API: Kiểm tra quyền chỉnh sửa (phải là người tạo tài liệu)
+
+    alt Không có quyền chỉnh sửa
+        API -->> UI: Thông báo "Không có quyền chỉnh sửa tài liệu này"
+        activate UI
+        UI -->> User: Hiển thị thông báo từ chối
+        deactivate UI
+    else Có quyền chỉnh sửa
+        activate DB
+        API ->> DB: Kiểm tra tài liệu có bị khóa chỉnh sửa không
+        DB -->> API: Trạng thái khóa của tài liệu
+        deactivate DB
+
+        alt Tài liệu đã bị khóa
+            API -->> UI: Thông báo "Tài liệu không thể chỉnh sửa"
+            activate UI
+            UI -->> User: Hiển thị thông báo tài liệu bị khóa
+            deactivate UI
+        else Tài liệu không bị khóa
+            API ->> API: Validate thông tin mới
+
+            alt Thông tin không hợp lệ
+                API -->> UI: Thông báo lỗi chi tiết
+                activate UI
+                UI -->> User: Hiển thị các lỗi cần sửa
+                deactivate UI
+            else Thông tin hợp lệ
+                API ->> API: Tạo phiên bản metadata mới
+
+                activate Blockchain
+                API ->> Blockchain: Lưu thay đổi lên blockchain (tạo version mới)
+                Blockchain -->> API: Xác nhận cập nhật blockchain
+                deactivate Blockchain
+
+                activate DB
+                API ->> DB: Ghi lại lịch sử thay đổi
+                DB -->> API: Xác nhận ghi log
+                deactivate DB
+
+                API -->> UI: Thông báo cập nhật thành công
+                activate UI
+                UI -->> User: Hiển thị thông báo thành công và thông tin đã cập nhật
+                deactivate UI
+            end
+        end
+    end
+
+    deactivate API
+```
+
+### Các trường hợp ngoại lệ
+- Không có quyền chỉnh sửa: Hệ thống từ chối thao tác
+- Tài liệu đã bị khóa: Hệ thống thông báo "Tài liệu không thể chỉnh sửa"
+- Thông tin không hợp lệ: Hệ thống yêu cầu sửa lại
+
+### Quy tắc nghiệp vụ
+- Không thể thay đổi file gốc, chỉ metadata
+- Mọi thay đổi đều tạo version mới
+- Lịch sử thay đổi được lưu vĩnh viễn
+- Chỉ người upload (chủ sở hữu) mới được chỉnh sửa
+
+---
+
+## UC-20: Xóa tài liệu
+
+### Mô tả ngắn gọn
+Loại bỏ tài liệu không cần thiết hoặc sai sót
+
+### Sequence Diagram
+```mermaid
+sequenceDiagram
+    actor User as Tất cả người dùng
+    participant UI as Giao diện quản lý tài liệu
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+    participant IPFS as IPFS Storage
+
+    User ->> UI: Chọn tài liệu cần xóa (từ danh sách tài liệu của mình)
+    activate UI
+    UI -->> User: Hiển thị thông tin tài liệu và nút xóa
+    deactivate UI
+
+    User ->> UI: Nhấn "Xóa tài liệu"
+    activate UI
+    UI -->> User: Hiển thị cảnh báo xóa vĩnh viễn
+    deactivate UI
+
+    User ->> UI: Xác nhận quyết định xóa
+    activate UI
+    UI ->> API: Gửi yêu cầu xóa tài liệu
+    deactivate UI
+
+    activate API
+    API ->> API: Kiểm tra quyền xóa (phải là người tạo tài liệu)
+
+    alt Không có quyền xóa
+        API -->> UI: Thông báo "Không có quyền xóa tài liệu này"
+        activate UI
+        UI -->> User: Hiển thị thông báo từ chối
+        deactivate UI
+    else Có quyền xóa
+        activate DB
+        API ->> DB: Kiểm tra tài liệu có đang được sử dụng không (ràng buộc)
+        DB -->> API: Trạng thái sử dụng của tài liệu
+        deactivate DB
+
+        alt Tài liệu đang được sử dụng
+            API -->> UI: Thông báo "Tài liệu đang được sử dụng, không thể xóa"
+            activate UI
+            UI -->> User: Hiển thị thông báo từ chối xóa
+            deactivate UI
+        else Tài liệu không đang được sử dụng
+            activate Blockchain
+            API ->> Blockchain: Đánh dấu xóa trên blockchain (trạng thái deleted)
+            Blockchain -->> API: Xác nhận cập nhật blockchain
+            deactivate Blockchain
+
+            activate IPFS
+            API ->> IPFS: Xóa file khỏi IPFS
+            IPFS -->> API: Xác nhận xóa file
+            deactivate IPFS
+
+            alt Lỗi xóa file IPFS
+                API -->> UI: Thông báo "Lỗi xóa file, đang hoàn tác"
                 activate UI
                 UI -->> User: Hiển thị thông báo lỗi
                 deactivate UI
-            else Tài liệu chưa được liên kết
+
                 activate Blockchain
-                API ->> Blockchain: Liên kết tài liệu với giao dịch
-                Blockchain -->> API: Xác nhận liên kết thành công
+                API ->> Blockchain: Hoàn tác trạng thái xóa
+                Blockchain -->> API: Xác nhận hoàn tác
                 deactivate Blockchain
+            else Xóa file thành công
+                activate DB
+                API ->> DB: Ghi nhật ký hành động xóa
+                DB -->> API: Xác nhận ghi log
+                deactivate DB
 
-                API -->> UI: Thông báo liên kết thành công
-                deactivate API
-
+                API -->> UI: Thông báo xóa tài liệu thành công
                 activate UI
-                UI -->> User: Hiển thị thông báo thành công
-                UI -->> User: Tài liệu đã được liên kết với giao dịch
+                UI -->> User: Hiển thị thông báo xóa thành công và cập nhật danh sách
                 deactivate UI
             end
         end
@@ -2444,1983 +1846,1417 @@ sequenceDiagram
 ```
 
 ### Các trường hợp ngoại lệ
-- Tài liệu chưa được xác minh
-- Người dùng không có quyền liên kết với giao dịch
-- Tài liệu đã được liên kết với giao dịch khác
-- Giao dịch không tồn tại
+- Tài liệu đang được sử dụng: Hệ thống từ chối xóa
+- Không có quyền xóa: Hệ thống từ chối thao tác
+- Lỗi xóa tệp: Hệ thống báo lỗi và hoàn tác
 
 ### Quy tắc nghiệp vụ
-- Chỉ tài liệu đã xác minh mới được liên kết
-- Công dân chỉ liên kết với giao dịch của mình
-- Cán bộ có thể liên kết với bất kỳ giao dịch nào
-- Một tài liệu có thể liên kết với nhiều giao dịch
+- Chỉ người upload (chủ sở hữu) mới được xóa tài liệu của mình
+- Không thể xóa tài liệu đang liên kết với giao dịch đang xử lý
+- Hành động xóa được ghi nhật ký vĩnh viễn
 
 ---
 
-### **Task 5.4: Tìm kiếm và Phân tích tài liệu**
+### **Task 3.4: Xác minh và Tìm kiếm tài liệu**
 
 ---
 
-## UC-30: Tìm kiếm tài liệu
+## UC-21: Xác minh tài liệu
 
 ### Mô tả ngắn gọn
-Tìm kiếm tài liệu theo nhiều tiêu chí
+Xác minh tính xác thực và hợp lệ của tài liệu, so khớp thông tin với dữ liệu blockchain
 
 ### Sequence Diagram
 ```mermaid
 sequenceDiagram
-    actor User as Toàn bộ người dùng đã đăng nhập
+    actor Officer as Cán bộ UBND cấp xã (Org2)
+    participant UI as Giao diện xác minh tài liệu
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+    participant IPFS as IPFS Storage
+    participant SMS as SMS Service
+
+    Officer ->> UI: Truy cập "Xác minh tài liệu" > "Danh sách chờ xác minh"
+    activate UI
+    UI -->> Officer: Hiển thị danh sách tài liệu chờ xác minh
+    deactivate UI
+
+    Officer ->> UI: Chọn tài liệu cần xác minh
+    activate UI
+    UI -->> Officer: Hiển thị chi tiết tài liệu và form xác minh
+    deactivate UI
+
+    Officer ->> UI: Kiểm tra nội dung và tính hợp lệ
+    Officer ->> UI: So khớp thông tin tài liệu với dữ liệu blockchain
+    activate UI
+    UI ->> API: Lấy dữ liệu blockchain để so khớp
+    deactivate UI
+
+    activate API
+    activate Blockchain
+    API ->> Blockchain: Truy vấn dữ liệu liên quan để so khớp
+    Blockchain -->> API: Dữ liệu blockchain để đối chiếu
+    deactivate Blockchain
+
+    activate IPFS
+    API ->> IPFS: Lấy nội dung file để kiểm tra
+    IPFS -->> API: Nội dung file gốc
+    deactivate IPFS
+
+    API -->> UI: Dữ liệu để so khớp và nội dung file
+    activate UI
+    UI -->> Officer: Hiển thị thông tin so khớp
+    deactivate UI
+
+    Officer ->> UI: Nhập nhận xét và kết quả xác minh (Xác thực/Từ chối)
+    activate UI
+    Officer ->> UI: Nhấn "Hoàn thành xác minh"
+    UI ->> API: Gửi kết quả xác minh
+    deactivate UI
+
+    alt Không có quyền xác minh
+        API -->> UI: Thông báo "Không có quyền xác minh"
+        activate UI
+        UI -->> Officer: Hiển thị thông báo từ chối
+        deactivate UI
+    else Có quyền xác minh
+        activate Blockchain
+        API ->> Blockchain: Ghi nhận quyết định xác minh và cập nhật trạng thái
+        Blockchain -->> API: Xác nhận cập nhật blockchain
+        deactivate Blockchain
+
+        activate DB
+        API ->> DB: Ghi lại log xác minh với chi tiết
+        DB -->> API: Xác nhận ghi log
+        deactivate DB
+
+        activate SMS
+        API ->> SMS: Gửi thông báo kết quả cho người gửi tài liệu
+        SMS -->> Người gửi: Nhận thông báo kết quả xác minh tài liệu
+        deactivate SMS
+
+        API -->> UI: Thông báo xác minh thành công
+        activate UI
+        UI -->> Officer: Hiển thị thông báo hoàn thành và cập nhật danh sách
+        deactivate UI
+    end
+
+    deactivate API
+```
+
+### Các trường hợp ngoại lệ
+- Tài liệu không hợp lệ: Hệ thống từ chối và yêu cầu sửa
+- Thiếu thông tin: Hệ thống yêu cầu bổ sung
+- Không có quyền xác minh: Hệ thống từ chối
+
+### Quy tắc nghiệp vụ
+- Chỉ cán bộ Org2 có quyền xác minh
+- Mỗi tài liệu chỉ cần xác minh một lần
+- Kết quả xác minh không thể thay đổi
+- Phải so khớp thông tin với dữ liệu blockchain
+
+---
+
+## UC-22: Tìm kiếm tài liệu
+
+### Mô tả ngắn gọn
+Tra cứu tài liệu nhanh chóng và chính xác theo nhiều tiêu chí
+
+### Sequence Diagram
+```mermaid
+sequenceDiagram
+    actor User as Tất cả người dùng
     participant UI as Giao diện tìm kiếm tài liệu
     participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
 
-    User ->> UI: Truy cập chức năng tìm kiếm tài liệu
+    User ->> UI: Truy cập "Tìm kiếm tài liệu"
     activate UI
-    UI -->> User: Hiển thị biểu mẫu tìm kiếm
+    UI -->> User: Hiển thị form tìm kiếm với các bộ lọc
     deactivate UI
 
-    User ->> UI: Nhập tiêu chí tìm kiếm: từ khóa, loại tài liệu, trạng thái, người upload, thời gian
+    User ->> UI: Nhập tiêu chí tìm kiếm (tên, loại, người tạo)
+    User ->> UI: Chọn bộ lọc (trạng thái, thửa đất, giao dịch, ngày tạo)
     activate UI
-    User ->> UI: Thực hiện tìm kiếm
-    UI ->> API: Gửi yêu cầu tìm kiếm với tiêu chí
-    deactivate UI
-
-    activate API
-    API ->> Blockchain: Tìm kiếm tài liệu theo tiêu chí
-    Blockchain -->> API: Trả về kết quả tìm kiếm
-    deactivate Blockchain
-
-    API ->> API: Lọc kết quả theo quyền người dùng
-
-    alt Không tìm thấy tài liệu nào
-        API -->> UI: Thông báo "Không tìm thấy tài liệu phù hợp"
-        activate UI
-        UI -->> User: Hiển thị thông báo không có kết quả
-        deactivate UI
-    else Có kết quả tìm kiếm
-        API ->> API: Sắp xếp kết quả theo thời gian tạo mới nhất
-        API -->> UI: Trả về danh sách tài liệu tìm được
-        deactivate API
-
-        activate UI
-        UI -->> User: Hiển thị thông tin: tiêu đề, loại, trạng thái, người upload, ngày upload
-        UI -->> User: Hiển thị phân trang và tổng số kết quả
-        deactivate UI
-
-        User ->> UI: Chọn xem chi tiết tài liệu
-        activate UI
-        UI -->> User: Hiển thị thông tin chi tiết tài liệu
-        deactivate UI
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Không tìm thấy tài liệu nào thỏa mãn tiêu chí
-- Lỗi kết nối blockchain
-- Token không hợp lệ
-
-### Quy tắc nghiệp vụ
-- Công dân chỉ tìm kiếm tài liệu do mình upload
-- Cán bộ có thể tìm kiếm tất cả tài liệu trong hệ thống
-- Hiển thị tối đa 10 tài liệu/trang
-- Có thể tìm kiếm theo nhiều tiêu chí kết hợp
-
----
-
-## UC-31: Xem tài liệu theo trạng thái
-
-### Mô tả ngắn gọn
-Cán bộ xem danh sách tài liệu theo trạng thái xác minh
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Staff as Cán bộ thẩm định
-    participant UI as Giao diện xem tài liệu theo trạng thái
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Staff ->> UI: Chọn trạng thái tài liệu cần xem: chờ xác minh, đã xác minh, bị từ chối
-    activate UI
-    UI -->> Staff: Hiển thị danh sách tài liệu theo trạng thái
+    User ->> UI: Nhấn "Tìm kiếm"
+    UI ->> API: Gửi tiêu chí tìm kiếm
     deactivate UI
 
     activate API
-    API ->> Blockchain: Truy vấn tài liệu theo trạng thái
-    Blockchain -->> API: Trả về danh sách tài liệu
-    deactivate Blockchain
+    API ->> API: Validate tiêu chí tìm kiếm
+    API ->> API: Xác định quyền truy cập của người dùng
 
-    alt Không có tài liệu nào ở trạng thái được chọn
-        API -->> UI: Thông báo "Không có tài liệu nào ở trạng thái này"
+    alt Tiêu chí tìm kiếm không hợp lệ
+        API -->> UI: Thông báo "Tiêu chí tìm kiếm không hợp lệ"
         activate UI
-        UI -->> Staff: Hiển thị thông báo không có tài liệu
+        UI -->> User: Hiển thị thông báo lỗi và yêu cầu nhập lại
         deactivate UI
-    else Có tài liệu
-        API ->> API: Sắp xếp theo thời gian upload mới nhất
-        API -->> UI: Trả về danh sách tài liệu
-        deactivate API
-
-        activate UI
-        UI -->> Staff: Hiển thị thông tin: tiêu đề, loại, người upload, ngày upload, trạng thái
-        UI -->> Staff: Hiển thị phân trang và tổng số tài liệu
-        deactivate UI
-
-        Staff ->> UI: Chọn xem chi tiết tài liệu
-        activate UI
-        UI -->> Staff: Hiển thị thông tin chi tiết tài liệu
-        deactivate UI
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Không có tài liệu nào ở trạng thái được chọn
-- Lỗi kết nối blockchain
-- Cán bộ không có quyền xem tài liệu theo trạng thái
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ thẩm định mới có quyền xem tài liệu theo trạng thái
-- Hiển thị tối đa 15 tài liệu/trang
-- Sắp xếp theo thời gian upload mới nhất
-- Cung cấp tùy chọn xác minh cho tài liệu chờ xác minh
-
----
-
-## UC-32: Xem tài liệu theo loại
-
-### Mô tả ngắn gọn
-Xem danh sách tài liệu theo loại cụ thể
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Toàn bộ người dùng đã đăng nhập
-    participant UI as Giao diện xem tài liệu theo loại
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    User ->> UI: Chọn loại tài liệu cần xem: giấy chứng nhận, hợp đồng, bản đồ, khác
-    activate UI
-    UI -->> User: Hiển thị danh sách tài liệu theo loại
-    deactivate UI
-
-    activate API
-    API ->> Blockchain: Truy vấn tài liệu theo loại
-    Blockchain -->> API: Trả về danh sách tài liệu
-    deactivate Blockchain
-
-    API ->> API: Lọc tài liệu theo quyền người dùng
-
-    alt Không có tài liệu nào thuộc loại được chọn
-        API -->> UI: Thông báo "Không có tài liệu nào thuộc loại này"
-        activate UI
-        UI -->> User: Hiển thị thông báo không có tài liệu
-        deactivate UI
-    else Có tài liệu
-        API ->> API: Sắp xếp theo thời gian upload mới nhất
-        API -->> UI: Trả về danh sách tài liệu
-        deactivate API
-
-        activate UI
-        UI -->> User: Hiển thị thông tin: tiêu đề, trạng thái, người upload, ngày upload
-        UI -->> User: Hiển thị phân trang và tổng số tài liệu
-        deactivate UI
-
-        User ->> UI: Chọn xem chi tiết tài liệu
-        activate UI
-        UI -->> User: Hiển thị thông tin chi tiết tài liệu
-        deactivate UI
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Không có tài liệu nào thuộc loại được chọn
-- Lỗi kết nối blockchain
-- Token không hợp lệ
-
-### Quy tắc nghiệp vụ
-- Công dân chỉ xem tài liệu do mình upload
-- Cán bộ có thể xem tất cả tài liệu trong hệ thống
-- Hiển thị tối đa 10 tài liệu/trang
-- Sắp xếp theo thời gian upload mới nhất
-
----
-
-### **Task 5.5: Quản lý tài liệu nâng cao**
-
----
-
-## UC-33: Xem tài liệu theo thửa đất
-
-### Mô tả ngắn gọn
-Xem danh sách tài liệu liên quan đến thửa đất cụ thể
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Toàn bộ người dùng đã đăng nhập
-    participant UI as Giao diện xem tài liệu theo thửa đất
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    User ->> UI: Chọn thửa đất cần xem tài liệu
-    activate UI
-    UI -->> User: Hiển thị danh sách tài liệu liên quan
-    deactivate UI
-
-    activate API
-    API ->> Blockchain: Truy vấn tài liệu liên quan đến thửa đất
-    Blockchain -->> API: Trả về danh sách tài liệu
-    deactivate Blockchain
-
-    API ->> API: Kiểm tra quyền xem tài liệu của thửa đất
-
-    alt Không có quyền xem
-        API -->> UI: Thông báo "Bạn không có quyền xem tài liệu của thửa đất này"
-        activate UI
-        UI -->> User: Hiển thị thông báo lỗi
-        deactivate UI
-    else Có quyền xem
-        alt Không có tài liệu nào liên quan
-            API -->> UI: Thông báo "Không có tài liệu nào liên quan đến thửa đất này"
-            activate UI
-            UI -->> User: Hiển thị thông báo không có tài liệu
-            deactivate UI
-        else Có tài liệu
-            API ->> API: Sắp xếp theo thời gian upload mới nhất
-            API -->> UI: Trả về danh sách tài liệu
-            deactivate API
-
-            activate UI
-            UI -->> User: Hiển thị thông tin: tiêu đề, loại, trạng thái, người upload, ngày upload
-            UI -->> User: Hiển thị phân trang và tổng số tài liệu
-            deactivate UI
-
-            User ->> UI: Chọn xem chi tiết tài liệu
-            activate UI
-            UI -->> User: Hiển thị thông tin chi tiết tài liệu
-            deactivate UI
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Thửa đất không tồn tại
-- Không có tài liệu nào liên quan đến thửa đất
-- Người dùng không có quyền xem tài liệu của thửa đất
-- Lỗi kết nối blockchain
-
-### Quy tắc nghiệp vụ
-- Công dân chỉ xem tài liệu của thửa đất thuộc sở hữu
-- Cán bộ có thể xem tài liệu của tất cả thửa đất
-- Hiển thị tối đa 10 tài liệu/trang
-- Sắp xếp theo thời gian upload mới nhất
-
----
-
-## UC-34: Xem tài liệu theo giao dịch
-
-### Mô tả ngắn gọn
-Xem danh sách tài liệu liên quan đến giao dịch cụ thể
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Toàn bộ người dùng đã đăng nhập
-    participant UI as Giao diện xem tài liệu theo giao dịch
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    User ->> UI: Chọn giao dịch cần xem tài liệu
-    activate UI
-    UI -->> User: Hiển thị danh sách tài liệu liên quan
-    deactivate UI
-
-    activate API
-    API ->> Blockchain: Truy vấn tài liệu liên quan đến giao dịch
-    Blockchain -->> API: Trả về danh sách tài liệu
-    deactivate Blockchain
-
-    API ->> API: Kiểm tra quyền xem tài liệu của giao dịch
-
-    alt Không có quyền xem
-        API -->> UI: Thông báo "Bạn không có quyền xem tài liệu của giao dịch này"
-        activate UI
-        UI -->> User: Hiển thị thông báo lỗi
-        deactivate UI
-    else Có quyền xem
-        alt Không có tài liệu nào liên quan
-            API -->> UI: Thông báo "Không có tài liệu nào liên quan đến giao dịch này"
-            activate UI
-            UI -->> User: Hiển thị thông báo không có tài liệu
-            deactivate UI
-        else Có tài liệu
-            API ->> API: Sắp xếp theo thời gian upload mới nhất
-            API -->> UI: Trả về danh sách tài liệu
-            deactivate API
-
-            activate UI
-            UI -->> User: Hiển thị thông tin: tiêu đề, loại, trạng thái, người upload, ngày upload
-            UI -->> User: Hiển thị phân trang và tổng số tài liệu
-            deactivate UI
-
-            User ->> UI: Chọn xem chi tiết tài liệu
-            activate UI
-            UI -->> User: Hiển thị thông tin chi tiết tài liệu
-            deactivate UI
-        end
-    end
-
-    deactivate API
-```
-
-    %% Bước 4: Xử lý kết quả
-    API ->> API: Phân trang kết quả (10 tài liệu/trang)
-    API ->> UI: Trả về danh sách tài liệu và thông tin phân trang
-
-    %% Bước 5: Hiển thị kết quả
-    UI ->> User: Hiển thị danh sách tài liệu liên quan
-    Note over User, UI: Thông tin: tiêu đề, loại, trạng thái, người upload, ngày upload
-    UI ->> User: Hiển thị phân trang và tổng số tài liệu
-
-    %% Bước 6: Chuyển trang (tùy chọn)
-    User ->> UI: Chọn trang tiếp theo
-    UI ->> API: Gửi yêu cầu trang mới
-    API ->> Blockchain: Truy vấn dữ liệu trang mới
-    Blockchain -->> API: Trả về dữ liệu trang mới
-    API ->> UI: Trả về danh sách tài liệu trang mới
-    UI ->> User: Hiển thị danh sách tài liệu trang mới
-```
-
-### Các trường hợp ngoại lệ
-- Giao dịch không tồn tại
-- Không có tài liệu nào liên quan đến giao dịch
-- Người dùng không có quyền xem tài liệu của giao dịch
-- Lỗi kết nối blockchain
-
-### Quy tắc nghiệp vụ
-- Công dân chỉ xem tài liệu của giao dịch liên quan
-- Cán bộ có thể xem tài liệu của tất cả giao dịch
-- Hiển thị tối đa 10 tài liệu/trang
-- Sắp xếp theo thời gian upload mới nhất
-
----
-
-## UC-36: Xem tài liệu theo người tải lên
-
-### Mô tả ngắn gọn
-Cán bộ xem danh sách tài liệu do một người dùng cụ thể tải lên
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Staff as Cán bộ thẩm định
-    participant UI as Giao diện xem tài liệu theo người tải lên
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Staff ->> UI: Chọn người dùng cần xem tài liệu
-    activate UI
-    UI -->> Staff: Hiển thị danh sách tài liệu của người dùng
-    deactivate UI
-
-    activate API
-    API ->> Blockchain: Truy vấn tài liệu theo người upload
-    Blockchain -->> API: Trả về danh sách tài liệu
-    deactivate Blockchain
-
-    alt Không có tài liệu nào
-        API -->> UI: Thông báo "Người dùng này chưa có tài liệu nào"
-        activate UI
-        UI -->> Staff: Hiển thị thông báo không có tài liệu
-        deactivate UI
-    else Có tài liệu
-        API ->> API: Sắp xếp theo thời gian upload mới nhất
-        API -->> UI: Trả về danh sách tài liệu
-        deactivate API
-
-        activate UI
-        UI -->> Staff: Hiển thị thông tin: tiêu đề, loại, trạng thái, ngày upload
-        UI -->> Staff: Hiển thị phân trang và tổng số tài liệu
-        deactivate UI
-
-        Staff ->> UI: Chọn xem chi tiết tài liệu
-        activate UI
-        UI -->> Staff: Hiển thị thông tin chi tiết tài liệu
-        deactivate UI
-    end
-
-    deactivate API
-```
-    API ->> Blockchain: Truy vấn dữ liệu trang mới
-    Blockchain -->> API: Trả về dữ liệu trang mới
-    API ->> UI: Trả về danh sách tài liệu trang mới
-    UI ->> Staff: Hiển thị danh sách tài liệu trang mới
-```
-
-### Các trường hợp ngoại lệ
-- Người dùng không tồn tại
-- Không có tài liệu nào do người dùng upload
-- Cán bộ không có quyền xem tài liệu của người dùng
-- Lỗi kết nối blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ thẩm định mới có quyền xem tài liệu theo người upload
-- Hiển thị tối đa 15 tài liệu/trang
-- Sắp xếp theo thời gian upload mới nhất
-- Cung cấp thống kê về trạng thái tài liệu
-
----
-
-## UC-37: Phân tích tài liệu
-
-### Mô tả ngắn gọn
-Cán bộ phân tích và đánh giá tài liệu để hỗ trợ quyết định
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Staff as Cán bộ thẩm định
-    participant UI as Giao diện phân tích tài liệu
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-    participant IPFS as IPFS Storage
-
-    Staff ->> UI: Chọn tài liệu cần phân tích
-    activate UI
-    UI -->> Staff: Hiển thị thông tin tài liệu và công cụ phân tích
-    deactivate UI
-
-    activate API
-    API ->> Blockchain: Truy vấn metadata tài liệu
-    Blockchain -->> API: Trả về metadata tài liệu
-    deactivate Blockchain
-
-    activate IPFS
-    API ->> IPFS: Truy vấn nội dung tài liệu
-    IPFS -->> API: Trả về nội dung tài liệu
-    deactivate IPFS
-
-    API ->> API: Phân tích tài liệu: kiểm tra tính hợp lệ, chất lượng, mức độ tin cậy
-
-    alt Tài liệu không hợp lệ
-        API -->> UI: Thông báo "Tài liệu không hợp lệ để phân tích"
-        activate UI
-        UI -->> Staff: Hiển thị thông báo lỗi
-        deactivate UI
-    else Tài liệu hợp lệ
-        API ->> API: Tạo báo cáo phân tích chi tiết
-        API -->> UI: Trả về kết quả phân tích
-        deactivate API
-
-        activate UI
-        UI -->> Staff: Hiển thị kết quả phân tích: mức độ tin cậy, chất lượng, khuyến nghị
-        UI -->> Staff: Hiển thị báo cáo chi tiết
-        deactivate UI
-
-        Staff ->> UI: Chọn lưu báo cáo phân tích
-        activate UI
-        UI ->> API: Gửi yêu cầu lưu báo cáo
-        deactivate UI
-
-        activate API
-        API ->> Blockchain: Lưu báo cáo phân tích
-        Blockchain -->> API: Xác nhận lưu thành công
-        deactivate Blockchain
-
-        API -->> UI: Thông báo lưu báo cáo thành công
-        deactivate API
-
-        activate UI
-        UI -->> Staff: Hiển thị thông báo thành công
-        deactivate UI
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Tài liệu không tồn tại
-- Người dùng không có quyền xem lịch sử
-- Lỗi kết nối blockchain
-- Không có lịch sử nào cho tài liệu
-
-### Quy tắc nghiệp vụ
-- Công dân chỉ xem lịch sử tài liệu do mình upload
-- Cán bộ có thể xem lịch sử tất cả tài liệu
-- Hiển thị cả lịch sử thay đổi và sử dụng
-- Sắp xếp theo thời gian (mới nhất trước)
-- Hiển thị tối đa 20 bản ghi/trang
-
----
-
-## UC-38: Phân tích tài liệu
-
-### Mô tả ngắn gọn
-Cán bộ phân tích và đánh giá tài liệu để hỗ trợ quyết định
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Staff as Cán bộ thẩm định
-    participant UI as Giao diện phân tích tài liệu
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-    participant IPFS as IPFS Storage
-
-    Staff ->> UI: Chọn tài liệu cần phân tích
-    activate UI
-    UI -->> Staff: Hiển thị thông tin tài liệu và công cụ phân tích
-    deactivate UI
-
-    activate API
-    API ->> Blockchain: Truy vấn metadata tài liệu
-    Blockchain -->> API: Trả về metadata tài liệu
-    deactivate Blockchain
-
-    activate IPFS
-    API ->> IPFS: Truy vấn nội dung tài liệu
-    IPFS -->> API: Trả về nội dung tài liệu
-    deactivate IPFS
-
-    API ->> API: Phân tích tài liệu: kiểm tra tính hợp lệ, chất lượng, mức độ tin cậy
-
-    alt Tài liệu không hợp lệ
-        API -->> UI: Thông báo "Tài liệu không hợp lệ để phân tích"
-        activate UI
-        UI -->> Staff: Hiển thị thông báo lỗi
-        deactivate UI
-    else Tài liệu hợp lệ
-        API ->> API: Tạo báo cáo phân tích chi tiết
-        API -->> UI: Trả về kết quả phân tích
-        deactivate API
-
-        activate UI
-        UI -->> Staff: Hiển thị kết quả phân tích: mức độ tin cậy, chất lượng, khuyến nghị
-        UI -->> Staff: Hiển thị báo cáo chi tiết
-        deactivate UI
-
-        Staff ->> UI: Chọn lưu báo cáo phân tích
-        activate UI
-        UI ->> API: Gửi yêu cầu lưu báo cáo
-        deactivate UI
-
-        activate API
-        API ->> Blockchain: Lưu báo cáo phân tích
-        Blockchain -->> API: Xác nhận lưu thành công
-        deactivate Blockchain
-
-        API -->> UI: Thông báo lưu báo cáo thành công
-        deactivate API
-
-        activate UI
-        UI -->> Staff: Hiển thị thông báo thành công
-        deactivate UI
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Tài liệu không tồn tại
-- Cán bộ không có quyền phân tích tài liệu
-- Lỗi kết nối IPFS hoặc blockchain
-- Nội dung tài liệu không thể phân tích
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ thẩm định mới có quyền phân tích tài liệu
-- Phân tích bao gồm kiểm tra tính hợp lệ và đánh giá chất lượng
-- Kết quả phân tích được lưu vào blockchain
-- Cung cấp khuyến nghị và đánh giá rủi ro
-- Hỗ trợ quyết định xác minh hoặc từ chối tài liệu
-
----
-
-### **Tiến độ Module 5 - HOÀN THÀNH:**
-- ✅ UC-24: Upload tài liệu mới
-- ✅ UC-25: Xem danh sách tài liệu
-- ✅ UC-26: Xem chi tiết tài liệu
-- ✅ UC-27: Xác minh tài liệu
-- ✅ UC-28: Từ chối tài liệu
-- ✅ UC-29: Liên kết tài liệu với thửa đất
-- ✅ UC-30: Liên kết tài liệu với giao dịch
-- ✅ UC-31: Tìm kiếm tài liệu
-- ✅ UC-32: Xem tài liệu theo trạng thái
-- ✅ UC-33: Xem tài liệu theo loại
-- ✅ UC-34: Xem tài liệu theo thửa đất
-- ✅ UC-35: Xem tài liệu theo giao dịch
-- ✅ UC-36: Xem tài liệu theo người upload
-- ✅ UC-37: Xem lịch sử tài liệu
-- ✅ UC-38: Phân tích tài liệu
-
-**🎉 Module 5 - QUẢN LÝ TÀI LIỆU (DOCUMENT MANAGEMENT) ĐÃ HOÀN THÀNH!**
-
-**Tiếp theo: Module 6 - Quản lý giao dịch (UC-39 đến UC-57)**
-
-## 💼 **MODULE 6: QUẢN LÝ GIAO DỊCH (TRANSACTION MANAGEMENT)**
-
-### **Task 6.1: Xử lý và Quản lý giao dịch**
-
----
-
-## UC-39: Xử lý giao dịch
-
-### Mô tả ngắn gọn
-Cán bộ xử lý và thẩm định giao dịch
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Staff as Cán bộ thẩm định
-    participant UI as Giao diện xử lý giao dịch
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Staff ->> UI: Chọn giao dịch có trạng thái "PENDING"
-    activate UI
-    UI -->> Staff: Hiển thị thông tin giao dịch và biểu mẫu xử lý
-    deactivate UI
-
-    Staff ->> UI: Xem xét thông tin giao dịch và tài liệu liên quan
-    activate UI
-    Staff ->> UI: Nhập nhận xét thẩm định
-    Staff ->> UI: Xác nhận xử lý
-    UI ->> API: Gửi kết quả xử lý giao dịch
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền xử lý giao dịch
-
-    alt Cán bộ không có quyền xử lý
-        API -->> UI: Thông báo "Bạn không có quyền xử lý giao dịch này"
-        activate UI
-        UI -->> Staff: Hiển thị thông báo lỗi
-        deactivate UI
-    else Cán bộ có quyền xử lý
+    else Tiêu chí hợp lệ
         activate Blockchain
-        API ->> Blockchain: Cập nhật trạng thái giao dịch thành "VERIFIED"
-        Blockchain -->> API: Xác nhận cập nhật thành công
+        API ->> Blockchain: Tìm kiếm trong cơ sở dữ liệu blockchain
+        Blockchain -->> API: Danh sách tài liệu phù hợp
         deactivate Blockchain
 
-        API ->> Blockchain: Ghi nhận thông tin xử lý: người xử lý, thời gian, nhận xét, kết quả
-        Blockchain -->> API: Xác nhận ghi nhận thành công
-        deactivate Blockchain
+        API ->> API: Lọc kết quả theo quyền truy cập của người dùng
+        API ->> API: Giới hạn kết quả tối đa 100 bản ghi
 
-        API -->> UI: Thông báo xử lý thành công
-        deactivate API
+        alt Không tìm thấy kết quả
+            API -->> UI: Thông báo "Không tìm thấy tài liệu phù hợp"
+            activate UI
+            UI -->> User: Hiển thị thông báo không có kết quả
+            deactivate UI
+        else Có kết quả
+            API -->> UI: Danh sách tài liệu phù hợp
+            activate UI
+            UI -->> User: Hiển thị kết quả tìm kiếm với phân trang và sắp xếp
+            deactivate UI
 
-        activate UI
-        UI -->> Staff: Hiển thị thông báo thành công
-        UI -->> Staff: Giao dịch đã được xử lý và xác minh
-        deactivate UI
+            User ->> UI: Chọn xem chi tiết tài liệu
+            activate UI
+            UI ->> API: Yêu cầu xem chi tiết tài liệu
+            deactivate UI
+        end
     end
 
     deactivate API
-    Blockchain -->> API: Xác nhận ghi nhận thành công
-
-    %% Bước 5: Hoàn tất quy trình
-    API ->> UI: Thông báo xử lý thành công
-    UI ->> Staff: Hiển thị thông báo thành công
-    Note over Staff, UI: Giao dịch đã được xử lý và chuyển tiếp
 ```
 
 ### Các trường hợp ngoại lệ
-- Giao dịch không ở trạng thái "PENDING"
-- Cán bộ không có quyền xử lý giao dịch
-- Hồ sơ không đầy đủ hoặc không hợp lệ
-- Lỗi cập nhật trên blockchain
+- Không tìm thấy kết quả: Hệ thống thông báo "Không tìm thấy tài liệu phù hợp"
+- Tiêu chí không hợp lệ: Hệ thống yêu cầu nhập lại
+- Lỗi truy vấn: Hệ thống thông báo lỗi
 
 ### Quy tắc nghiệp vụ
-- Chỉ cán bộ thẩm định mới có quyền xử lý giao dịch
-- Chỉ giao dịch có trạng thái "PENDING" mới được xử lý
-- Phải kiểm tra đầy đủ hồ sơ và tài liệu liên quan
-- Ghi nhận đầy đủ thông tin xử lý
+- Chỉ tìm được tài liệu có quyền truy cập
+- Kết quả được giới hạn 100 bản ghi
+- Hỗ trợ tìm kiếm mờ cho tên tài liệu
+- Tích hợp các chức năng: xem theo thửa đất, xem theo giao dịch, xem theo trạng thái, xem theo loại, xem theo người tải lên
 
 ---
 
-## UC-40: Tạo yêu cầu chuyển nhượng
+## UC-23: Xem lịch sử thay đổi tài liệu
 
-### Mô tả ngắn gọn
-Công dân tạo yêu cầu chuyển nhượng thửa đất
-
-### Sequence Diagram
 ```mermaid
 sequenceDiagram
-    actor Citizen as Công dân
-    participant UI as Giao diện tạo yêu cầu chuyển nhượng
+    actor User as Tất cả người dùng
+    participant UI as Giao diện chi tiết tài liệu
     participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
+    participant Blockchain as Fabric Network
 
-    Citizen ->> UI: Truy cập chức năng tạo yêu cầu chuyển nhượng
+    User ->> UI: Chọn tab "Lịch sử thay đổi"
     activate UI
-    UI -->> Citizen: Hiển thị biểu mẫu tạo giao dịch
-    deactivate UI
-
-    Citizen ->> UI: Nhập thông tin chuyển nhượng: thửa đất, người nhận, lý do chuyển nhượng
-    activate UI
-    Citizen ->> UI: Xác nhận tạo yêu cầu
-    UI ->> API: Gửi thông tin giao dịch
+    UI ->> API: Yêu cầu xem lịch sử thay đổi tài liệu
     deactivate UI
 
     activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra tính hợp lệ của thông tin
+    API ->> API: Kiểm tra quyền truy cập lịch sử tài liệu
 
-    alt Thông tin không hợp lệ
-        API -->> UI: Thông báo "Thông tin không hợp lệ"
+    alt Không có quyền xem lịch sử
+        API -->> UI: Thông báo "Không có quyền xem lịch sử"
         activate UI
-        UI -->> Citizen: Hiển thị thông báo lỗi
+        UI -->> User: Hiển thị thông báo từ chối truy cập
+        deactivate UI
+    else Có quyền xem
+        activate Blockchain
+        API ->> Blockchain: Truy vấn lịch sử thay đổi thông tin từ blockchain
+        Blockchain -->> API: Danh sách các thay đổi với timestamp
+        deactivate Blockchain
+
+        alt Chưa có thay đổi nào
+            API -->> UI: Thông báo "Chưa có thay đổi nào"
+            activate UI
+            UI -->> User: Hiển thị thông báo không có lịch sử
+            deactivate UI
+        else Có lịch sử thay đổi
+            API -->> UI: Danh sách lịch sử thay đổi theo thời gian
+            activate UI
+            UI -->> User: Hiển thị timeline lịch sử thay đổi
+            deactivate UI
+        end
+    end
+
+    deactivate API
+```
+
+---
+
+## 📋 **MODULE 4: QUẢN LÝ GIAO DỊCH**
+
+### **Task 4.1: Tạo các loại giao dịch**
+
+---
+
+## UC-24: Tạo giao dịch chuyển nhượng
+
+```mermaid
+sequenceDiagram
+    actor Owner as Chủ sử dụng đất (Org3)
+    participant UI as Giao diện tạo giao dịch
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+    participant SMS as SMS Service
+
+    Owner ->> UI: Truy cập "Quản lý giao dịch" > "Tạo giao dịch chuyển nhượng"
+    activate UI
+    UI -->> Owner: Hiển thị danh sách thửa đất thuộc sở hữu
+    deactivate UI
+
+    Owner ->> UI: Chọn thửa đất cần chuyển nhượng
+    activate UI
+    UI -->> Owner: Hiển thị form tạo giao dịch chuyển nhượng
+    deactivate UI
+
+    Owner ->> UI: Nhập thông tin bên nhận (CCCD)
+    Owner ->> UI: Liên kết các tài liệu bắt buộc (UC-18)
+    activate UI
+    Owner ->> UI: Nhấn "Tạo giao dịch"
+    UI ->> API: Gửi thông tin giao dịch chuyển nhượng
+    deactivate UI
+
+    activate API
+    API ->> API: Kiểm tra quyền sở hữu thửa đất của người tạo
+
+    activate Blockchain
+    API ->> Blockchain: Kiểm tra trạng thái thửa đất trên blockchain
+    Blockchain -->> API: Thông tin trạng thái thửa đất
+    deactivate Blockchain
+
+    activate Blockchain
+    API ->> Blockchain: Kiểm tra bên nhận có tồn tại trong hệ thống
+    Blockchain -->> API: Thông tin bên nhận
+    deactivate Blockchain
+
+    alt Không phải người sử dụng đất
+        API -->> UI: Thông báo "Không có quyền chuyển nhượng thửa đất này"
+        activate UI
+        UI -->> Owner: Hiển thị thông báo từ chối
+        deactivate UI
+    else Thửa đất đang tranh chấp/thế chấp
+        API -->> UI: Thông báo "Thửa đất không thể chuyển nhượng"
+        activate UI
+        UI -->> Owner: Hiển thị thông báo từ chối
+        deactivate UI
+    else Bên nhận không tồn tại
+        API -->> UI: Thông báo "Bên nhận không có tài khoản trong hệ thống"
+        activate UI
+        UI -->> Owner: Hiển thị thông báo lỗi
+        deactivate UI
+    else Thửa đất đang trong giao dịch khác
+        API -->> UI: Thông báo "Thửa đất đang trong giao dịch khác"
+        activate UI
+        UI -->> Owner: Hiển thị thông báo từ chối
         deactivate UI
     else Thông tin hợp lệ
-        API ->> Blockchain: Kiểm tra quyền sở hữu thửa đất
-
-        alt Không có quyền sở hữu
-            API -->> UI: Thông báo "Bạn không có quyền sở hữu thửa đất này"
-            activate UI
-            UI -->> Citizen: Hiển thị thông báo lỗi
-            deactivate UI
-        else Có quyền sở hữu
-            alt Thửa đất đang có giao dịch khác xử lý
-                API -->> UI: Thông báo "Thửa đất đang có giao dịch khác xử lý"
-                activate UI
-                UI -->> Citizen: Hiển thị thông báo lỗi
-                deactivate UI
-            else Thửa đất có thể chuyển nhượng
-                activate Blockchain
-                API ->> Blockchain: Tạo giao dịch chuyển nhượng: loại giao dịch, thửa đất, người chuyển, người nhận, trạng thái PENDING
-                Blockchain -->> API: Xác nhận tạo giao dịch thành công
-                deactivate Blockchain
-
-                API -->> UI: Thông báo tạo giao dịch thành công
-                deactivate API
-
-                activate UI
-                UI -->> Citizen: Hiển thị thông tin giao dịch đã tạo
-                UI -->> Citizen: Hiển thị mã giao dịch và trạng thái chờ xử lý
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Thông tin giao dịch không đầy đủ hoặc không hợp lệ
-- Công dân không có quyền sở hữu thửa đất
-- Thửa đất đang có giao dịch khác xử lý
-- Lỗi kết nối blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ người sử dụng đất mới có quyền tạo yêu cầu chuyển nhượng
-- Thửa đất phải không có giao dịch đang xử lý
-- Giao dịch mới có trạng thái "PENDING"
-- Hệ thống tự động thông báo cho người nhận
-
----
-
-## UC-41: Xác nhận nhận chuyển nhượng
-
-### Mô tả ngắn gọn
-Người nhận xác nhận yêu cầu chuyển nhượng thửa đất
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Recipient as Người nhận chuyển nhượng
-    participant UI as Giao diện xác nhận giao dịch
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Recipient ->> UI: Chọn giao dịch chuyển nhượng
-    activate UI
-    UI -->> Recipient: Hiển thị thông tin giao dịch và biểu mẫu xác nhận
-    deactivate UI
-
-    Recipient ->> UI: Xem xét thông tin giao dịch: thửa đất, người chuyển, lý do chuyển nhượng
-    activate UI
-    Recipient ->> UI: Xác nhận chuyển nhượng
-    UI ->> API: Gửi yêu cầu xác nhận giao dịch
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> Blockchain: Kiểm tra quyền xác nhận giao dịch
-
-    alt Không có quyền xác nhận
-        API -->> UI: Thông báo "Bạn không có quyền xác nhận giao dịch này"
-        activate UI
-        UI -->> Recipient: Hiển thị thông báo lỗi
-        deactivate UI
-    else Có quyền xác nhận
         activate Blockchain
-        API ->> Blockchain: Xác nhận giao dịch chuyển nhượng
-        Blockchain -->> API: Xác nhận xác nhận thành công
+        API ->> Blockchain: Tạo giao dịch chuyển nhượng trên blockchain
+        Blockchain -->> API: Xác nhận tạo giao dịch
         deactivate Blockchain
 
-        API ->> Blockchain: Cập nhật trạng thái giao dịch và thay đổi người sử dụng đất
-        Blockchain -->> API: Xác nhận cập nhật thành công
+        activate Blockchain
+        API ->> Blockchain: Cập nhật trạng thái thửa đất trên blockchain
+        Blockchain -->> API: Xác nhận cập nhật trạng thái
         deactivate Blockchain
 
-        API -->> UI: Thông báo xác nhận thành công
-        deactivate API
+        activate DB
+        API ->> DB: Ghi log giao dịch vào MongoDB
+        DB -->> API: Xác nhận ghi log
+        deactivate DB
 
+        activate SMS
+        API ->> SMS: Gửi thông báo cho bên nhận
+        SMS -->> Bên nhận: Nhận thông báo có giao dịch chuyển nhượng
+        deactivate SMS
+
+        API ->> API: Tạo thông báo hệ thống cho cơ quan hành chính cấp xã (Org2)
+        
+        activate DB
+        API ->> DB: Lưu thông báo vào hệ thống
+        DB -->> API: Xác nhận lưu thông báo
+        deactivate DB
+
+        API -->> UI: Thông báo tạo giao dịch thành công
         activate UI
-        UI -->> Recipient: Hiển thị thông báo thành công
-        UI -->> Recipient: Giao dịch đã được xác nhận và hoàn tất
+        UI -->> Owner: Hiển thị thông báo thành công và mã giao dịch
         deactivate UI
     end
 
     deactivate API
-    Blockchain -->> API: Xác nhận xác nhận thành công
-
-    %% Bước 5: Hoàn tất quy trình
-    API ->> UI: Thông báo xác nhận thành công
-    UI ->> Recipient: Hiển thị thông báo thành công
-    Note over Recipient, UI: Thửa đất đã được chuyển nhượng thành công
 ```
-
-### Các trường hợp ngoại lệ
-- Giao dịch không tồn tại
-- Người dùng không phải là người nhận chuyển nhượng
-- Giao dịch không ở trạng thái "APPROVED"
-- Lỗi cập nhật trên blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ người nhận chuyển nhượng mới có quyền xác nhận
-- Giao dịch phải ở trạng thái "APPROVED" mới được xác nhận
-- Sau khi xác nhận, người sử dụng đất được thay đổi
-- Ghi nhận đầy đủ thông tin xác nhận
 
 ---
 
-## UC-42: Tạo yêu cầu tách thửa
+## UC-25: Tạo giao dịch tách thửa
 
-### Mô tả ngắn gọn
-Công dân tạo yêu cầu tách thửa đất thành nhiều thửa nhỏ hơn
-
-### Sequence Diagram
 ```mermaid
 sequenceDiagram
-    actor Citizen as Công dân
-    participant UI as Giao diện tạo yêu cầu tách thửa
+    actor Owner as Chủ sử dụng đất (Org3)
+    participant UI as Giao diện tạo giao dịch
     participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+    participant SMS as SMS Service
 
-    Citizen ->> UI: Truy cập chức năng tạo yêu cầu tách thửa
+    Owner ->> UI: Truy cập "Quản lý giao dịch" > "Tạo giao dịch tách thửa"
     activate UI
-    UI -->> Citizen: Hiển thị biểu mẫu tạo giao dịch tách thửa
+    UI -->> Owner: Hiển thị danh sách thửa đất thuộc sở hữu
     deactivate UI
 
-    Citizen ->> UI: Nhập thông tin tách thửa: thửa đất gốc, số thửa mới, diện tích từng thửa, lý do tách
+    Owner ->> UI: Chọn thửa đất cần tách
     activate UI
-    Citizen ->> UI: Xác nhận tạo yêu cầu
+    UI -->> Owner: Hiển thị form tạo giao dịch tách thửa
+    deactivate UI
+
+    Owner ->> UI: Nhập thông tin các thửa đất mới (diện tích, vị trí)
+    Owner ->> UI: Liên kết tài liệu bắt buộc (bản đồ phân chia)
+    activate UI
+    Owner ->> UI: Nhấn "Tạo giao dịch"
     UI ->> API: Gửi thông tin giao dịch tách thửa
     deactivate UI
 
     activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra tính hợp lệ của thông tin
+    API ->> API: Kiểm tra quyền sở hữu thửa đất
 
-    alt Thông tin không hợp lệ
-        API -->> UI: Thông báo "Thông tin tách thửa không hợp lệ"
+    activate Blockchain
+    API ->> Blockchain: Kiểm tra trạng thái và thông tin thửa đất trên blockchain
+    Blockchain -->> API: Thông tin trạng thái và diện tích hiện tại
+    deactivate Blockchain
+
+    API ->> API: Validate thông tin thửa mới (tổng diện tích = diện tích gốc)
+
+    alt Không phải người sử dụng đất
+        API -->> UI: Thông báo "Không có quyền tách thửa đất này"
         activate UI
-        UI -->> Citizen: Hiển thị thông báo lỗi
+        UI -->> Owner: Hiển thị thông báo từ chối
+        deactivate UI
+    else Thửa đất đang tranh chấp/thế chấp
+        API -->> UI: Thông báo "Thửa đất không thể tách"
+        activate UI
+        UI -->> Owner: Hiển thị thông báo từ chối
+        deactivate UI
+    else Thông tin diện tích không khớp
+        API -->> UI: Thông báo "Tổng diện tích các thửa mới phải bằng diện tích gốc"
+        activate UI
+        UI -->> Owner: Hiển thị thông báo lỗi và yêu cầu sửa
         deactivate UI
     else Thông tin hợp lệ
-        API ->> Blockchain: Kiểm tra quyền sở hữu thửa đất
+        activate Blockchain
+        API ->> Blockchain: Tạo giao dịch tách thửa trên blockchain
+        Blockchain -->> API: Xác nhận tạo giao dịch
+        deactivate Blockchain
 
-        alt Không có quyền sở hữu
-            API -->> UI: Thông báo "Bạn không có quyền sở hữu thửa đất này"
-            activate UI
-            UI -->> Citizen: Hiển thị thông báo lỗi
-            deactivate UI
-        else Có quyền sở hữu
-            alt Thửa đất không đủ diện tích để tách
-                API -->> UI: Thông báo "Thửa đất không đủ diện tích để tách"
-                activate UI
-                UI -->> Citizen: Hiển thị thông báo lỗi
-                deactivate UI
-            else Thửa đất có thể tách
-                activate Blockchain
-                API ->> Blockchain: Tạo giao dịch tách thửa: loại giao dịch, thửa đất gốc, thông tin tách thửa, trạng thái PENDING
-                Blockchain -->> API: Xác nhận tạo giao dịch thành công
-                deactivate Blockchain
+        activate Blockchain
+        API ->> Blockchain: Lưu thông tin thửa đất mới lên blockchain
+        Blockchain -->> API: Xác nhận lưu dữ liệu
+        deactivate Blockchain
 
-                API -->> UI: Thông báo tạo giao dịch thành công
-                deactivate API
+        activate DB
+        API ->> DB: Ghi log giao dịch vào MongoDB
+        DB -->> API: Xác nhận ghi log
+        deactivate DB
 
-                activate UI
-                UI -->> Citizen: Hiển thị thông tin giao dịch đã tạo
-                UI -->> Citizen: Hiển thị mã giao dịch và trạng thái chờ xử lý
-                deactivate UI
-            end
-        end
+        API ->> API: Tạo thông báo hệ thống cho cơ quan hành chính cấp xã (Org2)
+        
+        activate DB
+        API ->> DB: Lưu thông báo vào hệ thống
+        DB -->> API: Xác nhận lưu thông báo
+        deactivate DB
+
+        API -->> UI: Thông báo tạo giao dịch thành công
+        activate UI
+        UI -->> Owner: Hiển thị thông báo thành công và mã giao dịch
+        deactivate UI
     end
 
     deactivate API
 ```
 
-### Các trường hợp ngoại lệ
-- Thông tin tách thửa không hợp lệ
-- Công dân không có quyền sở hữu thửa đất
-- Thửa đất không đủ diện tích để tách
-- Lỗi kết nối blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ người sử dụng đất mới có quyền tạo yêu cầu tách thửa
-- Tổng diện tích các thửa mới phải bằng diện tích thửa gốc
-- Mỗi thửa mới phải có diện tích tối thiểu theo quy định
-- Giao dịch mới có trạng thái "PENDING"
-
 ---
 
-## UC-43: Tạo yêu cầu gộp thửa
+## UC-26: Tạo giao dịch gộp thửa
 
-### Mô tả ngắn gọn
-Công dân tạo yêu cầu gộp nhiều thửa đất thành một thửa lớn hơn
-
-### Sequence Diagram
 ```mermaid
 sequenceDiagram
-    actor Citizen as Công dân
-    participant UI as Giao diện tạo yêu cầu gộp thửa
+    actor Owner as Chủ sử dụng đất (Org3)
+    participant UI as Giao diện tạo giao dịch
     participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
 
-    Citizen ->> UI: Truy cập chức năng tạo yêu cầu gộp thửa
+    Owner ->> UI: Truy cập "Quản lý giao dịch" > "Tạo giao dịch gộp thửa"
     activate UI
-    UI -->> Citizen: Hiển thị biểu mẫu tạo giao dịch gộp thửa
+    UI -->> Owner: Hiển thị danh sách thửa đất thuộc sở hữu
     deactivate UI
 
-    Citizen ->> UI: Chọn các thửa đất cần gộp: danh sách thửa đất, thông tin thửa mới, lý do gộp thửa
+    Owner ->> UI: Chọn các thửa đất cần gộp (tối thiểu 2 thửa)
     activate UI
-    Citizen ->> UI: Xác nhận tạo yêu cầu
+    UI -->> Owner: Hiển thị form tạo giao dịch gộp thửa
+    deactivate UI
+
+    Owner ->> UI: Nhập thông tin thửa đất mới sau gộp
+    Owner ->> UI: Liên kết tài liệu bắt buộc (bản đồ gộp)
+    activate UI
+    Owner ->> UI: Nhấn "Tạo giao dịch"
     UI ->> API: Gửi thông tin giao dịch gộp thửa
     deactivate UI
 
     activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra tính hợp lệ của thông tin
-
-    alt Thông tin không hợp lệ
-        API -->> UI: Thông báo "Thông tin gộp thửa không hợp lệ"
-        activate UI
-        UI -->> Citizen: Hiển thị thông báo lỗi
-        deactivate UI
-    else Thông tin hợp lệ
-        API ->> Blockchain: Kiểm tra quyền sở hữu tất cả thửa đất
-
-        alt Không có quyền sở hữu tất cả thửa đất
-            API -->> UI: Thông báo "Bạn không có quyền sở hữu tất cả thửa đất cần gộp"
-            activate UI
-            UI -->> Citizen: Hiển thị thông báo lỗi
-            deactivate UI
-        else Có quyền sở hữu tất cả thửa đất
-            alt Các thửa đất không liền kề
-                API -->> UI: Thông báo "Các thửa đất cần gộp phải liền kề"
-                activate UI
-                UI -->> Citizen: Hiển thị thông báo lỗi
-                deactivate UI
-            else Các thửa đất có thể gộp
-                activate Blockchain
-                API ->> Blockchain: Tạo giao dịch gộp thửa: loại giao dịch, danh sách thửa đất, thông tin thửa mới, trạng thái PENDING
-                Blockchain -->> API: Xác nhận tạo giao dịch thành công
-                deactivate Blockchain
-
-                API -->> UI: Thông báo tạo giao dịch thành công
-                deactivate API
-
-                activate UI
-                UI -->> Citizen: Hiển thị thông tin giao dịch đã tạo
-                UI -->> Citizen: Hiển thị mã giao dịch và trạng thái chờ xử lý
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-    
-    alt Không có quyền sở hữu
-        API ->> UI: Thông báo lỗi quyền sở hữu
-        UI ->> Citizen: Hiển thị thông báo lỗi
-    end
-
-    %% Bước 5: Tạo giao dịch
-    API ->> Blockchain: Tạo giao dịch gộp thửa
-    Note over API, Blockchain: Lưu: loại giao dịch, danh sách thửa đất, thông tin thửa mới, trạng thái PENDING
-    Blockchain -->> API: Xác nhận tạo giao dịch thành công
-
-    %% Bước 6: Hoàn tất quy trình
-    API ->> UI: Thông báo tạo giao dịch thành công
-    UI ->> Citizen: Hiển thị thông tin giao dịch đã tạo
-    Note over Citizen, UI: Hiển thị mã giao dịch và trạng thái chờ xử lý
-```
-
-### Các trường hợp ngoại lệ
-- Thông tin gộp thửa không hợp lệ
-- Công dân không có quyền sở hữu tất cả thửa đất
-- Các thửa đất không liền kề nhau
-- Lỗi kết nối blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ người sử dụng đất tất cả thửa đất mới có quyền tạo yêu cầu gộp thửa
-- Các thửa đất phải liền kề nhau
-- Tất cả thửa đất phải cùng mục đích sử dụng
-- Giao dịch mới có trạng thái "PENDING"
-
----
-
-## UC-44: Tạo yêu cầu đổi mục đích sử dụng
-
-### Mô tả ngắn gọn
-Công dân tạo yêu cầu đổi mục đích sử dụng thửa đất
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Citizen as Công dân
-    participant UI as Giao diện tạo yêu cầu đổi mục đích sử dụng
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Citizen ->> UI: Truy cập chức năng tạo yêu cầu đổi mục đích
-    activate UI
-    UI -->> Citizen: Hiển thị biểu mẫu tạo giao dịch đổi mục đích
-    deactivate UI
-
-    Citizen ->> UI: Chọn thửa đất và mục đích sử dụng mới: thửa đất, mục đích hiện tại, mục đích mới, lý do đổi
-    activate UI
-    Citizen ->> UI: Xác nhận tạo yêu cầu
-    UI ->> API: Gửi thông tin giao dịch đổi mục đích
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra tính hợp lệ của thông tin
-
-    alt Thông tin không hợp lệ
-        API -->> UI: Thông báo "Thông tin đổi mục đích không hợp lệ"
-        activate UI
-        UI -->> Citizen: Hiển thị thông báo lỗi
-        deactivate UI
-    else Thông tin hợp lệ
-        API ->> Blockchain: Kiểm tra quyền sở hữu thửa đất
-
-        alt Không có quyền sở hữu
-            API -->> UI: Thông báo "Bạn không có quyền sở hữu thửa đất này"
-            activate UI
-            UI -->> Citizen: Hiển thị thông báo lỗi
-            deactivate UI
-        else Có quyền sở hữu
-            alt Mục đích sử dụng mới không được phép
-                API -->> UI: Thông báo "Mục đích sử dụng mới không được phép"
-                activate UI
-                UI -->> Citizen: Hiển thị thông báo lỗi
-                deactivate UI
-            else Mục đích sử dụng mới được phép
-                alt Thửa đất đang có giao dịch khác xử lý
-                    API -->> UI: Thông báo "Thửa đất đang có giao dịch khác xử lý"
-                    activate UI
-                    UI -->> Citizen: Hiển thị thông báo lỗi
-                    deactivate UI
-                else Thửa đất có thể đổi mục đích
-                    activate Blockchain
-                    API ->> Blockchain: Tạo giao dịch đổi mục đích: loại giao dịch, thửa đất, mục đích cũ, mục đích mới, trạng thái PENDING
-                    Blockchain -->> API: Xác nhận tạo giao dịch thành công
-                    deactivate Blockchain
-
-                    API -->> UI: Thông báo tạo giao dịch thành công
-                    deactivate API
-
-                    activate UI
-                    UI -->> Citizen: Hiển thị thông tin giao dịch đã tạo
-                    UI -->> Citizen: Hiển thị mã giao dịch và trạng thái chờ xử lý
-                    deactivate UI
-                end
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Thông tin đổi mục đích không hợp lệ
-- Công dân không có quyền sở hữu thửa đất
-- Mục đích sử dụng mới không được phép
-- Lỗi kết nối blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ người sử dụng đất mới có quyền tạo yêu cầu đổi mục đích
-- Mục đích sử dụng mới phải phù hợp với quy hoạch
-- Thửa đất phải không có giao dịch đang xử lý
-- Giao dịch mới có trạng thái "PENDING"
-
----
-
-## UC-45: Tạo yêu cầu cấp lại GCN
-
-### Mô tả ngắn gọn
-Công dân tạo yêu cầu cấp lại Giấy chứng nhận quyền sử dụng đất
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Citizen as Công dân
-    participant UI as Giao diện tạo yêu cầu cấp lại GCN
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Citizen ->> UI: Truy cập chức năng tạo yêu cầu cấp lại GCN
-    activate UI
-    UI -->> Citizen: Hiển thị biểu mẫu tạo giao dịch cấp lại GCN
-    deactivate UI
-
-    Citizen ->> UI: Chọn thửa đất và lý do cấp lại: thửa đất, lý do cấp lại (mất, hỏng, thay đổi thông tin)
-    activate UI
-    Citizen ->> UI: Xác nhận tạo yêu cầu
-    UI ->> API: Gửi thông tin giao dịch cấp lại GCN
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra tính hợp lệ của thông tin
-
-    alt Thông tin không hợp lệ
-        API -->> UI: Thông báo "Thông tin cấp lại GCN không hợp lệ"
-        activate UI
-        UI -->> Citizen: Hiển thị thông báo lỗi
-        deactivate UI
-    else Thông tin hợp lệ
-        API ->> Blockchain: Kiểm tra quyền sở hữu thửa đất
-
-        alt Không có quyền sở hữu
-            API -->> UI: Thông báo "Bạn không có quyền sở hữu thửa đất này"
-            activate UI
-            UI -->> Citizen: Hiển thị thông báo lỗi
-            deactivate UI
-        else Có quyền sở hữu
-            alt Thửa đất chưa có GCN
-                API -->> UI: Thông báo "Thửa đất chưa có Giấy chứng nhận"
-                activate UI
-                UI -->> Citizen: Hiển thị thông báo lỗi
-                deactivate UI
-            else Thửa đất đã có GCN
-                alt Thửa đất đang có giao dịch khác xử lý
-                    API -->> UI: Thông báo "Thửa đất đang có giao dịch khác xử lý"
-                    activate UI
-                    UI -->> Citizen: Hiển thị thông báo lỗi
-                    deactivate UI
-                else Thửa đất có thể cấp lại GCN
-                    activate Blockchain
-                    API ->> Blockchain: Tạo giao dịch cấp lại GCN: loại giao dịch, thửa đất, lý do cấp lại, trạng thái PENDING
-                    Blockchain -->> API: Xác nhận tạo giao dịch thành công
-                    deactivate Blockchain
-
-                    API -->> UI: Thông báo tạo giao dịch thành công
-                    deactivate API
-
-                    activate UI
-                    UI -->> Citizen: Hiển thị thông tin giao dịch đã tạo
-                    UI -->> Citizen: Hiển thị mã giao dịch và trạng thái chờ xử lý
-                    deactivate UI
-                end
-            end
-        end
-    end
-
-    deactivate API
-```
-    
-    alt Không có quyền sở hữu
-        API ->> UI: Thông báo lỗi quyền sở hữu
-        UI ->> Citizen: Hiển thị thông báo lỗi
-    end
-
-    %% Bước 5: Tạo giao dịch
-    API ->> Blockchain: Tạo giao dịch cấp lại GCN
-    Note over API, Blockchain: Lưu: loại giao dịch, thửa đất, lý do cấp lại, trạng thái PENDING
-    Blockchain -->> API: Xác nhận tạo giao dịch thành công
-
-    %% Bước 6: Hoàn tất quy trình
-    API ->> UI: Thông báo tạo giao dịch thành công
-    UI ->> Citizen: Hiển thị thông tin giao dịch đã tạo
-    Note over Citizen, UI: Hiển thị mã giao dịch và trạng thái chờ xử lý
-```
-
-### Các trường hợp ngoại lệ
-- Thông tin cấp lại GCN không hợp lệ
-- Công dân không có quyền sở hữu thửa đất
-- Thửa đất đang có giao dịch khác xử lý
-- Lỗi kết nối blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ người sử dụng đất mới có quyền tạo yêu cầu cấp lại GCN
-- Thửa đất phải không có giao dịch đang xử lý
-- Lý do cấp lại phải hợp lệ (mất, hỏng, thay đổi thông tin)
-- Giao dịch mới có trạng thái "PENDING"
-
----
-
-### **Task 6.2: Chuyển tiếp và Phê duyệt giao dịch**
-
----
-
-## UC-46: Chuyển tiếp giao dịch
-
-### Mô tả ngắn gọn
-Cán bộ chuyển tiếp giao dịch đã xử lý lên cấp phê duyệt
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Staff as Cán bộ thẩm định
-    participant UI as Giao diện chuyển tiếp giao dịch
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Staff ->> UI: Chọn giao dịch đã xử lý
-    activate UI
-    UI -->> Staff: Hiển thị thông tin giao dịch và biểu mẫu chuyển tiếp
-    deactivate UI
-
-    Staff ->> UI: Xem xét lại thông tin giao dịch
-    activate UI
-    Staff ->> UI: Nhập ghi chú chuyển tiếp
-    Staff ->> UI: Xác nhận chuyển tiếp
-    UI ->> API: Gửi yêu cầu chuyển tiếp giao dịch
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền chuyển tiếp giao dịch
-
-    alt Cán bộ không có quyền chuyển tiếp
-        API -->> UI: Thông báo "Bạn không có quyền chuyển tiếp giao dịch này"
-        activate UI
-        UI -->> Staff: Hiển thị thông báo lỗi
-        deactivate UI
-    else Cán bộ có quyền chuyển tiếp
-        alt Giao dịch không ở trạng thái "VERIFIED"
-            API -->> UI: Thông báo "Giao dịch chưa được xử lý hoàn tất"
-            activate UI
-            UI -->> Staff: Hiển thị thông báo lỗi
-            deactivate UI
-        else Giao dịch có thể chuyển tiếp
-            alt Hồ sơ chưa đầy đủ
-                API -->> UI: Thông báo "Hồ sơ chưa đầy đủ để chuyển tiếp"
-                activate UI
-                UI -->> Staff: Hiển thị thông báo lỗi
-                deactivate UI
-            else Hồ sơ đầy đủ
-                activate Blockchain
-                API ->> Blockchain: Cập nhật trạng thái giao dịch thành "FORWARDED"
-                Blockchain -->> API: Xác nhận cập nhật thành công
-                deactivate Blockchain
-
-                API ->> Blockchain: Ghi nhận thông tin chuyển tiếp: người chuyển tiếp, thời gian, ghi chú
-                Blockchain -->> API: Xác nhận ghi nhận thành công
-                deactivate Blockchain
-
-                API -->> UI: Thông báo chuyển tiếp thành công
-                deactivate API
-
-                activate UI
-                UI -->> Staff: Hiển thị thông báo thành công
-                UI -->> Staff: Giao dịch đã được chuyển tiếp lên cấp phê duyệt
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Giao dịch không ở trạng thái "VERIFIED"
-- Cán bộ không có quyền chuyển tiếp giao dịch
-- Hồ sơ chưa đầy đủ để chuyển tiếp
-- Lỗi cập nhật trên blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ thẩm định mới có quyền chuyển tiếp giao dịch
-- Chỉ giao dịch có trạng thái "VERIFIED" mới được chuyển tiếp
-- Phải đảm bảo hồ sơ đầy đủ trước khi chuyển tiếp
-- Ghi nhận đầy đủ thông tin chuyển tiếp
-
----
-
-### **Tiến độ Module 6 - HOÀN THÀNH PHẦN 1:**
-- ✅ UC-39: Xử lý giao dịch
-- ✅ UC-40: Tạo yêu cầu chuyển nhượng
-- ✅ UC-41: Xác nhận nhận chuyển nhượng
-- ✅ UC-42: Tạo yêu cầu tách thửa
-- ✅ UC-43: Tạo yêu cầu gộp thửa
-- ✅ UC-44: Tạo yêu cầu đổi mục đích sử dụng
-- ✅ UC-45: Tạo yêu cầu cấp lại GCN
-- ✅ UC-46: Chuyển tiếp giao dịch
-
-**Tiếp theo: Hoàn thành Module 6 (UC-47 đến UC-57)**
-
----
-
-## UC-47: Phê duyệt giao dịch chuyển nhượng
-
-### Mô tả ngắn gọn
-Cán bộ phê duyệt giao dịch chuyển nhượng thửa đất
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Manager as Cán bộ phê duyệt
-    participant UI as Giao diện phê duyệt giao dịch
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Manager ->> UI: Chọn giao dịch chuyển nhượng đã chuyển tiếp
-    activate UI
-    UI -->> Manager: Hiển thị thông tin giao dịch và biểu mẫu phê duyệt
-    deactivate UI
-
-    Manager ->> UI: Xem xét thông tin giao dịch và tài liệu liên quan
-    activate UI
-    Manager ->> UI: Nhập nhận xét phê duyệt
-    Manager ->> UI: Xác nhận phê duyệt
-    UI ->> API: Gửi kết quả phê duyệt giao dịch
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền phê duyệt giao dịch
-
-    alt Cán bộ không có quyền phê duyệt
-        API -->> UI: Thông báo "Bạn không có quyền phê duyệt giao dịch này"
-        activate UI
-        UI -->> Manager: Hiển thị thông báo lỗi
-        deactivate UI
-    else Cán bộ có quyền phê duyệt
-        alt Giao dịch không ở trạng thái "FORWARDED"
-            API -->> UI: Thông báo "Giao dịch chưa được chuyển tiếp để phê duyệt"
-            activate UI
-            UI -->> Manager: Hiển thị thông báo lỗi
-            deactivate UI
-        else Giao dịch có thể phê duyệt
-            activate Blockchain
-            API ->> Blockchain: Cập nhật trạng thái giao dịch thành "APPROVED"
-            Blockchain -->> API: Xác nhận cập nhật thành công
-            deactivate Blockchain
-
-            API ->> Blockchain: Ghi nhận thông tin phê duyệt: người phê duyệt, thời gian, nhận xét, kết quả
-            Blockchain -->> API: Xác nhận ghi nhận thành công
-            deactivate Blockchain
-
-            API -->> UI: Thông báo phê duyệt thành công
-            deactivate API
-
-            activate UI
-            UI -->> Manager: Hiển thị thông báo thành công
-            UI -->> Manager: Giao dịch đã được phê duyệt và hoàn tất
-            deactivate UI
-        end
-    end
-
-    deactivate API
-```
-
-    %% Bước 5: Hoàn tất quy trình
-    API ->> UI: Thông báo phê duyệt thành công
-    UI ->> Manager: Hiển thị thông báo thành công
-    Note over Manager, UI: Giao dịch chuyển nhượng đã được phê duyệt
-```
-
-### Các trường hợp ngoại lệ
-- Giao dịch không ở trạng thái "FORWARDED"
-- Cán bộ không có quyền phê duyệt giao dịch
-- Hồ sơ không đầy đủ hoặc không hợp lệ
-- Lỗi cập nhật trên blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ phê duyệt mới có quyền phê duyệt giao dịch
-- Chỉ giao dịch có trạng thái "FORWARDED" mới được phê duyệt
-- Phải kiểm tra đầy đủ hồ sơ và tài liệu liên quan
-- Ghi nhận đầy đủ thông tin phê duyệt
-
----
-
-## UC-48: Phê duyệt giao dịch tách thửa
-
-### Mô tả ngắn gọn
-Cán bộ phê duyệt giao dịch tách thửa đất
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Manager as Cán bộ phê duyệt
-    participant UI as Giao diện phê duyệt giao dịch tách thửa
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Manager ->> UI: Chọn giao dịch tách thửa đã chuyển tiếp
-    activate UI
-    UI -->> Manager: Hiển thị thông tin giao dịch và biểu mẫu phê duyệt
-    deactivate UI
-
-    Manager ->> UI: Xem xét thông tin giao dịch và tài liệu liên quan
-    activate UI
-    Manager ->> UI: Nhập nhận xét phê duyệt
-    Manager ->> UI: Xác nhận phê duyệt
-    UI ->> API: Gửi kết quả phê duyệt giao dịch
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền phê duyệt giao dịch
-
-    alt Cán bộ không có quyền phê duyệt
-        API -->> UI: Thông báo "Bạn không có quyền phê duyệt giao dịch này"
-        activate UI
-        UI -->> Manager: Hiển thị thông báo lỗi
-        deactivate UI
-    else Cán bộ có quyền phê duyệt
-        alt Giao dịch không ở trạng thái "FORWARDED"
-            API -->> UI: Thông báo "Giao dịch chưa được chuyển tiếp để phê duyệt"
-            activate UI
-            UI -->> Manager: Hiển thị thông báo lỗi
-            deactivate UI
-        else Giao dịch có thể phê duyệt
-            alt Hồ sơ không đầy đủ hoặc không hợp lệ
-                API -->> UI: Thông báo "Hồ sơ không đầy đủ hoặc không hợp lệ"
-                activate UI
-                UI -->> Manager: Hiển thị thông báo lỗi
-                deactivate UI
-            else Hồ sơ đầy đủ và hợp lệ
-                activate Blockchain
-                API ->> Blockchain: Cập nhật trạng thái giao dịch thành "APPROVED"
-                Blockchain -->> API: Xác nhận cập nhật thành công
-                deactivate Blockchain
-
-                API ->> Blockchain: Thực hiện tách thửa đất: tạo các thửa mới và cập nhật thửa gốc
-                Blockchain -->> API: Xác nhận tách thửa thành công
-                deactivate Blockchain
-
-                API ->> Blockchain: Ghi nhận thông tin phê duyệt: người phê duyệt, thời gian, nhận xét, kết quả
-                Blockchain -->> API: Xác nhận ghi nhận thành công
-                deactivate Blockchain
-
-                API -->> UI: Thông báo phê duyệt thành công
-                deactivate API
-
-                activate UI
-                UI -->> Manager: Hiển thị thông báo thành công
-                UI -->> Manager: Giao dịch tách thửa đã được phê duyệt và thực hiện
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Giao dịch không ở trạng thái "FORWARDED"
-- Cán bộ không có quyền phê duyệt giao dịch
-- Hồ sơ không đầy đủ hoặc không hợp lệ
-- Lỗi thực hiện tách thửa trên blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ phê duyệt mới có quyền phê duyệt giao dịch
-- Chỉ giao dịch có trạng thái "FORWARDED" mới được phê duyệt
-- Sau khi phê duyệt, hệ thống tự động thực hiện tách thửa
-- Ghi nhận đầy đủ thông tin phê duyệt và thực hiện
-
----
-
-## UC-49: Phê duyệt giao dịch gộp thửa
-
-### Mô tả ngắn gọn
-Cán bộ phê duyệt giao dịch gộp thửa đất
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Manager as Cán bộ phê duyệt
-    participant UI as Giao diện phê duyệt giao dịch gộp thửa
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Manager ->> UI: Chọn giao dịch gộp thửa đã chuyển tiếp
-    activate UI
-    UI -->> Manager: Hiển thị thông tin giao dịch và biểu mẫu phê duyệt
-    deactivate UI
-
-    Manager ->> UI: Xem xét thông tin giao dịch và tài liệu liên quan
-    activate UI
-    Manager ->> UI: Nhập nhận xét phê duyệt
-    Manager ->> UI: Xác nhận phê duyệt
-    UI ->> API: Gửi kết quả phê duyệt giao dịch
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền phê duyệt giao dịch
-
-    alt Cán bộ không có quyền phê duyệt
-        API -->> UI: Thông báo "Bạn không có quyền phê duyệt giao dịch này"
-        activate UI
-        UI -->> Manager: Hiển thị thông báo lỗi
-        deactivate UI
-    else Cán bộ có quyền phê duyệt
-        alt Giao dịch không ở trạng thái "FORWARDED"
-            API -->> UI: Thông báo "Giao dịch chưa được chuyển tiếp để phê duyệt"
-            activate UI
-            UI -->> Manager: Hiển thị thông báo lỗi
-            deactivate UI
-        else Giao dịch có thể phê duyệt
-            alt Hồ sơ không đầy đủ hoặc không hợp lệ
-                API -->> UI: Thông báo "Hồ sơ không đầy đủ hoặc không hợp lệ"
-                activate UI
-                UI -->> Manager: Hiển thị thông báo lỗi
-                deactivate UI
-            else Hồ sơ đầy đủ và hợp lệ
-                activate Blockchain
-                API ->> Blockchain: Cập nhật trạng thái giao dịch thành "APPROVED"
-                Blockchain -->> API: Xác nhận cập nhật thành công
-                deactivate Blockchain
-
-                API ->> Blockchain: Thực hiện gộp thửa đất: tạo thửa mới và xóa các thửa cũ
-                Blockchain -->> API: Xác nhận gộp thửa thành công
-                deactivate Blockchain
-
-                API ->> Blockchain: Ghi nhận thông tin phê duyệt: người phê duyệt, thời gian, nhận xét, kết quả
-                Blockchain -->> API: Xác nhận ghi nhận thành công
-                deactivate Blockchain
-
-                API -->> UI: Thông báo phê duyệt thành công
-                deactivate API
-
-                activate UI
-                UI -->> Manager: Hiển thị thông báo thành công
-                UI -->> Manager: Giao dịch gộp thửa đã được phê duyệt và thực hiện
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Giao dịch không ở trạng thái "FORWARDED"
-- Cán bộ không có quyền phê duyệt giao dịch
-- Hồ sơ không đầy đủ hoặc không hợp lệ
-- Lỗi thực hiện gộp thửa trên blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ phê duyệt mới có quyền phê duyệt giao dịch
-- Chỉ giao dịch có trạng thái "FORWARDED" mới được phê duyệt
-- Sau khi phê duyệt, hệ thống tự động thực hiện gộp thửa
-- Ghi nhận đầy đủ thông tin phê duyệt và thực hiện
-
----
-
-## UC-50: Phê duyệt giao dịch đổi mục đích
-
-### Mô tả ngắn gọn
-Cán bộ phê duyệt giao dịch đổi mục đích sử dụng đất
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Manager as Cán bộ phê duyệt
-    participant UI as Giao diện phê duyệt giao dịch đổi mục đích
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Manager ->> UI: Chọn giao dịch đổi mục đích đã chuyển tiếp
-    activate UI
-    UI -->> Manager: Hiển thị thông tin giao dịch và biểu mẫu phê duyệt
-    deactivate UI
-
-    Manager ->> UI: Xem xét thông tin giao dịch và tài liệu liên quan
-    activate UI
-    Manager ->> UI: Nhập nhận xét phê duyệt
-    Manager ->> UI: Xác nhận phê duyệt
-    UI ->> API: Gửi kết quả phê duyệt giao dịch
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền phê duyệt giao dịch
-
-    alt Cán bộ không có quyền phê duyệt
-        API -->> UI: Thông báo "Bạn không có quyền phê duyệt giao dịch này"
-        activate UI
-        UI -->> Manager: Hiển thị thông báo lỗi
-        deactivate UI
-    else Cán bộ có quyền phê duyệt
-        alt Giao dịch không ở trạng thái "FORWARDED"
-            API -->> UI: Thông báo "Giao dịch chưa được chuyển tiếp để phê duyệt"
-            activate UI
-            UI -->> Manager: Hiển thị thông báo lỗi
-            deactivate UI
-        else Giao dịch có thể phê duyệt
-            alt Hồ sơ không đầy đủ hoặc không hợp lệ
-                API -->> UI: Thông báo "Hồ sơ không đầy đủ hoặc không hợp lệ"
-                activate UI
-                UI -->> Manager: Hiển thị thông báo lỗi
-                deactivate UI
-            else Hồ sơ đầy đủ và hợp lệ
-                activate Blockchain
-                API ->> Blockchain: Cập nhật trạng thái giao dịch thành "APPROVED"
-                Blockchain -->> API: Xác nhận cập nhật thành công
-                deactivate Blockchain
-
-                API ->> Blockchain: Thực hiện đổi mục đích sử dụng: cập nhật mục đích sử dụng của thửa đất
-                Blockchain -->> API: Xác nhận đổi mục đích thành công
-                deactivate Blockchain
-
-                API ->> Blockchain: Ghi nhận thông tin phê duyệt: người phê duyệt, thời gian, nhận xét, kết quả
-                Blockchain -->> API: Xác nhận ghi nhận thành công
-                deactivate Blockchain
-
-                API -->> UI: Thông báo phê duyệt thành công
-                deactivate API
-
-                activate UI
-                UI -->> Manager: Hiển thị thông báo thành công
-                UI -->> Manager: Giao dịch đổi mục đích đã được phê duyệt và thực hiện
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Giao dịch không ở trạng thái "FORWARDED"
-- Cán bộ không có quyền phê duyệt giao dịch
-- Hồ sơ không đầy đủ hoặc không hợp lệ
-- Lỗi thực hiện đổi mục đích trên blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ phê duyệt mới có quyền phê duyệt giao dịch
-- Chỉ giao dịch có trạng thái "FORWARDED" mới được phê duyệt
-- Sau khi phê duyệt, hệ thống tự động thực hiện đổi mục đích
-- Ghi nhận đầy đủ thông tin phê duyệt và thực hiện
-
----
-
-## UC-51: Phê duyệt giao dịch cấp lại GCN
-
-### Mô tả ngắn gọn
-Cán bộ phê duyệt giao dịch cấp lại Giấy chứng nhận
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Manager as Cán bộ phê duyệt
-    participant UI as Giao diện phê duyệt giao dịch cấp lại GCN
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Manager ->> UI: Chọn giao dịch cấp lại GCN đã chuyển tiếp
-    activate UI
-    UI -->> Manager: Hiển thị thông tin giao dịch và biểu mẫu phê duyệt
-    deactivate UI
-
-    Manager ->> UI: Xem xét thông tin giao dịch và tài liệu liên quan
-    activate UI
-    Manager ->> UI: Nhập nhận xét phê duyệt
-    Manager ->> UI: Xác nhận phê duyệt
-    UI ->> API: Gửi kết quả phê duyệt giao dịch
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền phê duyệt giao dịch
-
-    alt Cán bộ không có quyền phê duyệt
-        API -->> UI: Thông báo "Bạn không có quyền phê duyệt giao dịch này"
-        activate UI
-        UI -->> Manager: Hiển thị thông báo lỗi
-        deactivate UI
-    else Cán bộ có quyền phê duyệt
-        alt Giao dịch không ở trạng thái "FORWARDED"
-            API -->> UI: Thông báo "Giao dịch chưa được chuyển tiếp để phê duyệt"
-            activate UI
-            UI -->> Manager: Hiển thị thông báo lỗi
-            deactivate UI
-        else Giao dịch có thể phê duyệt
-            alt Hồ sơ không đầy đủ hoặc không hợp lệ
-                API -->> UI: Thông báo "Hồ sơ không đầy đủ hoặc không hợp lệ"
-                activate UI
-                UI -->> Manager: Hiển thị thông báo lỗi
-                deactivate UI
-            else Hồ sơ đầy đủ và hợp lệ
-                activate Blockchain
-                API ->> Blockchain: Cập nhật trạng thái giao dịch thành "APPROVED"
-                Blockchain -->> API: Xác nhận cập nhật thành công
-                deactivate Blockchain
-
-                API ->> Blockchain: Thực hiện cấp lại GCN: tạo GCN mới và cập nhật thông tin thửa đất
-                Blockchain -->> API: Xác nhận cấp lại GCN thành công
-                deactivate Blockchain
-
-                API ->> Blockchain: Ghi nhận thông tin phê duyệt: người phê duyệt, thời gian, nhận xét, kết quả
-                Blockchain -->> API: Xác nhận ghi nhận thành công
-                deactivate Blockchain
-
-                API -->> UI: Thông báo phê duyệt thành công
-                deactivate API
-
-                activate UI
-                UI -->> Manager: Hiển thị thông báo thành công
-                UI -->> Manager: Giao dịch cấp lại GCN đã được phê duyệt và thực hiện
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Giao dịch không ở trạng thái "FORWARDED"
-- Cán bộ không có quyền phê duyệt giao dịch
-- Hồ sơ không đầy đủ hoặc không hợp lệ
-- Lỗi thực hiện cấp lại GCN trên blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ phê duyệt mới có quyền phê duyệt giao dịch
-- Chỉ giao dịch có trạng thái "FORWARDED" mới được phê duyệt
-- Sau khi phê duyệt, hệ thống tự động thực hiện cấp lại GCN
-- Ghi nhận đầy đủ thông tin phê duyệt và thực hiện
-
----
-
-## UC-52: Từ chối giao dịch
-
-### Mô tả ngắn gọn
-Cán bộ từ chối giao dịch không đáp ứng yêu cầu
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Staff as Cán bộ xử lý/phê duyệt
-    participant UI as Giao diện từ chối giao dịch
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Staff ->> UI: Chọn giao dịch cần từ chối
-    activate UI
-    UI -->> Staff: Hiển thị thông tin giao dịch và biểu mẫu từ chối
-    deactivate UI
-
-    Staff ->> UI: Nhập lý do từ chối chi tiết: hồ sơ thiếu, thông tin sai, không đủ điều kiện
-    activate UI
-    Staff ->> UI: Xác nhận từ chối
-    UI ->> API: Gửi yêu cầu từ chối giao dịch
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền từ chối giao dịch
-
-    alt Cán bộ không có quyền từ chối
-        API -->> UI: Thông báo "Bạn không có quyền từ chối giao dịch này"
-        activate UI
-        UI -->> Staff: Hiển thị thông báo lỗi
-        deactivate UI
-    else Cán bộ có quyền từ chối
-        alt Giao dịch không ở trạng thái có thể từ chối
-            API -->> UI: Thông báo "Giao dịch không thể từ chối ở trạng thái hiện tại"
-            activate UI
-            UI -->> Staff: Hiển thị thông báo lỗi
-            deactivate UI
-        else Giao dịch có thể từ chối
-            alt Lý do từ chối không hợp lệ
-                API -->> UI: Thông báo "Lý do từ chối không hợp lệ"
-                activate UI
-                UI -->> Staff: Hiển thị thông báo lỗi
-                deactivate UI
-            else Lý do từ chối hợp lệ
-                activate Blockchain
-                API ->> Blockchain: Cập nhật trạng thái giao dịch thành "REJECTED"
-                Blockchain -->> API: Xác nhận cập nhật thành công
-                deactivate Blockchain
-
-                API ->> Blockchain: Ghi nhận thông tin từ chối: người từ chối, thời gian, lý do từ chối
-                Blockchain -->> API: Xác nhận ghi nhận thành công
-                deactivate Blockchain
-
-                API -->> UI: Thông báo từ chối thành công
-                deactivate API
-
-                activate UI
-                UI -->> Staff: Hiển thị thông báo thành công
-                UI -->> Staff: Giao dịch đã được từ chối và thông báo cho người yêu cầu
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Giao dịch không ở trạng thái có thể từ chối
-- Cán bộ không có quyền từ chối giao dịch
-- Lý do từ chối không hợp lệ
-- Lỗi cập nhật trên blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ có quyền mới có thể từ chối giao dịch
-- Phải cung cấp lý do từ chối chi tiết và hợp lệ
-- Giao dịch bị từ chối có trạng thái "REJECTED"
-- Ghi nhận đầy đủ thông tin từ chối
-
----
-
-### **Task 6.3: Tìm kiếm và Xem giao dịch**
-
----
-
-## UC-53: Tìm kiếm giao dịch
-
-### Mô tả ngắn gọn
-Người dùng tìm kiếm giao dịch theo các tiêu chí
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Người dùng
-    participant UI as Giao diện tìm kiếm giao dịch
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    User ->> UI: Truy cập chức năng tìm kiếm giao dịch
-    activate UI
-    UI -->> User: Hiển thị form tìm kiếm
-    deactivate UI
-
-    User ->> UI: Nhập tiêu chí tìm kiếm: mã giao dịch, loại giao dịch, trạng thái, thời gian
-    activate UI
-    User ->> UI: Nhấn "Tìm kiếm"
-    UI ->> API: Gửi yêu cầu tìm kiếm giao dịch
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> Blockchain: Tìm kiếm giao dịch theo tiêu chí
-    Blockchain -->> API: Trả về danh sách giao dịch phù hợp
+    API ->> API: Kiểm tra quyền sở hữu tất cả thửa đất được chọn
+
+    activate Blockchain
+    API ->> Blockchain: Kiểm tra trạng thái tất cả thửa đất trên blockchain
+    Blockchain -->> API: Thông tin trạng thái và diện tích các thửa
     deactivate Blockchain
 
-    alt Không tìm thấy giao dịch nào
-        API -->> UI: Thông báo "Không tìm thấy giao dịch nào phù hợp"
+    API ->> API: Validate diện tích thửa mới khớp với tổng diện tích các thửa gốc
+
+    alt Không sở hữu tất cả thửa đất
+        API -->> UI: Thông báo "Không có quyền gộp một hoặc nhiều thửa đất được chọn"
         activate UI
-        UI -->> User: Hiển thị thông báo không có kết quả
+        UI -->> Owner: Hiển thị thông báo từ chối
         deactivate UI
-    else Có kết quả tìm kiếm
-        API ->> API: Lọc kết quả theo quyền người dùng
-        API ->> API: Sắp xếp theo thời gian tạo mới nhất
-        API -->> UI: Trả về kết quả tìm kiếm
+    else Có thửa đất đang tranh chấp/thế chấp
+        API -->> UI: Thông báo "Một hoặc nhiều thửa đất không thể gộp"
+        activate UI
+        UI -->> Owner: Hiển thị thông báo từ chối
+        deactivate UI
+    else Thửa đất không liền kề
+        API -->> UI: Thông báo "Các thửa đất phải liền kề để có thể gộp"
+        activate UI
+        UI -->> Owner: Hiển thị thông báo từ chối
+        deactivate UI
+    else Diện tích không khớp
+        API -->> UI: Thông báo "Diện tích thửa mới phải bằng tổng diện tích các thửa gốc"
+        activate UI
+        UI -->> Owner: Hiển thị thông báo lỗi
+        deactivate UI
+    else Thông tin hợp lệ
+        activate Blockchain
+        API ->> Blockchain: Tạo giao dịch gộp thửa trên blockchain
+        Blockchain -->> API: Xác nhận tạo giao dịch
+        deactivate Blockchain
+
+        activate Blockchain
+        API ->> Blockchain: Lưu thông tin thửa đất mới lên blockchain
+        Blockchain -->> API: Xác nhận lưu dữ liệu
+        deactivate Blockchain
+
+        activate DB
+        API ->> DB: Ghi log giao dịch vào MongoDB
+        DB -->> API: Xác nhận ghi log
+        deactivate DB
+
+        API ->> API: Tạo thông báo hệ thống cho cơ quan hành chính cấp xã (Org2)
+        
+        activate DB
+        API ->> DB: Lưu thông báo vào hệ thống
+        DB -->> API: Xác nhận lưu thông báo
+        deactivate DB
+
+        API -->> UI: Thông báo tạo giao dịch thành công
+        activate UI
+        UI -->> Owner: Hiển thị thông báo thành công và mã giao dịch
+        deactivate UI
+    end
+
+    deactivate API
+```
+
+---
+
+## UC-27: Tạo giao dịch đổi mục đích sử dụng
+
+```mermaid
+sequenceDiagram
+    actor Owner as Chủ sử dụng đất (Org3)
+    participant UI as Giao diện tạo giao dịch
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+
+    Owner ->> UI: Truy cập "Quản lý giao dịch" > "Tạo giao dịch đổi mục đích sử dụng"
+    activate UI
+    UI -->> Owner: Hiển thị danh sách thửa đất thuộc sở hữu
+    deactivate UI
+
+    Owner ->> UI: Chọn thửa đất cần đổi mục đích
+    activate UI
+    UI -->> Owner: Hiển thị form đổi mục đích với mục đích hiện tại
+    deactivate UI
+
+    Owner ->> UI: Chọn mục đích sử dụng mới từ danh sách cho phép
+    Owner ->> UI: Nhập lý do và kế hoạch sử dụng
+    Owner ->> UI: Liên kết tài liệu bắt buộc (kế hoạch sử dụng, giấy phép)
+    activate UI
+    Owner ->> UI: Nhấn "Tạo giao dịch"
+    UI ->> API: Gửi thông tin đổi mục đích
+    deactivate UI
+
+    activate API
+    API ->> API: Kiểm tra quyền sở hữu thửa đất
+
+    activate Blockchain
+    API ->> Blockchain: Kiểm tra trạng thái thửa đất và mục đích hiện tại trên blockchain
+    Blockchain -->> API: Thông tin trạng thái và mục đích sử dụng
+    deactivate Blockchain
+
+    API ->> API: Kiểm tra mục đích mới phù hợp với quy hoạch vùng
+
+    alt Không phải người sử dụng đất
+        API -->> UI: Thông báo "Không có quyền đổi mục đích thửa đất này"
+        activate UI
+        UI -->> Owner: Hiển thị thông báo từ chối
+        deactivate UI
+    else Thửa đất đang tranh chấp/thế chấp
+        API -->> UI: Thông báo "Thửa đất không thể đổi mục đích sử dụng"
+        activate UI
+        UI -->> Owner: Hiển thị thông báo từ chối
+        deactivate UI
+    else Mục đích không phù hợp quy hoạch
+        API -->> UI: Thông báo "Mục đích sử dụng mới không phù hợp với quy hoạch vùng"
+        activate UI
+        UI -->> Owner: Hiển thị thông báo từ chối và gợi ý mục đích phù hợp
+        deactivate UI
+    else Thông tin hợp lệ
+        activate Blockchain
+        API ->> Blockchain: Tạo giao dịch đổi mục đích trên blockchain
+        Blockchain -->> API: Xác nhận tạo giao dịch
+        deactivate Blockchain
+
+        activate DB
+        API ->> DB: Ghi log giao dịch vào MongoDB
+        DB -->> API: Xác nhận ghi log
+        deactivate DB
+
+        API ->> API: Tạo thông báo hệ thống cho cơ quan hành chính cấp xã (Org2)
+        
+        activate DB
+        API ->> DB: Lưu thông báo vào hệ thống
+        DB -->> API: Xác nhận lưu thông báo
+        deactivate DB
+
+        API -->> UI: Thông báo tạo giao dịch thành công
+        activate UI
+        UI -->> Owner: Hiển thị thông báo thành công và mã giao dịch
+        deactivate UI
+    end
+
+    deactivate API
+```
+
+---
+
+## UC-28: Tạo giao dịch cấp lại GCN
+
+```mermaid
+sequenceDiagram
+    actor Owner as Chủ sử dụng đất (Org3)
+    participant UI as Giao diện tạo giao dịch
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+
+    Owner ->> UI: Truy cập "Quản lý giao dịch" > "Tạo giao dịch cấp lại GCN"
+    activate UI
+    UI -->> Owner: Hiển thị danh sách thửa đất thuộc sở hữu có GCN
+    deactivate UI
+
+    Owner ->> UI: Chọn thửa đất cần cấp lại GCN
+    activate UI
+    UI -->> Owner: Hiển thị form cấp lại GCN với thông tin GCN hiện tại
+    deactivate UI
+
+    Owner ->> UI: Chọn lý do cấp lại (mất, hỏng, sai thông tin, thay đổi thông tin)
+    Owner ->> UI: Nhập mô tả chi tiết tình huống
+    Owner ->> UI: Liên kết tài liệu bắt buộc (tùy theo lý do)
+    activate UI
+    Owner ->> UI: Nhấn "Tạo giao dịch"
+    UI ->> API: Gửi thông tin cấp lại GCN
+    deactivate UI
+
+    activate API
+    API ->> API: Kiểm tra quyền sở hữu thửa đất
+
+    activate Blockchain
+    API ->> Blockchain: Kiểm tra trạng thái thửa đất và thông tin GCN hiện tại trên blockchain
+    Blockchain -->> API: Thông tin trạng thái và GCN
+    deactivate Blockchain
+
+    activate Blockchain
+    API ->> Blockchain: Kiểm tra yêu cầu cấp lại GCN trùng lặp (đang xử lý)
+    Blockchain -->> API: Kết quả kiểm tra trùng lặp
+    deactivate Blockchain
+
+    alt Không phải người sử dụng đất
+        API -->> UI: Thông báo "Không có quyền yêu cầu cấp lại GCN cho thửa đất này"
+        activate UI
+        UI -->> Owner: Hiển thị thông báo từ chối
+        deactivate UI
+    else Thửa đất không có GCN
+        API -->> UI: Thông báo "Thửa đất chưa có GCN để cấp lại"
+        activate UI
+        UI -->> Owner: Hiển thị thông báo từ chối
+        deactivate UI
+    else Đã có yêu cầu đang xử lý
+        API -->> UI: Thông báo "Đã có yêu cầu cấp lại GCN đang được xử lý"
+        activate UI
+        UI -->> Owner: Hiển thị thông báo và mã giao dịch đang xử lý
+        deactivate UI
+    else Thông tin hợp lệ
+        activate Blockchain
+        API ->> Blockchain: Tạo giao dịch cấp lại GCN trên blockchain
+        Blockchain -->> API: Xác nhận tạo giao dịch
+        deactivate Blockchain
+
+        activate DB
+        API ->> DB: Ghi log giao dịch vào MongoDB
+        DB -->> API: Xác nhận ghi log
+        deactivate DB
+
+        API ->> API: Tạo thông báo hệ thống cho cơ quan hành chính cấp xã (Org2)
+        
+        activate DB
+        API ->> DB: Lưu thông báo vào hệ thống
+        DB -->> API: Xác nhận lưu thông báo
+        deactivate DB
+
+        API -->> UI: Thông báo tạo giao dịch thành công
+        activate UI
+        UI -->> Owner: Hiển thị thông báo thành công và mã giao dịch
+        deactivate UI
+    end
+
+    deactivate API
+```
+
+---
+### **Task 4.2: Xem và xác nhận giao dịch**
+
+---
+
+## UC-29: Xem chi tiết giao dịch
+
+```mermaid
+sequenceDiagram
+    actor User as Tất cả người dùng
+    participant UI as Giao diện chi tiết giao dịch
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+
+    User ->> UI: Chọn giao dịch để xem chi tiết (từ danh sách hoặc tìm kiếm)
+    activate UI
+    UI ->> API: Yêu cầu thông tin chi tiết giao dịch
+    deactivate UI
+
+    activate API
+    API ->> API: Kiểm tra quyền truy cập giao dịch
+
+    alt Không có quyền xem giao dịch
+        API -->> UI: Thông báo "Không có quyền xem giao dịch này"
+        activate UI
+        UI -->> User: Hiển thị thông báo từ chối truy cập
+        deactivate UI
+    else Có quyền xem
+        activate Blockchain
+        API ->> Blockchain: Tải thông tin giao dịch từ blockchain
+        Blockchain -->> API: Thông tin chi tiết giao dịch và trạng thái
+        deactivate Blockchain
+
+        activate DB
+        API ->> DB: Lấy thông tin bổ sung (log, nhận xét)
+        DB -->> API: Thông tin bổ sung
+        deactivate DB
+
+        API -->> UI: Trả về thông tin đầy đủ
+        activate UI
+        UI -->> User: Hiển thị chi tiết giao dịch với các tab (Thông tin chính, Tài liệu, Lịch sử)
+        deactivate UI
+
+        User ->> UI: Chọn xem các tab khác nhau (Tài liệu, Lịch sử, Bên liên quan)
+        activate UI
+        UI ->> API: Lấy thông tin tab được chọn
+        deactivate UI
+
+        activate API
+        activate Blockchain
+        API ->> Blockchain: Truy vấn thông tin cụ thể theo tab
+        Blockchain -->> API: Dữ liệu tab được yêu cầu
+        deactivate Blockchain
+
+        API -->> UI: Trả về dữ liệu
+        activate UI
+        UI -->> User: Hiển thị thông tin chi tiết theo tab
+        deactivate UI
         deactivate API
+    end
 
+    deactivate API
+```
+
+---
+
+## UC-30: Xác nhận nhận chuyển nhượng đất
+
+```mermaid
+sequenceDiagram
+    actor Receiver as Bên nhận (Org3)
+    participant UI as Giao diện xác nhận
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+    participant SMS as SMS Service
+
+    Receiver ->> UI: Truy cập giao dịch chuyển nhượng (qua thông báo hoặc danh sách)
+    activate UI
+    UI ->> API: Lấy thông tin giao dịch chuyển nhượng
+    deactivate UI
+
+    activate API
+    API ->> API: Kiểm tra quyền của bên nhận
+
+    activate Blockchain
+    API ->> Blockchain: Kiểm tra giao dịch hợp lệ và trạng thái trên blockchain
+    Blockchain -->> API: Thông tin giao dịch và tính hợp lệ
+    deactivate Blockchain
+
+    alt Không phải bên nhận được chỉ định
+        API -->> UI: Thông báo "Không có quyền xác nhận giao dịch này"
         activate UI
-        UI -->> User: Hiển thị danh sách giao dịch
-        UI -->> User: Hiển thị: mã giao dịch, loại, trạng thái, thời gian tạo
-        UI -->> User: Hỗ trợ phân trang nếu có nhiều kết quả
+        UI -->> Receiver: Hiển thị thông báo từ chối
+        deactivate UI
+    else Giao dịch không hợp lệ hoặc đã hết hạn
+        API -->> UI: Thông báo "Giao dịch không hợp lệ hoặc đã hết hạn"
+        activate UI
+        UI -->> Receiver: Hiển thị thông báo lỗi
+        deactivate UI
+    else Giao dịch hợp lệ
+        API -->> UI: Hiển thị thông tin chi tiết giao dịch
+        activate UI
+        UI -->> Receiver: Hiển thị form xác nhận với thông tin thửa đất và điều kiện
         deactivate UI
 
-        User ->> UI: Chọn xem chi tiết giao dịch
+        Receiver ->> UI: Xem xét thông tin và nhấn "Xác nhận nhận"
         activate UI
-        UI -->> User: Hiển thị thông tin chi tiết giao dịch
+        UI ->> API: Gửi xác nhận nhận chuyển nhượng
+        deactivate UI
+
+        API ->> API: Kiểm tra lại quyền và tình trạng giao dịch
+
+        activate Blockchain
+        API ->> Blockchain: Cập nhật trạng thái giao dịch (đã xác nhận bởi bên nhận)
+        Blockchain -->> API: Xác nhận cập nhật blockchain
+        deactivate Blockchain
+
+        activate DB
+        API ->> DB: Ghi log thời điểm và thông tin xác nhận
+        DB -->> API: Xác nhận ghi log
+        deactivate DB
+
+        activate SMS
+        API ->> SMS: Thông báo cho bên chuyển nhượng về việc đã được xác nhận
+        SMS -->> Bên chuyển nhượng: Nhận thông báo bên nhận đã xác nhận
+        deactivate SMS
+
+        API ->> API: Tạo thông báo hệ thống cho Org2 về giao dịch sẵn sàng xử lý
+        
+        activate DB
+        API ->> DB: Lưu thông báo vào hệ thống
+        DB -->> API: Xác nhận lưu thông báo
+        deactivate DB
+
+        API -->> UI: Thông báo xác nhận thành công
+        activate UI
+        UI -->> Receiver: Hiển thị thông báo xác nhận thành công và hướng dẫn bước tiếp theo
         deactivate UI
     end
 
     deactivate API
 ```
 
-### Các trường hợp ngoại lệ
-- Không tìm thấy giao dịch nào phù hợp
-- Tiêu chí tìm kiếm không hợp lệ
-- Lỗi kết nối blockchain
-
-### Quy tắc nghiệp vụ
-- Người dùng chỉ có thể tìm kiếm giao dịch của mình
-- Cán bộ có thể tìm kiếm tất cả giao dịch
-- Kết quả tìm kiếm được phân trang
-- Hiển thị thông tin cơ bản của giao dịch
+---
+### **Task 4.3: Xử lý và phê duyệt giao dịch**
 
 ---
 
-## UC-54: Xem giao dịch theo thửa đất
+## UC-31: Xử lý hồ sơ giao dịch
 
-### Mô tả ngắn gọn
-Xem tất cả giao dịch liên quan đến một thửa đất
-
-### Sequence Diagram
 ```mermaid
 sequenceDiagram
-    actor User as Người dùng
-    participant UI as Giao diện xem giao dịch theo thửa đất
+    actor Officer as Cán bộ UBND cấp xã (Org2)
+    participant UI as Giao diện xử lý hồ sơ
     participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
 
-    User ->> UI: Chọn thửa đất cần xem giao dịch
+    Officer ->> UI: Truy cập "Xử lý giao dịch" > "Danh sách giao dịch chờ xử lý"
     activate UI
-    UI -->> User: Hiển thị thông tin thửa đất và yêu cầu xác nhận
-    deactivate UI
-
-    User ->> UI: Xác nhận xem giao dịch của thửa đất
-    activate UI
-    UI ->> API: Gửi yêu cầu xem giao dịch theo thửa đất
+    UI ->> API: Lấy danh sách giao dịch theo trạng thái chờ xử lý
     deactivate UI
 
     activate API
-    API ->> API: Xác thực JWT token
-    API ->> Blockchain: Kiểm tra quyền truy cập thửa đất
+    API ->> API: Kiểm tra quyền xử lý của cán bộ
 
-    alt Không có quyền truy cập
-        API -->> UI: Thông báo "Bạn không có quyền xem giao dịch của thửa đất này"
-        activate UI
-        UI -->> User: Hiển thị thông báo lỗi
-        deactivate UI
-    else Có quyền truy cập
+    activate Blockchain
+    API ->> Blockchain: Truy vấn giao dịch theo trạng thái và khu vực quản lý
+    Blockchain -->> API: Danh sách giao dịch cần xử lý
+    deactivate Blockchain
+
+    API -->> UI: Trả về danh sách giao dịch
+    activate UI
+    UI -->> Officer: Hiển thị danh sách giao dịch với thông tin tóm tắt
+    deactivate UI
+
+    Officer ->> UI: Chọn giao dịch cần xử lý
+    activate UI
+    UI ->> API: Lấy chi tiết giao dịch và hồ sơ đính kèm
+    deactivate UI
+
+    activate API
+    activate Blockchain
+    API ->> Blockchain: Lấy thông tin chi tiết giao dịch và tài liệu từ blockchain
+    Blockchain -->> API: Thông tin đầy đủ giao dịch
+    deactivate Blockchain
+
+    API -->> UI: Hiển thị thông tin đầy đủ và form xử lý
+    activate UI
+    UI -->> Officer: Hiển thị thông tin giao dịch, tài liệu và tùy chọn xử lý
+    deactivate UI
+
+    Officer ->> UI: Kiểm tra hồ sơ và chọn hành động (Xác nhận/Yêu cầu bổ sung/Từ chối)
+    Officer ->> UI: Nhập nhận xét và lý do (nếu từ chối hoặc yêu cầu bổ sung)
+    activate UI
+    Officer ->> UI: Nhấn "Xử lý hồ sơ"
+    UI ->> API: Gửi kết quả xử lý và nhận xét
+    deactivate UI
+
+    API ->> API: Validate quyết định xử lý
+
+    alt Quyết định xác nhận
         activate Blockchain
-        API ->> Blockchain: Lấy danh sách giao dịch theo thửa đất
-        Blockchain -->> API: Trả về danh sách giao dịch
+        API ->> Blockchain: Cập nhật trạng thái giao dịch (đã xác nhận bởi Org2)
+        Blockchain -->> API: Xác nhận cập nhật
         deactivate Blockchain
 
-        alt Không có giao dịch nào
-            API -->> UI: Thông báo "Không có giao dịch nào cho thửa đất này"
-            activate UI
-            UI -->> User: Hiển thị thông báo không có giao dịch
-            deactivate UI
-        else Có giao dịch
-            API ->> API: Sắp xếp theo thời gian tạo (mới nhất trước)
-            API -->> UI: Trả về danh sách giao dịch
-            deactivate API
+        API ->> API: Tạo thông báo hệ thống cho Org1 về giao dịch sẵn sàng phê duyệt cuối
+        
+        activate DB
+        API ->> DB: Lưu thông báo vào hệ thống
+        DB -->> API: Xác nhận lưu thông báo
+        deactivate DB
+    else Quyết định yêu cầu bổ sung
+        activate Blockchain
+        API ->> Blockchain: Cập nhật trạng thái giao dịch (chờ bổ sung tài liệu)
+        Blockchain -->> API: Xác nhận cập nhật
+        deactivate Blockchain
 
+        API ->> API: Tạo thông báo hệ thống yêu cầu bổ sung cho người tạo giao dịch
+        
+        activate DB
+        API ->> DB: Lưu thông báo vào hệ thống
+        DB -->> API: Xác nhận lưu thông báo
+        deactivate DB
+    else Quyết định từ chối
+        activate Blockchain
+        API ->> Blockchain: Cập nhật trạng thái giao dịch (bị từ chối)
+        Blockchain -->> API: Xác nhận cập nhật
+        deactivate Blockchain
+
+        API ->> API: Tạo thông báo hệ thống từ chối với lý do cho người tạo giao dịch
+        
+        activate DB
+        API ->> DB: Lưu thông báo vào hệ thống
+        DB -->> API: Xác nhận lưu thông báo
+        deactivate DB
+    end
+
+    activate DB
+    API ->> DB: Ghi log lịch sử xử lý với timestamp và cán bộ xử lý
+    DB -->> API: Xác nhận ghi log
+    deactivate DB
+
+    API -->> UI: Thông báo xử lý thành công
+    activate UI
+    UI -->> Officer: Hiển thị thông báo hoàn thành và cập nhật danh sách giao dịch
+    deactivate UI
+
+    deactivate API
+```
+
+---
+
+## UC-32: Phê duyệt giao dịch chuyển nhượng
+
+```mermaid
+sequenceDiagram
+    actor Officer as Cán bộ Sở TN&MT (Org1)
+    participant UI as Giao diện phê duyệt
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+    participant SMS as SMS Service
+
+    Officer ->> UI: Truy cập "Phê duyệt giao dịch" > "Giao dịch chuyển nhượng đã xác nhận"
+    activate UI
+    UI ->> API: Lấy danh sách giao dịch chuyển nhượng sẵn sàng phê duyệt
+    deactivate UI
+
+    activate API
+    activate Blockchain
+    API ->> Blockchain: Truy vấn giao dịch đã được Org2 xác nhận
+    Blockchain -->> API: Danh sách giao dịch chuyển nhượng
+    deactivate Blockchain
+
+    API -->> UI: Trả về danh sách
+    activate UI
+    UI -->> Officer: Hiển thị danh sách giao dịch chuyển nhượng
+    deactivate UI
+
+    Officer ->> UI: Chọn giao dịch chuyển nhượng cần phê duyệt
+    activate UI
+    UI ->> API: Lấy thông tin chi tiết giao dịch chuyển nhượng
+    deactivate UI
+
+    activate Blockchain
+    API ->> Blockchain: Kiểm tra trạng thái giao dịch và thông tin liên quan
+    Blockchain -->> API: Thông tin chi tiết giao dịch
+    deactivate Blockchain
+
+    API -->> UI: Hiển thị thông tin chi tiết và form phê duyệt
+    activate UI
+    UI -->> Officer: Hiển thị thông tin giao dịch, thửa đất, bên liên quan và form phê duyệt
+    deactivate UI
+
+    Officer ->> UI: Kiểm tra toàn bộ hồ sơ và nhấn "Phê duyệt cuối cùng"
+    activate UI
+    UI ->> API: Gửi phê duyệt cuối cùng
+    deactivate UI
+
+    API ->> API: Kiểm tra quyền phê duyệt cuối cùng
+
+    alt Không có quyền phê duyệt
+        API -->> UI: Thông báo "Không có quyền phê duyệt giao dịch này"
+        activate UI
+        UI -->> Officer: Hiển thị thông báo từ chối
+        deactivate UI
+    else Có quyền phê duyệt
+        activate Blockchain
+        API ->> Blockchain: Thực hiện chuyển nhượng quyền sở hữu trên blockchain
+        Blockchain -->> API: Xác nhận chuyển nhượng thành công
+        deactivate Blockchain
+
+        activate Blockchain
+        API ->> Blockchain: Vô hiệu hóa GCN cũ và cập nhật trạng thái thửa đất
+        Blockchain -->> API: Xác nhận cập nhật GCN và trạng thái
+        deactivate Blockchain
+
+        activate Blockchain
+        API ->> Blockchain: Cập nhật quyền sở hữu cho bên nhận
+        Blockchain -->> API: Xác nhận cập nhật quyền sở hữu
+        deactivate Blockchain
+
+        activate DB
+        API ->> DB: Ghi log phê duyệt cuối cùng với timestamp
+        DB -->> API: Xác nhận ghi log
+        deactivate DB
+
+        activate SMS
+        API ->> SMS: Gửi thông báo hoàn thành chuyển nhượng cho bên chuyển nhượng
+        SMS -->> Bên chuyển nhượng: Nhận thông báo chuyển nhượng hoàn thành
+        deactivate SMS
+
+        activate SMS
+        API ->> SMS: Gửi thông báo hoàn thành chuyển nhượng cho bên nhận
+        SMS -->> Bên nhận: Nhận thông báo đã trở thành chủ sử dụng đất
+        deactivate SMS
+
+        API -->> UI: Thông báo phê duyệt thành công
+        activate UI
+        UI -->> Officer: Hiển thị thông báo hoàn thành giao dịch chuyển nhượng
+        deactivate UI
+    end
+
+    deactivate API
+```
+
+---
+
+## UC-33: Phê duyệt giao dịch tách thửa
+
+```mermaid
+sequenceDiagram
+    actor Officer as Cán bộ Sở TN&MT (Org1)
+    participant UI as Giao diện phê duyệt
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+    participant SMS as SMS Service
+
+    Officer ->> UI: Truy cập giao dịch tách thửa đã xác nhận
+    activate UI
+    UI ->> API: Lấy thông tin giao dịch tách
+    deactivate UI
+
+    activate API
+    activate Blockchain
+    API ->> Blockchain: Kiểm tra thông tin kế hoạch tách từ blockchain
+    Blockchain -->> API: Chi tiết kế hoạch tách thửa
+    deactivate Blockchain
+
+    API -->> UI: Hiển thị chi tiết kế hoạch
+    activate UI
+    UI -->> Officer: Hiển thị form phê duyệt với thông tin tách thửa
+    deactivate UI
+
+    Officer ->> UI: Kiểm tra và nhấn "Phê duyệt"
+    activate UI
+    UI ->> API: Gửi phê duyệt
+    deactivate UI
+
+    activate Blockchain
+    API ->> Blockchain: Vô hiệu hóa thửa đất gốc trên blockchain
+    Blockchain -->> API: Xác nhận vô hiệu hóa
+    deactivate Blockchain
+
+    activate Blockchain
+    API ->> Blockchain: Tạo các thửa đất mới theo kế hoạch tách
+    Blockchain -->> API: Xác nhận tạo thửa đất mới
+    deactivate Blockchain
+
+    activate Blockchain
+    API ->> Blockchain: Cập nhật quyền sở hữu cho chủ sở hữu
+    Blockchain -->> API: Xác nhận cập nhật quyền sở hữu
+    deactivate Blockchain
+
+    activate DB
+    API ->> DB: Ghi log phê duyệt tách thửa
+    DB -->> API: Xác nhận ghi log
+    deactivate DB
+
+    activate SMS
+    API ->> SMS: Thông báo hoàn thành tách thửa cho chủ sở hữu
+    SMS -->> Chủ sở hữu: Nhận thông báo tách thửa hoàn thành
+    deactivate SMS
+
+    API -->> UI: Thông báo phê duyệt thành công
+    activate UI
+    UI -->> Officer: Hiển thị kết quả phê duyệt tách thửa
+    deactivate UI
+
+    deactivate API
+```
+
+---
+
+## UC-34: Phê duyệt giao dịch gộp thửa
+
+```mermaid
+sequenceDiagram
+    actor Officer as Cán bộ Sở TN&MT (Org1)
+    participant UI as Giao diện phê duyệt
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+    participant SMS as SMS Service
+
+    Officer ->> UI: Truy cập giao dịch gộp thửa đã xác nhận
+    activate UI
+    UI ->> API: Lấy thông tin giao dịch gộp
+    deactivate UI
+
+    activate API
+    activate Blockchain
+    API ->> Blockchain: Kiểm tra thông tin kế hoạch gộp từ blockchain
+    Blockchain -->> API: Chi tiết kế hoạch gộp thửa
+    deactivate Blockchain
+
+    API -->> UI: Hiển thị chi tiết kế hoạch
+    activate UI
+    UI -->> Officer: Hiển thị form phê duyệt với thông tin gộp thửa
+    deactivate UI
+
+    Officer ->> UI: Kiểm tra và nhấn "Phê duyệt"
+    activate UI
+    UI ->> API: Gửi phê duyệt
+    deactivate UI
+
+    activate Blockchain
+    API ->> Blockchain: Vô hiệu hóa các thửa đất gốc trên blockchain
+    Blockchain -->> API: Xác nhận vô hiệu hóa
+    deactivate Blockchain
+
+    activate Blockchain
+    API ->> Blockchain: Tạo thửa đất mới sau gộp
+    Blockchain -->> API: Xác nhận tạo thửa đất mới
+    deactivate Blockchain
+
+    activate Blockchain
+    API ->> Blockchain: Cập nhật quyền sở hữu cho chủ sở hữu
+    Blockchain -->> API: Xác nhận cập nhật quyền sở hữu
+    deactivate Blockchain
+
+    activate DB
+    API ->> DB: Ghi log phê duyệt gộp thửa
+    DB -->> API: Xác nhận ghi log
+    deactivate DB
+
+    activate SMS
+    API ->> SMS: Thông báo hoàn thành gộp thửa cho chủ sở hữu
+    SMS -->> Chủ sở hữu: Nhận thông báo gộp thửa hoàn thành
+    deactivate SMS
+
+    API -->> UI: Thông báo phê duyệt thành công
+    activate UI
+    UI -->> Officer: Hiển thị kết quả phê duyệt gộp thửa
+    deactivate UI
+
+    deactivate API
+```
+
+---
+
+## UC-35: Phê duyệt giao dịch đổi mục đích
+
+```mermaid
+sequenceDiagram
+    actor Officer as Cán bộ Sở TN&MT (Org1)
+    participant UI as Giao diện phê duyệt
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+    participant SMS as SMS Service
+
+    Officer ->> UI: Truy cập giao dịch đổi mục đích đã xác nhận
+    activate UI
+    UI ->> API: Lấy thông tin giao dịch
+    deactivate UI
+
+    activate API
+    activate Blockchain
+    API ->> Blockchain: Kiểm tra thông tin đổi mục đích từ blockchain
+    Blockchain -->> API: Chi tiết yêu cầu đổi mục đích và lý do
+    deactivate Blockchain
+
+    API -->> UI: Hiển thị chi tiết và lý do
+    activate UI
+    UI -->> Officer: Hiển thị form phê duyệt với thông tin đổi mục đích
+    deactivate UI
+
+    Officer ->> UI: Kiểm tra và nhấn "Phê duyệt"
+    activate UI
+    UI ->> API: Gửi phê duyệt
+    deactivate UI
+
+    activate Blockchain
+    API ->> Blockchain: Cập nhật mục đích sử dụng đất trên blockchain
+    Blockchain -->> API: Xác nhận cập nhật mục đích
+    deactivate Blockchain
+
+    activate Blockchain
+    API ->> Blockchain: Vô hiệu hóa GCN cũ (nếu có)
+    Blockchain -->> API: Xác nhận vô hiệu hóa GCN
+    deactivate Blockchain
+
+    activate DB
+    API ->> DB: Ghi log phê duyệt đổi mục đích
+    DB -->> API: Xác nhận ghi log
+    deactivate DB
+
+    activate SMS
+    API ->> SMS: Thông báo hoàn thành đổi mục đích cho chủ sở hữu
+    SMS -->> Chủ sở hữu: Nhận thông báo đổi mục đích hoàn thành
+    deactivate SMS
+
+    API -->> UI: Thông báo phê duyệt thành công
+    activate UI
+    UI -->> Officer: Hiển thị kết quả phê duyệt
+    deactivate UI
+
+    deactivate API
+```
+
+---
+
+## UC-36: Phê duyệt giao dịch cấp lại GCN
+
+```mermaid
+sequenceDiagram
+    actor Officer as Cán bộ Sở TN&MT (Org1)
+    participant UI as Giao diện phê duyệt
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+    participant IPFS as IPFS Storage
+    participant SMS as SMS Service
+
+    Officer ->> UI: Truy cập giao dịch cấp lại GCN đã xác nhận
+    activate UI
+    UI ->> API: Lấy thông tin giao dịch
+    deactivate UI
+
+    activate API
+    activate Blockchain
+    API ->> Blockchain: Kiểm tra lý do cấp lại từ blockchain
+    Blockchain -->> API: Chi tiết lý do và thông tin GCN cũ
+    deactivate Blockchain
+
+    API -->> UI: Hiển thị chi tiết và lý do
+    activate UI
+    UI -->> Officer: Hiển thị form phê duyệt cấp lại GCN
+    deactivate UI
+
+    Officer ->> UI: Nhập thông tin GCN mới
+    Officer ->> UI: Upload file GCN mới
+    activate UI
+    Officer ->> UI: Nhấn "Phê duyệt"
+    UI ->> API: Gửi phê duyệt và file GCN
+    deactivate UI
+
+    activate IPFS
+    API ->> IPFS: Upload file GCN mới lên IPFS
+    IPFS -->> API: Hash của file GCN mới
+    deactivate IPFS
+
+    activate Blockchain
+    API ->> Blockchain: Cập nhật thông tin GCN mới trên blockchain
+    Blockchain -->> API: Xác nhận cập nhật GCN
+    deactivate Blockchain
+
+    activate DB
+    API ->> DB: Ghi log phê duyệt cấp lại GCN
+    DB -->> API: Xác nhận ghi log
+    deactivate DB
+
+    activate SMS
+    API ->> SMS: Thông báo hoàn thành cấp lại GCN cho chủ sở hữu
+    SMS -->> Chủ sở hữu: Nhận thông báo GCN mới đã được cấp
+    deactivate SMS
+
+    API -->> UI: Thông báo phê duyệt thành công
+    activate UI
+    UI -->> Officer: Hiển thị kết quả phê duyệt
+    deactivate UI
+
+    deactivate API
+```
+
+---
+
+## UC-37: Từ chối giao dịch
+
+```mermaid
+sequenceDiagram
+    actor Officer as Cán bộ Sở TN&MT (Org1)
+    participant UI as Giao diện xử lý
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+
+    Officer ->> UI: Truy cập giao dịch cần từ chối
+    activate UI
+    UI ->> API: Lấy thông tin giao dịch
+    deactivate UI
+
+    activate API
+    activate Blockchain
+    API ->> Blockchain: Kiểm tra trạng thái giao dịch từ blockchain
+    Blockchain -->> API: Thông tin chi tiết giao dịch
+    deactivate Blockchain
+
+    API -->> UI: Hiển thị thông tin chi tiết
+    activate UI
+    UI -->> Officer: Hiển thị form từ chối với thông tin giao dịch
+    deactivate UI
+
+    Officer ->> UI: Nhập lý do từ chối chi tiết
+    activate UI
+    Officer ->> UI: Nhấn "Từ chối giao dịch"
+    UI ->> API: Gửi quyết định từ chối
+    deactivate UI
+
+    activate Blockchain
+    API ->> Blockchain: Cập nhật trạng thái từ chối trên blockchain
+    Blockchain -->> API: Xác nhận cập nhật trạng thái
+    deactivate Blockchain
+
+    activate DB
+    API ->> DB: Ghi log lý do từ chối
+    DB -->> API: Xác nhận ghi log
+    deactivate DB
+
+    API ->> API: Tạo thông báo hệ thống từ chối với lý do cho các bên liên quan
+    
+    activate DB
+    API ->> DB: Lưu thông báo vào hệ thống
+    DB -->> API: Xác nhận lưu thông báo
+    deactivate DB
+
+    API -->> UI: Thông báo từ chối thành công
+    activate UI
+    UI -->> Officer: Hiển thị kết quả từ chối
+    deactivate UI
+
+    deactivate API
+```
+
+---
+
+## UC-38: Tìm kiếm giao dịch
+
+```mermaid
+sequenceDiagram
+    actor User as Tất cả người dùng
+    participant UI as Giao diện tìm kiếm giao dịch
+    participant API as Backend API
+    participant DB as MongoDB
+    participant Blockchain as Fabric Network
+
+    User ->> UI: Truy cập "Tìm kiếm giao dịch"
+    activate UI
+    UI -->> User: Hiển thị form tìm kiếm với các bộ lọc
+    deactivate UI
+
+    User ->> UI: Nhập tiêu chí tìm kiếm (mã giao dịch, loại, trạng thái)
+    User ->> UI: Chọn bộ lọc (ngày tạo, người tạo, thửa đất liên quan)
+    activate UI
+    User ->> UI: Nhấn "Tìm kiếm"
+    UI ->> API: Gửi tiêu chí tìm kiếm
+    deactivate UI
+
+    activate API
+    API ->> API: Validate tiêu chí tìm kiếm
+    API ->> API: Xác định quyền truy cập của người dùng
+
+    alt Tiêu chí tìm kiếm không hợp lệ
+        API -->> UI: Thông báo "Tiêu chí tìm kiếm không hợp lệ"
+        activate UI
+        UI -->> User: Hiển thị thông báo lỗi và yêu cầu nhập lại
+        deactivate UI
+    else Tiêu chí hợp lệ
+        activate Blockchain
+        API ->> Blockchain: Tìm kiếm giao dịch trong blockchain
+        Blockchain -->> API: Danh sách giao dịch phù hợp
+        deactivate Blockchain
+
+        API ->> API: Lọc kết quả theo quyền truy cập của người dùng
+        API ->> API: Giới hạn kết quả tối đa 100 bản ghi
+
+        alt Không tìm thấy kết quả
+            API -->> UI: Thông báo "Không tìm thấy giao dịch phù hợp"
             activate UI
-            UI -->> User: Hiển thị danh sách giao dịch theo thửa đất
-            UI -->> User: Hiển thị: mã giao dịch, loại, trạng thái, thời gian, người thực hiện
+            UI -->> User: Hiển thị thông báo không có kết quả
+            deactivate UI
+        else Có kết quả
+            API -->> UI: Danh sách giao dịch phù hợp
+            activate UI
+            UI -->> User: Hiển thị kết quả tìm kiếm với phân trang và sắp xếp
             deactivate UI
 
             User ->> UI: Chọn xem chi tiết giao dịch
             activate UI
-            UI -->> User: Hiển thị thông tin chi tiết giao dịch
+            UI ->> API: Yêu cầu chi tiết giao dịch
             deactivate UI
         end
     end
@@ -4428,604 +3264,62 @@ sequenceDiagram
     deactivate API
 ```
 
-### Các trường hợp ngoại lệ
-- Không có giao dịch nào cho thửa đất
-- Người dùng không có quyền truy cập thửa đất
-- Lỗi kết nối blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ người sử dụng đất và cán bộ mới có quyền xem giao dịch
-- Hiển thị tất cả giao dịch từ khi tạo thửa đất
-- Sắp xếp theo thời gian tạo (mới nhất trước)
-- Hiển thị thông tin chi tiết của từng giao dịch
-
 ---
 
-## UC-55: Xem giao dịch theo người sử dụng đất
+## UC-39: Xem lịch sử thay đổi giao dịch
 
-### Mô tả ngắn gọn
-Xem tất cả giao dịch của một người sử dụng đất
-
-### Sequence Diagram
 ```mermaid
 sequenceDiagram
-    actor User as Người dùng
-    participant UI as Giao diện xem giao dịch theo người sử dụng đất
+    actor User as Tất cả người dùng
+    participant UI as Giao diện chi tiết giao dịch
     participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
+    participant Blockchain as Fabric Network
 
-    User ->> UI: Chọn người sử dụng đất cần xem giao dịch
+    User ->> UI: Chọn tab "Lịch sử thay đổi" (trong UC-29)
     activate UI
-    UI -->> User: Hiển thị thông tin người sử dụng đất và yêu cầu xác nhận
-    deactivate UI
-
-    User ->> UI: Xác nhận xem giao dịch của người sử dụng đất
-    activate UI
-    UI ->> API: Gửi yêu cầu xem giao dịch theo người sử dụng đất
+    UI ->> API: Yêu cầu xem lịch sử giao dịch
     deactivate UI
 
     activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền truy cập thông tin người sử dụng đất
+    API ->> API: Kiểm tra quyền truy cập lịch sử
 
-    alt Không có quyền truy cập
-        API -->> UI: Thông báo "Bạn không có quyền xem giao dịch của người sử dụng đất này"
+    alt Không có quyền xem lịch sử
+        API -->> UI: Thông báo "Không có quyền xem lịch sử"
         activate UI
-        UI -->> User: Hiển thị thông báo lỗi
+        UI -->> User: Hiển thị thông báo từ chối truy cập
         deactivate UI
-    else Có quyền truy cập
+    else Có quyền xem
         activate Blockchain
-        API ->> Blockchain: Lấy danh sách giao dịch theo người sử dụng đất
-        Blockchain -->> API: Trả về danh sách giao dịch
+        API ->> Blockchain: Truy vấn lịch sử thay đổi từ blockchain
+        Blockchain -->> API: Danh sách thay đổi với timestamp
         deactivate Blockchain
 
-        alt Không có giao dịch nào
-            API -->> UI: Thông báo "Không có giao dịch nào cho người sử dụng đất này"
+        alt Chưa có thay đổi nào
+            API -->> UI: Thông báo "Chưa có thay đổi nào"
             activate UI
-            UI -->> User: Hiển thị thông báo không có giao dịch
+            UI -->> User: Hiển thị thông báo không có lịch sử
             deactivate UI
-        else Có giao dịch
-            API ->> API: Sắp xếp theo thời gian tạo (mới nhất trước)
-            API -->> UI: Trả về danh sách giao dịch
-            deactivate API
-
+        else Có lịch sử thay đổi
+            API -->> UI: Danh sách lịch sử thay đổi theo thời gian
             activate UI
-            UI -->> User: Hiển thị danh sách giao dịch theo người sử dụng đất
-            UI -->> User: Hiển thị: mã giao dịch, loại, trạng thái, thời gian, thửa đất liên quan
+            UI -->> User: Hiển thị timeline lịch sử thay đổi
             deactivate UI
 
-            User ->> UI: Chọn xem chi tiết giao dịch
+            User ->> UI: Xem chi tiết từng thay đổi
             activate UI
-            UI -->> User: Hiển thị thông tin chi tiết giao dịch
-            deactivate UI
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Không có giao dịch nào cho người sử dụng đất
-- Người dùng không có quyền truy cập thông tin
-- Lỗi kết nối blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ mới có quyền xem giao dịch của người sử dụng đất khác
-- Công dân chỉ có thể xem giao dịch của mình
-- Hiển thị tất cả giao dịch của người sử dụng đất
-- Sắp xếp theo thời gian tạo (mới nhất trước)
-
----
-
-## UC-56: Xem tất cả giao dịch
-
-### Mô tả ngắn gọn
-Cán bộ xem tất cả giao dịch trong hệ thống
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Staff as Cán bộ
-    participant UI as Giao diện xem tất cả giao dịch
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    Staff ->> UI: Truy cập trang "Quản lý giao dịch"
-    activate UI
-    UI -->> Staff: Hiển thị danh sách giao dịch với bộ lọc
-    deactivate UI
-
-    Staff ->> UI: Chọn bộ lọc: trạng thái, loại giao dịch, thời gian
-    activate UI
-    UI ->> API: Gửi yêu cầu lấy danh sách giao dịch với bộ lọc
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền xem tất cả giao dịch
-
-    alt Không có quyền truy cập
-        API -->> UI: Thông báo "Bạn không có quyền xem tất cả giao dịch"
-        activate UI
-        UI -->> Staff: Hiển thị thông báo lỗi
-        deactivate UI
-    else Có quyền truy cập
-        activate Blockchain
-        API ->> Blockchain: Lấy danh sách giao dịch theo bộ lọc
-        Blockchain -->> API: Trả về danh sách giao dịch
-        deactivate Blockchain
-
-        alt Không có giao dịch nào
-            API -->> UI: Thông báo "Không có giao dịch nào trong hệ thống"
-            activate UI
-            UI -->> Staff: Hiển thị thông báo không có giao dịch
-            deactivate UI
-        else Có giao dịch
-            API ->> API: Sắp xếp theo thời gian tạo mới nhất
-            API -->> UI: Trả về danh sách giao dịch
-            deactivate API
-
-            activate UI
-            UI -->> Staff: Hiển thị danh sách giao dịch với phân trang
-            UI -->> Staff: Hiển thị: mã giao dịch, loại, trạng thái, thời gian, người sử dụng đất, thửa đất
+            UI ->> API: Lấy chi tiết thay đổi cụ thể
             deactivate UI
 
-            Staff ->> UI: Chọn xem chi tiết giao dịch
-            activate UI
-            UI -->> Staff: Hiển thị thông tin chi tiết giao dịch
-            deactivate UI
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Không có giao dịch nào trong hệ thống
-- Cán bộ không có quyền xem tất cả giao dịch
-- Lỗi kết nối blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ mới có quyền xem tất cả giao dịch
-- Có thể lọc theo trạng thái, loại giao dịch, thời gian
-- Kết quả được phân trang để dễ quản lý
-- Hiển thị thông tin chi tiết của từng giao dịch
-
----
-
-## UC-57: Xem chi tiết giao dịch
-
-### Mô tả ngắn gọn
-Xem thông tin chi tiết của một giao dịch cụ thể
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Người dùng
-    participant UI as Giao diện xem chi tiết giao dịch
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-
-    User ->> UI: Chọn giao dịch từ danh sách
-    activate UI
-    UI -->> User: Hiển thị thông tin cơ bản của giao dịch
-    deactivate UI
-
-    User ->> UI: Nhấn "Xem chi tiết"
-    activate UI
-    UI ->> API: Gửi yêu cầu xem chi tiết giao dịch
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> Blockchain: Kiểm tra quyền truy cập giao dịch
-
-    alt Không có quyền truy cập
-        API -->> UI: Thông báo "Bạn không có quyền xem chi tiết giao dịch này"
-        activate UI
-        UI -->> User: Hiển thị thông báo lỗi
-        deactivate UI
-    else Có quyền truy cập
-        alt Giao dịch không tồn tại
-            API -->> UI: Thông báo "Giao dịch không tồn tại"
-            activate UI
-            UI -->> User: Hiển thị thông báo lỗi
-            deactivate UI
-        else Giao dịch tồn tại
+            activate API
             activate Blockchain
-            API ->> Blockchain: Lấy thông tin chi tiết giao dịch
-            Blockchain -->> API: Trả về thông tin chi tiết giao dịch
+            API ->> Blockchain: Truy vấn chi tiết thay đổi
+            Blockchain -->> API: Thông tin chi tiết thay đổi
             deactivate Blockchain
 
-            API -->> UI: Trả về thông tin chi tiết
-            deactivate API
-
+            API -->> UI: Trả về thông tin
             activate UI
-            UI -->> User: Hiển thị thông tin chi tiết giao dịch
-            UI -->> User: Hiển thị: thông tin giao dịch, lịch sử xử lý, tài liệu liên quan, ghi chú
+            UI -->> User: Hiển thị chi tiết thay đổi
             deactivate UI
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Giao dịch không tồn tại
-- Người dùng không có quyền truy cập giao dịch
-- Lỗi kết nối blockchain
-
-### Quy tắc nghiệp vụ
-- Chỉ người liên quan và cán bộ mới có quyền xem chi tiết
-- Hiển thị đầy đủ thông tin giao dịch và lịch sử xử lý
-- Hiển thị tài liệu liên quan đến giao dịch
-- Hiển thị ghi chú và nhận xét của cán bộ
-
----
-
-### **Tiến độ Module 6 - HOÀN THÀNH:**
-- ✅ UC-39: Xử lý giao dịch
-- ✅ UC-40: Tạo yêu cầu chuyển nhượng
-- ✅ UC-41: Xác nhận nhận chuyển nhượng
-- ✅ UC-42: Tạo yêu cầu tách thửa
-- ✅ UC-43: Tạo yêu cầu gộp thửa
-- ✅ UC-44: Tạo yêu cầu đổi mục đích sử dụng
-- ✅ UC-45: Tạo yêu cầu cấp lại GCN
-- ✅ UC-46: Chuyển tiếp giao dịch
-- ✅ UC-47: Phê duyệt giao dịch chuyển nhượng
-- ✅ UC-48: Phê duyệt giao dịch tách thửa
-- ✅ UC-49: Phê duyệt giao dịch gộp thửa
-- ✅ UC-50: Phê duyệt giao dịch đổi mục đích
-- ✅ UC-51: Phê duyệt giao dịch cấp lại GCN
-- ✅ UC-52: Từ chối giao dịch
-- ✅ UC-53: Tìm kiếm giao dịch
-- ✅ UC-54: Xem giao dịch theo thửa đất
-- ✅ UC-55: Xem giao dịch theo người sử dụng đất
-- ✅ UC-56: Xem tất cả giao dịch
-- ✅ UC-57: Xem chi tiết giao dịch
-
-**🎉 Module 6 - QUẢN LÝ GIAO DỊCH (TRANSACTION MANAGEMENT) ĐÃ HOÀN THÀNH!**
-
-**Tiếp theo: Module 7 - Quản lý thông báo (UC-58 đến UC-62)**
-
-## 🔔 **MODULE 7: QUẢN LÝ THÔNG BÁO (NOTIFICATION MANAGEMENT)**
-
-### **Task 7.1: Xem và Quản lý thông báo**
-
----
-
-## UC-58: Xem danh sách thông báo
-
-### Mô tả ngắn gọn
-Người dùng xem danh sách thông báo của mình
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Người dùng
-    participant UI as Giao diện xem danh sách thông báo
-    participant API as Backend API
-    participant DB as MongoDB
-
-    User ->> UI: Truy cập trang "Thông báo"
-    activate UI
-    UI -->> User: Hiển thị danh sách thông báo với bộ lọc
-    deactivate UI
-
-    User ->> UI: Chọn bộ lọc: trạng thái, loại thông báo, thời gian
-    activate UI
-    UI ->> API: Gửi yêu cầu lấy danh sách thông báo
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-
-    alt Người dùng chưa đăng nhập
-        API -->> UI: Thông báo "Vui lòng đăng nhập để xem thông báo"
-        activate UI
-        UI -->> User: Hiển thị thông báo lỗi
-        deactivate UI
-    else Người dùng đã đăng nhập
-        activate DB
-        API ->> DB: Lấy danh sách thông báo theo người dùng và bộ lọc
-        DB -->> API: Trả về danh sách thông báo
-        deactivate DB
-
-        alt Không có thông báo nào
-            API -->> UI: Thông báo "Không có thông báo nào"
-            activate UI
-            UI -->> User: Hiển thị thông báo không có dữ liệu
-            deactivate UI
-        else Có thông báo
-            API ->> API: Sắp xếp theo thời gian tạo (mới nhất trước)
-            API -->> UI: Trả về danh sách thông báo
-            deactivate API
-
-            activate UI
-            UI -->> User: Hiển thị danh sách thông báo với phân trang
-            UI -->> User: Hiển thị: tiêu đề, nội dung, thời gian, trạng thái đọc
-            deactivate UI
-
-            User ->> UI: Chọn xem chi tiết thông báo
-            activate UI
-            UI -->> User: Hiển thị nội dung chi tiết thông báo
-            deactivate UI
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Không có thông báo nào
-- Lỗi kết nối database
-- Người dùng chưa đăng nhập
-
-### Quy tắc nghiệp vụ
-- Chỉ hiển thị thông báo của người dùng đang đăng nhập
-- Có thể lọc theo trạng thái đọc, loại thông báo, thời gian
-- Kết quả được phân trang để dễ quản lý
-- Sắp xếp theo thời gian tạo (mới nhất trước)
-
----
-
-## UC-59: Đếm thông báo chưa đọc
-
-### Mô tả ngắn gọn
-Hệ thống đếm số lượng thông báo chưa đọc
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Người dùng
-    participant UI as Giao diện hệ thống
-    participant API as Backend API
-    participant DB as MongoDB
-
-    User ->> UI: Truy cập giao diện hệ thống
-    activate UI
-    UI ->> API: Gửi yêu cầu đếm thông báo chưa đọc
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-
-    alt Người dùng chưa đăng nhập
-        API -->> UI: Thông báo "Vui lòng đăng nhập để xem thông báo"
-        activate UI
-        UI -->> User: Hiển thị thông báo lỗi
-        deactivate UI
-    else Người dùng đã đăng nhập
-        activate DB
-        API ->> DB: Đếm số lượng thông báo chưa đọc
-        DB -->> API: Trả về số lượng thông báo chưa đọc
-        deactivate DB
-
-        alt Không có thông báo chưa đọc
-            API -->> UI: Trả về số lượng 0
-            deactivate API
-
-            activate UI
-            UI -->> User: Ẩn badge số lượng thông báo
-            deactivate UI
-        else Có thông báo chưa đọc
-            API -->> UI: Trả về số lượng thông báo chưa đọc
-            deactivate API
-
-            activate UI
-            UI -->> User: Hiển thị badge số lượng thông báo chưa đọc
-            UI -->> User: Hiển thị số lượng trên icon thông báo
-            deactivate UI
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Không có thông báo chưa đọc
-- Lỗi kết nối database
-- Người dùng chưa đăng nhập
-
-### Quy tắc nghiệp vụ
-- Chỉ đếm thông báo của người dùng đang đăng nhập
-- Cập nhật real-time khi có thông báo mới
-- Hiển thị số lượng trên giao diện chính
-- Ẩn badge khi không có thông báo chưa đọc
-
----
-
-## UC-60: Đánh dấu đã đọc
-
-### Mô tả ngắn gọn
-Người dùng đánh dấu thông báo đã đọc
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Người dùng
-    participant UI as Giao diện đánh dấu thông báo đã đọc
-    participant API as Backend API
-    participant DB as MongoDB
-
-    User ->> UI: Chọn thông báo từ danh sách
-    activate UI
-    UI -->> User: Hiển thị thông báo và tùy chọn đánh dấu đã đọc
-    deactivate UI
-
-    User ->> UI: Nhấn "Đánh dấu đã đọc"
-    activate UI
-    UI ->> API: Gửi yêu cầu đánh dấu đã đọc
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-
-    alt Người dùng chưa đăng nhập
-        API -->> UI: Thông báo "Vui lòng đăng nhập để thực hiện hành động này"
-        activate UI
-        UI -->> User: Hiển thị thông báo lỗi
-        deactivate UI
-    else Người dùng đã đăng nhập
-        alt Thông báo không tồn tại
-            API -->> UI: Thông báo "Thông báo không tồn tại"
-            activate UI
-            UI -->> User: Hiển thị thông báo lỗi
-            deactivate UI
-        else Thông báo tồn tại
-            alt Thông báo đã được đánh dấu đã đọc
-                API -->> UI: Thông báo "Thông báo đã được đánh dấu đã đọc"
-                activate UI
-                UI -->> User: Hiển thị thông báo
-                deactivate UI
-            else Thông báo chưa đọc
-                activate DB
-                API ->> DB: Cập nhật trạng thái thông báo thành "đã đọc"
-                DB -->> API: Xác nhận cập nhật thành công
-                deactivate DB
-
-                API -->> UI: Trả về kết quả cập nhật thành công
-                deactivate API
-
-                activate UI
-                UI -->> User: Cập nhật trạng thái thông báo trên giao diện
-                UI -->> User: Thay đổi màu sắc và cập nhật số lượng chưa đọc
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Thông báo không tồn tại
-- Thông báo đã được đánh dấu đã đọc
-- Lỗi cập nhật database
-- Người dùng không có quyền truy cập thông báo
-
-### Quy tắc nghiệp vụ
-- Chỉ có thể đánh dấu thông báo của chính mình
-- Cập nhật ngay lập tức trạng thái trên giao diện
-- Giảm số lượng thông báo chưa đọc
-- Ghi nhận thời gian đánh dấu đã đọc
-
----
-
-## UC-61: Đánh dấu tất cả đã đọc
-
-### Mô tả ngắn gọn
-Người dùng đánh dấu tất cả thông báo đã đọc
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor User as Người dùng
-    participant UI as Giao diện đánh dấu tất cả thông báo đã đọc
-    participant API as Backend API
-    participant DB as MongoDB
-
-    User ->> UI: Nhấn "Đánh dấu tất cả đã đọc"
-    activate UI
-    UI -->> User: Hiển thị xác nhận hành động
-    deactivate UI
-
-    User ->> UI: Xác nhận đánh dấu tất cả đã đọc
-    activate UI
-    UI ->> API: Gửi yêu cầu đánh dấu tất cả đã đọc
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-
-    alt Người dùng chưa đăng nhập
-        API -->> UI: Thông báo "Vui lòng đăng nhập để thực hiện hành động này"
-        activate UI
-        UI -->> User: Hiển thị thông báo lỗi
-        deactivate UI
-    else Người dùng đã đăng nhập
-        alt Không có thông báo chưa đọc
-            API -->> UI: Thông báo "Không có thông báo nào cần đánh dấu đã đọc"
-            activate UI
-            UI -->> User: Hiển thị thông báo
-            deactivate UI
-        else Có thông báo chưa đọc
-            activate DB
-            API ->> DB: Cập nhật trạng thái tất cả thông báo thành "đã đọc"
-            DB -->> API: Xác nhận cập nhật thành công
-            deactivate DB
-
-            API -->> UI: Trả về kết quả cập nhật thành công
-            deactivate API
-
-            activate UI
-            UI -->> User: Cập nhật trạng thái tất cả thông báo
-            UI -->> User: Thay đổi màu sắc tất cả thông báo và reset số lượng chưa đọc
-            deactivate UI
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Không có thông báo chưa đọc
-- Lỗi cập nhật database
-- Người dùng chưa đăng nhập
-
-### Quy tắc nghiệp vụ
-- Chỉ đánh dấu thông báo của người dùng đang đăng nhập
-- Cập nhật tất cả thông báo chưa đọc cùng lúc
-- Reset số lượng thông báo chưa đọc về 0
-- Ghi nhận thời gian đánh dấu tất cả đã đọc
-
----
-
-## UC-62: Lưu trữ thông báo
-
-### Mô tả ngắn gọn
-Hệ thống tự động lưu trữ thông báo cũ
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    participant System as Hệ thống
-    participant API as Backend API
-    participant DB as MongoDB
-    participant Archive as Lưu trữ
-
-    System ->> API: Chạy job kiểm tra thông báo cũ
-    activate API
-    API ->> DB: Tìm thông báo đã đọc quá 30 ngày
-
-    alt Không có thông báo cũ để lưu trữ
-        API ->> API: Ghi log "Không có thông báo cũ để lưu trữ"
-        deactivate API
-    else Có thông báo cũ để lưu trữ
-        activate DB
-        API ->> DB: Lấy thông báo cũ để lưu trữ
-        DB -->> API: Trả về danh sách thông báo cũ
-        deactivate DB
-
-        activate Archive
-        API ->> Archive: Lưu trữ thông báo cũ
-        Archive -->> API: Xác nhận lưu trữ thành công
-        deactivate Archive
-
-        alt Lưu trữ thành công
-            activate DB
-            API ->> DB: Xóa thông báo đã được lưu trữ
-            DB -->> API: Xác nhận xóa thành công
-            deactivate DB
-
-            API ->> DB: Ghi nhận thông tin lưu trữ: số lượng thông báo lưu trữ, thời gian lưu trữ
-            DB -->> API: Xác nhận ghi nhận thành công
-            deactivate DB
-
-            API ->> API: Ghi log "Lưu trữ thành công X thông báo"
-            deactivate API
-        else Lỗi lưu trữ
-            API ->> API: Ghi log "Lỗi lưu trữ thông báo"
             deactivate API
         end
     end
@@ -5033,536 +3327,4 @@ sequenceDiagram
     deactivate API
 ```
 
-### Các trường hợp ngoại lệ
-- Không có thông báo cũ để lưu trữ
-- Lỗi quá trình lưu trữ
-- Lỗi xóa thông báo sau lưu trữ
-
-### Quy tắc nghiệp vụ
-- Tự động chạy job lưu trữ hàng ngày
-- Chỉ lưu trữ thông báo đã đọc quá 30 ngày
-- Lưu trữ đầy đủ thông tin thông báo
-- Xóa thông báo sau khi lưu trữ thành công
-
 ---
-
-### **Tiến độ Module 7 - HOÀN THÀNH:**
-- ✅ UC-58: Xem danh sách thông báo
-- ✅ UC-59: Đếm thông báo chưa đọc
-- ✅ UC-60: Đánh dấu đã đọc
-- ✅ UC-61: Đánh dấu tất cả đã đọc
-- ✅ UC-62: Lưu trữ thông báo
-
-**🎉 Module 7 - QUẢN LÝ THÔNG BÁO (NOTIFICATION MANAGEMENT) ĐÃ HOÀN THÀNH!**
-
-**Tiếp theo: Module 8 - Quản trị hệ thống (UC-63 đến UC-64)**
-
-## 🔧 **MODULE 8: QUẢN TRỊ HỆ THỐNG (SYSTEM ADMINISTRATION)**
-
-### **Task 8.1: Cài đặt và Quản lý hệ thống**
-
----
-
-## UC-63: Cài đặt hệ thống
-
-### Mô tả ngắn gọn
-Admin tổ chức cấu hình các tham số hệ thống và tùy chỉnh hoạt động cho tổ chức
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Admin as Admin tổ chức
-    participant UI as Giao diện cài đặt hệ thống
-    participant API as Backend API
-    participant DB as MongoDB
-    participant Config as Configuration Service
-
-    Admin ->> UI: Truy cập trang "Cài đặt hệ thống"
-    activate UI
-    UI -->> Admin: Hiển thị form cài đặt hệ thống
-    deactivate UI
-
-    Admin ->> UI: Chọn nhóm cài đặt: bảo mật, hiệu suất, giao diện, thông báo
-    activate UI
-    Admin ->> UI: Chỉnh sửa các tham số cấu hình cho tổ chức
-    Admin ->> UI: Nhấn "Lưu cài đặt"
-    UI ->> API: Gửi yêu cầu cập nhật cài đặt
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền Admin tổ chức
-
-    alt Admin không có quyền thay đổi cấu hình
-        API -->> UI: Thông báo "Bạn không có quyền thay đổi cấu hình hệ thống"
-        activate UI
-        UI -->> Admin: Hiển thị thông báo lỗi
-        deactivate UI
-    else Admin có quyền thay đổi cấu hình
-        API ->> API: Validate tính hợp lệ của cấu hình
-
-        alt Cấu hình không hợp lệ
-            API -->> UI: Thông báo "Cấu hình không hợp lệ"
-            activate UI
-            UI -->> Admin: Hiển thị thông báo lỗi và hướng dẫn
-            deactivate UI
-        else Cấu hình hợp lệ
-            activate Config
-            API ->> Config: Backup cấu hình cũ của tổ chức
-            Config -->> API: Xác nhận backup thành công
-            deactivate Config
-
-            activate DB
-            API ->> DB: Lưu cấu hình mới cho tổ chức
-            DB -->> API: Xác nhận lưu cấu hình
-            deactivate DB
-
-            activate Config
-            API ->> Config: Áp dụng cấu hình mới cho tổ chức
-            Config -->> API: Xác nhận áp dụng cấu hình
-            deactivate Config
-
-            API ->> API: Ghi nhận lịch sử thay đổi cấu hình
-            API -->> UI: Thông báo "Cài đặt đã được cập nhật thành công"
-            deactivate API
-
-            activate UI
-            UI -->> Admin: Hiển thị thông báo thành công
-            UI -->> Admin: Hiển thị cài đặt mới đã áp dụng
-            deactivate UI
-
-            alt Cần restart service
-                API ->> API: Restart các service cần thiết của tổ chức
-                API -->> UI: Thông báo "Hệ thống đã được khởi động lại"
-                activate UI
-                UI -->> Admin: Hiển thị thông báo restart
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Cấu hình không hợp lệ
-- Admin không có quyền thay đổi cấu hình
-- Lỗi backup cấu hình cũ
-- Lỗi áp dụng cấu hình mới
-
-### Quy tắc nghiệp vụ
-- Chỉ Admin tổ chức mới có quyền thay đổi cấu hình hệ thống của tổ chức đó
-- Mọi thay đổi phải được backup trước
-- Ghi nhận đầy đủ lịch sử thay đổi
-- Một số cài đặt cần restart hệ thống
-- Cấu hình của tổ chức không ảnh hưởng đến tổ chức khác
-
----
-
-## UC-64: Quản lý logs
-
-### Mô tả ngắn gọn
-Admin tổ chức xem và quản lý nhật ký hoạt động hệ thống cho tổ chức
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Admin as Admin tổ chức
-    participant UI as Giao diện quản lý logs
-    participant API as Backend API
-    participant DB as MongoDB
-    participant LogService as Log Service
-
-    Admin ->> UI: Truy cập trang "Quản lý logs"
-    activate UI
-    UI -->> Admin: Hiển thị giao diện quản lý logs
-    deactivate UI
-
-    Admin ->> UI: Chọn loại log: application, system, security, blockchain, user activity
-    activate UI
-    Admin ->> UI: Thiết lập bộ lọc: thời gian, mức độ, nguồn, người dùng
-    Admin ->> UI: Nhấn "Tìm kiếm logs"
-    UI ->> API: Gửi yêu cầu tìm kiếm logs
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền Admin tổ chức
-
-    alt Admin không có quyền truy cập logs
-        API -->> UI: Thông báo "Bạn không có quyền truy cập logs hệ thống"
-        activate UI
-        UI -->> Admin: Hiển thị thông báo lỗi
-        deactivate UI
-    else Admin có quyền truy cập logs
-        activate LogService
-        API ->> LogService: Tìm kiếm logs theo bộ lọc và tổ chức
-        LogService -->> API: Trả về logs phù hợp với tổ chức
-        deactivate LogService
-
-        alt Không tìm thấy logs
-            API -->> UI: Thông báo "Không có logs phù hợp"
-            activate UI
-            UI -->> Admin: Hiển thị thông báo không có logs
-            deactivate UI
-        else Có logs phù hợp
-            API ->> API: Phân tích và xử lý logs
-            API -->> UI: Trả về danh sách logs đã lọc
-            deactivate API
-
-            activate UI
-            UI -->> Admin: Hiển thị danh sách logs với bộ lọc
-            UI -->> Admin: Hiển thị: thời gian, mức độ, nguồn, nội dung
-            deactivate UI
-
-            Admin ->> UI: Xem chi tiết log entry
-            activate UI
-            UI -->> Admin: Hiển thị chi tiết log với thông tin đầy đủ
-            deactivate UI
-
-            Admin ->> UI: Xuất logs ra file
-            activate UI
-            UI ->> API: Gửi yêu cầu xuất logs
-            deactivate UI
-
-            activate API
-            API ->> LogService: Tạo file logs theo định dạng yêu cầu
-            LogService -->> API: Trả về file logs
-            API -->> UI: Trả về file logs để tải xuống
-            deactivate API
-
-            activate UI
-            UI -->> Admin: Tải xuống file logs
-            deactivate UI
-
-            Admin ->> UI: Thiết lập retention policy cho logs
-            activate UI
-            Admin ->> UI: Chọn thời gian lưu trữ và mức độ ưu tiên
-            Admin ->> UI: Nhấn "Lưu policy"
-            UI ->> API: Gửi yêu cầu cập nhật retention policy
-            deactivate UI
-
-            activate API
-            API ->> DB: Lưu retention policy cho tổ chức
-            DB -->> API: Xác nhận lưu policy
-            API -->> UI: Thông báo "Policy đã được cập nhật"
-            deactivate API
-
-            activate UI
-            UI -->> Admin: Hiển thị thông báo thành công
-            deactivate UI
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Không tìm thấy logs phù hợp
-- Admin không có quyền truy cập logs
-- Lỗi đọc file log
-- Logs quá lớn cần phân trang
-
-### Quy tắc nghiệp vụ
-- Chỉ Admin tổ chức mới có quyền truy cập logs hệ thống của tổ chức đó
-- Logs được lưu trữ theo mức độ ưu tiên và tổ chức
-- Tự động xóa logs cũ theo chính sách retention của tổ chức
-- Logs quan trọng được backup định kỳ
-- Mã hóa logs nhạy cảm khi lưu trữ
-- Admin có thể thiết lập retention policy riêng cho tổ chức
-
----
-
-## UC-65: Xuất dữ liệu
-
-### Mô tả ngắn gọn
-Cán bộ xuất dữ liệu ra file
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Staff as Cán bộ quản lý
-    participant UI as Giao diện xuất dữ liệu
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-    participant DB as MongoDB
-
-    Staff ->> UI: Truy cập trang "Xuất dữ liệu"
-    activate UI
-    UI -->> Staff: Hiển thị form xuất dữ liệu
-    deactivate UI
-
-    Staff ->> UI: Chọn loại dữ liệu và định dạng xuất: giao dịch, thửa đất, người dùng, định dạng: Excel, CSV, PDF
-    activate UI
-    Staff ->> UI: Nhấn "Xuất dữ liệu"
-    UI ->> API: Gửi yêu cầu xuất dữ liệu
-    deactivate UI
-
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền xuất dữ liệu
-
-    alt Cán bộ không có quyền xuất dữ liệu
-        API -->> UI: Thông báo "Bạn không có quyền xuất dữ liệu"
-        activate UI
-        UI -->> Staff: Hiển thị thông báo lỗi
-        deactivate UI
-    else Cán bộ có quyền xuất dữ liệu
-        activate Blockchain
-        API ->> Blockchain: Lấy dữ liệu giao dịch và thửa đất
-        Blockchain -->> API: Trả về dữ liệu giao dịch và thửa đất
-        deactivate Blockchain
-
-        activate DB
-        API ->> DB: Lấy dữ liệu người dùng và thông báo
-        DB -->> API: Trả về dữ liệu người dùng và thông báo
-        deactivate DB
-
-        alt Không có dữ liệu để xuất
-            API -->> UI: Thông báo "Không có dữ liệu để xuất"
-            activate UI
-            UI -->> Staff: Hiển thị thông báo không có dữ liệu
-            deactivate UI
-        else Có dữ liệu để xuất
-            alt File quá lớn để tạo
-                API -->> UI: Thông báo "Dữ liệu quá lớn, vui lòng chọn phạm vi nhỏ hơn"
-                activate UI
-                UI -->> Staff: Hiển thị thông báo lỗi
-                deactivate UI
-            else File có thể tạo
-                API ->> API: Tổng hợp dữ liệu theo định dạng yêu cầu
-                API ->> API: Tạo file Excel/CSV/PDF
-                API -->> UI: Trả về file đã tạo
-                deactivate API
-
-                activate UI
-                UI -->> Staff: Hiển thị link tải xuống file
-                UI -->> Staff: Tải xuống file với tên và định dạng phù hợp
-                deactivate UI
-            end
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Không có dữ liệu để xuất
-- Lỗi tạo file xuất
-- Cán bộ không có quyền xuất dữ liệu
-- File quá lớn để tạo
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ quản lý mới có quyền xuất dữ liệu
-- Hỗ trợ nhiều định dạng file (Excel, CSV, PDF)
-- File xuất có tên và timestamp rõ ràng
-- Dữ liệu được mã hóa và bảo mật
-
----
-
-## UC-66: Dashboard tổng quan
-
-### Mô tả ngắn gọn
-Hiển thị dashboard tổng quan hệ thống
-
-### Sequence Diagram
-```mermaid
-sequenceDiagram
-    actor Staff as Cán bộ quản lý
-    participant UI as Giao diện Dashboard tổng quan
-    participant API as Backend API
-    participant Blockchain as Hyperledger Fabric
-    participant DB as MongoDB
-
-    Staff ->> UI: Truy cập trang "Dashboard tổng quan"
-    activate UI
-    UI -->> Staff: Hiển thị loading dashboard
-    deactivate UI
-
-    UI ->> API: Gửi yêu cầu lấy dữ liệu dashboard
-    activate API
-    API ->> API: Xác thực JWT token
-    API ->> API: Kiểm tra quyền truy cập dashboard
-
-    alt Cán bộ không có quyền truy cập dashboard
-        API -->> UI: Thông báo "Bạn không có quyền truy cập dashboard"
-        activate UI
-        UI -->> Staff: Hiển thị thông báo lỗi
-        deactivate UI
-    else Cán bộ có quyền truy cập dashboard
-        activate Blockchain
-        API ->> Blockchain: Lấy thống kê giao dịch và thửa đất
-        Blockchain -->> API: Trả về thống kê giao dịch và thửa đất
-        deactivate Blockchain
-
-        activate DB
-        API ->> DB: Lấy thống kê người dùng và thông báo
-        DB -->> API: Trả về thống kê người dùng và thông báo
-        deactivate DB
-
-        alt Không có dữ liệu để hiển thị
-            API -->> UI: Thông báo "Không có dữ liệu để hiển thị dashboard"
-            activate UI
-            UI -->> Staff: Hiển thị thông báo không có dữ liệu
-            deactivate UI
-        else Có dữ liệu để hiển thị
-            API ->> API: Tính toán các chỉ số KPI
-            API ->> API: Tạo biểu đồ và thống kê real-time
-            API -->> UI: Trả về dữ liệu dashboard
-            deactivate API
-
-            activate UI
-            UI -->> Staff: Hiển thị dashboard với các widget
-            UI -->> Staff: Hiển thị: KPI, biểu đồ, bảng thống kê, thông báo quan trọng
-            deactivate UI
-
-            Staff ->> UI: Tương tác với các widget dashboard
-            activate UI
-            UI -->> Staff: Cập nhật dữ liệu real-time
-            deactivate UI
-        end
-    end
-
-    deactivate API
-```
-
-### Các trường hợp ngoại lệ
-- Không có dữ liệu để hiển thị
-- Lỗi kết nối blockchain hoặc database
-- Cán bộ không có quyền truy cập dashboard
-
-### Quy tắc nghiệp vụ
-- Chỉ cán bộ quản lý mới có quyền truy cập dashboard
-- Hiển thị dữ liệu real-time từ blockchain và database
-- Dashboard có các widget tương tác
-- Cập nhật tự động theo thời gian thực
-
----
-
-### **Tiến độ Module 8 - HOÀN THÀNH:**
-- ✅ UC-63: Cài đặt hệ thống
-- ✅ UC-64: Quản lý logs
-
-**🎉 Module 8 - QUẢN TRỊ HỆ THỐNG (SYSTEM ADMINISTRATION) ĐÃ HOÀN THÀNH!**
-
-
-
-
-
-
-
----
-
-## 🎯 **TỔNG KẾT HOÀN THÀNH TẤT CẢ MODULES**
-
-### **📋 TỔNG QUAN HOÀN THÀNH:**
-
-#### **✅ Module 1 - Xác thực (AUTHENTICATION) - HOÀN THÀNH**
-- ✅ UC-01: Đăng ký tài khoản công dân
-- ✅ UC-02: Admin tạo tài khoản cán bộ
-- ✅ UC-03: Xác minh mã OTP
-- ✅ UC-04: Đăng nhập hệ thống
-- ✅ UC-05: Đăng xuất hệ thống
-- ✅ UC-06: Thay đổi mật khẩu
-- ✅ UC-07: Quên mật khẩu
-- ✅ UC-08: Đặt lại mật khẩu
-- ✅ UC-09: Gửi lại OTP
-
-#### **✅ Module 2 - Quản lý người dùng (ADMIN MANAGEMENT) - HOÀN THÀNH**
-- ✅ UC-10: Xem danh sách người dùng
-- ✅ UC-11: Xem thông tin người dùng
-- ✅ UC-12: Cập nhật thông tin người dùng
-- ✅ UC-13: Khóa/Mở khóa tài khoản
-- ✅ UC-14: Xóa tài khoản người dùng
-
-#### **✅ Module 3 - Quản lý hồ sơ cá nhân (PROFILE MANAGEMENT) - HOÀN THÀNH**
-- ✅ UC-15: Xem thông tin cá nhân
-- ✅ UC-16: Cập nhật thông tin cá nhân
-
-#### **✅ Module 4 - Quản lý thửa đất (LAND MANAGEMENT) - HOÀN THÀNH**
-- ✅ UC-17: Tạo thửa đất mới
-- ✅ UC-18: Cập nhật thông tin thửa đất
-- ✅ UC-19: Tìm kiếm thửa đất
-- ✅ UC-20: Xem thửa đất theo người sử dụng đất
-- ✅ UC-21: Xem tất cả thửa đất
-- ✅ UC-22: Xem chi tiết thửa đất
-- ✅ UC-23: Xem lịch sử thửa đất
-
-#### **✅ Module 5 - Quản lý tài liệu (DOCUMENT MANAGEMENT) - HOÀN THÀNH**
-- ✅ UC-24: Upload tài liệu mới
-- ✅ UC-25: Xem danh sách tài liệu
-- ✅ UC-26: Xem chi tiết tài liệu
-- ✅ UC-27: Xác minh tài liệu
-- ✅ UC-28: Từ chối tài liệu
-- ✅ UC-29: Liên kết tài liệu với thửa đất
-- ✅ UC-30: Liên kết tài liệu với giao dịch
-- ✅ UC-31: Tìm kiếm tài liệu
-- ✅ UC-32: Xem tài liệu theo trạng thái
-- ✅ UC-33: Xem tài liệu theo loại
-- ✅ UC-34: Xem tài liệu theo thửa đất
-- ✅ UC-35: Xem tài liệu theo giao dịch
-- ✅ UC-36: Xem tài liệu theo người upload
-- ✅ UC-37: Xem lịch sử tài liệu
-- ✅ UC-38: Phân tích tài liệu
-
-#### **✅ Module 6 - Quản lý giao dịch (TRANSACTION MANAGEMENT) - HOÀN THÀNH**
-- ✅ UC-39: Xử lý giao dịch
-- ✅ UC-40: Tạo yêu cầu chuyển nhượng
-- ✅ UC-41: Xác nhận nhận chuyển nhượng
-- ✅ UC-42: Tạo yêu cầu tách thửa
-- ✅ UC-43: Tạo yêu cầu gộp thửa
-- ✅ UC-44: Tạo yêu cầu đổi mục đích sử dụng
-- ✅ UC-45: Tạo yêu cầu cấp lại GCN
-- ✅ UC-46: Chuyển tiếp giao dịch
-- ✅ UC-47: Phê duyệt giao dịch chuyển nhượng
-- ✅ UC-48: Phê duyệt giao dịch tách thửa
-- ✅ UC-49: Phê duyệt giao dịch gộp thửa
-- ✅ UC-50: Phê duyệt giao dịch đổi mục đích
-- ✅ UC-51: Phê duyệt giao dịch cấp lại GCN
-- ✅ UC-52: Từ chối giao dịch
-- ✅ UC-53: Tìm kiếm giao dịch
-- ✅ UC-54: Xem giao dịch theo thửa đất
-- ✅ UC-55: Xem giao dịch theo người sử dụng đất
-- ✅ UC-56: Xem tất cả giao dịch
-- ✅ UC-57: Xem chi tiết giao dịch
-
-#### **✅ Module 7 - Quản lý thông báo (NOTIFICATION MANAGEMENT) - HOÀN THÀNH**
-- ✅ UC-58: Xem danh sách thông báo
-- ✅ UC-59: Đếm thông báo chưa đọc
-- ✅ UC-60: Đánh dấu đã đọc
-- ✅ UC-61: Đánh dấu tất cả đã đọc
-- ✅ UC-62: Lưu trữ thông báo
-
-#### **✅ Module 8 - Quản trị hệ thống (SYSTEM ADMINISTRATION) - HOÀN THÀNH**
-- ✅ UC-63: Cài đặt hệ thống
-- ✅ UC-64: Quản lý logs
-
-
-
----
-
-## 🎉 **HOÀN THÀNH 100% - TẤT CẢ 64 USE CASES!**
-
-### **📊 Thống kê hoàn thành:**
-- **Tổng số Modules**: 8
-- **Tổng số Use Cases**: 64
-- **Tổng số Sequence Diagrams**: 64
-- **Tổng số Tasks**: 25
-
-### **🔧 Đặc điểm kỹ thuật:**
-- **Format**: Mermaid Sequence Diagrams
-- **Kiến trúc**: Blockchain (Hyperledger Fabric) + MongoDB + IPFS
-- **Ngôn ngữ**: Tiếng Việt, tập trung vào nghiệp vụ
-- **Cấu trúc**: Single file tổng hợp
-- **Thứ tự**: Theo đúng SRS use cases (đã cập nhật)
-
-### **✅ Tất cả Sequence Diagrams đã được tạo với:**
-- Luồng nghiệp vụ logic và chính xác
-- Kiến trúc hệ thống đúng (Blockchain + MongoDB + IPFS)
-- Ngôn ngữ nghiệp vụ chuyên nghiệp
-- Validation ngắn gọn và hiệu quả
-- Xử lý ngoại lệ đầy đủ
-- Quy tắc nghiệp vụ rõ ràng
-- Phân quyền Admin tổ chức rõ ràng
-
-**🎯 Dự án Sequence Diagrams cho Hệ thống Quản lý Đất đai Blockchain đã hoàn thành 100% với 64 Use Cases!**

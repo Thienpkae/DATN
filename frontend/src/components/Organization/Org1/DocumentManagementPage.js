@@ -134,8 +134,7 @@ const DocumentManagementPage = () => {
         ipfsHash: ipfsHash,
         fileType: selectedFile.type || selectedFile.name.split('.').pop().toUpperCase(),
         fileSize: selectedFile.size,
-        verified: true, // Org1 tạo tài liệu sẽ tự động được xác thực
-        verifiedBy: user?.cccd || 'Unknown'
+        status: 'VERIFIED' // Org1 tạo tài liệu sẽ tự động được xác thực
       });
       
       message.success('Tạo tài liệu thành công');
@@ -288,7 +287,12 @@ const DocumentManagementPage = () => {
     { title: 'Mã tài liệu', dataIndex: 'docID', key: 'docID', render: v => <code>{v}</code> },
     { title: 'Tiêu đề', dataIndex: 'title', key: 'title' },
     { title: 'Loại', dataIndex: 'type', key: 'type', render: v => <Tag color="blue">{v}</Tag> },
-    { title: 'Trạng thái', dataIndex: 'verified', key: 'verified', render: v => v ? <Tag color="green">Đã xác thực</Tag> : <Tag color="orange">Chờ xác thực</Tag> },
+    { title: 'Trạng thái', dataIndex: 'status', key: 'status', render: v => {
+        if (v === 'VERIFIED') return <Tag color="green">Đã xác thực</Tag>;
+        if (v === 'REJECTED') return <Tag color="red">Không hợp lệ</Tag>;
+        return <Tag color="orange">Chờ xác thực</Tag>;
+      }
+    },
     { title: 'Loại file', dataIndex: 'fileType', key: 'fileType', render: v => <Tag color="blue">{documentService.getDisplayFileType(v)}</Tag> },
     { title: 'Kích thước', dataIndex: 'fileSize', key: 'fileSize', render: v => v ? `${(v / 1024).toFixed(2)} KB` : 'N/A' },
     { title: 'Người upload', dataIndex: 'uploadedBy', key: 'uploadedBy' },

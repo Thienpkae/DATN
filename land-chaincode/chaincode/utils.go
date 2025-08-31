@@ -23,11 +23,13 @@ var validLandUsePurposes = map[string]bool{
 }
 
 var validLegalStatuses = map[string]bool{
-	"":     true, // Chưa có trạng thái pháp lý (đất chưa được cấp GCN)
-	"HNK":  true, // Đất trồng cây hàng năm khác
-	"LUA":  true, // Đất lúa nước còn lại
-	"ONT*": true, // Đất ở tại nông thôn
-	"CLN":  true, // Đất trồng cây lâu năm
+	"":               true, // Chưa có trạng thái pháp lý (đất chưa được cấp GCN)
+	"HNK":            true, // Đất trồng cây hàng năm khác
+	"LUA":            true, // Đất lúa nước còn lại
+	"ONT*":           true, // Đất ở tại nông thôn
+	"CLN":            true, // Đất trồng cây lâu năm
+	"Đang tranh chấp": true, // Đất đang tranh chấp
+	"Đang thế chấp":   true, // Đất đang thế chấp
 }
 
 var requiredDocuments = map[string][]string{
@@ -382,6 +384,15 @@ func GetTransaction(ctx contractapi.TransactionContextInterface, txID string) (*
 	if err := json.Unmarshal(data, &tx); err != nil {
 		return nil, fmt.Errorf("lỗi khi giải mã giao dịch: %v", err)
 	}
+	
+	// Normalize null arrays to empty arrays for backward compatibility
+	if tx.DocumentIDs == nil {
+		tx.DocumentIDs = []string{}
+	}
+	if tx.ParcelIDs == nil {
+		tx.ParcelIDs = []string{}
+	}
+	
 	return &tx, nil
 }
 
@@ -495,7 +506,6 @@ func RecordTransactionLog(ctx contractapi.TransactionContextInterface, txID, act
 		TxID:      fmt.Sprintf("LOG_%s_%s_%d", txID, action, txTime.UnixNano()),
 		Type:      "LOG",
 		UserID:    userID,
-		Action:    action,
 		Details:   details,
 		CreatedAt: txTime,
 		UpdatedAt: txTime,
@@ -533,4 +543,68 @@ func parseFloat(s string) (float64, error) {
 		return 0, fmt.Errorf("lỗi khi chuyển đổi chuỗi %s sang số thực: %v", s, err)
 	}
 	return f, nil
+}
+
+// Document Status Validation Utils
+
+// IsValidDocumentStatus - Kiểm tra trạng thái tài liệu có hợp lệ không
+func IsValidDocumentStatus(status string) bool {
+	validStatuses := []string{"PENDING", "VERIFIED", "REJECTED"}
+	for _, validStatus := range validStatuses {
+		if status == validStatus {
+			return true
+		}
+	}
+	return false
+}
+
+
+
+// IsDocumentVerified - Kiểm tra tài liệu đã được xác thực chưa
+func IsDocumentVerified(doc *Document) bool {
+	return doc.Status == "VERIFIED"
+}
+
+// IsDocumentRejected - Kiểm tra tài liệu có bị từ chối không
+func IsDocumentRejected(doc *Document) bool {
+	return doc.Status == "REJECTED"
+}
+
+// IsDocumentPending - Kiểm tra tài liệu có đang chờ xác thực không
+func IsDocumentPending(doc *Document) bool {
+	return doc.Status == "PENDING"
+}
+
+// CanVerifyDocument - Kiểm tra tài liệu có thể được xác thực không
+func CanVerifyDocument(doc *Document) bool {
+	return doc.Status == "PENDING"
+}
+
+// CanRejectDocument - Kiểm tra tài liệu có thể bị từ chối không
+func CanRejectDocument(doc *Document) bool {
+	return doc.Status == "PENDING"
+}
+
+// SetDocumentVerified - Đặt trạng thái tài liệu thành đã xác thực
+func SetDocumentVerified(doc *Document, verifiedBy string, verifiedAt time.Time) {
+	doc.Status = "VERIFIED"
+	doc.VerifiedBy = verifiedBy
+	doc.VerifiedAt = verifiedAt
+	doc.UpdatedAt = verifiedAt
+}
+
+// SetDocumentRejected - Đặt trạng thái tài liệu thành bị từ chối
+func SetDocumentRejected(doc *Document, rejectedBy string, rejectedAt time.Time) {
+	doc.Status = "REJECTED"
+	doc.VerifiedBy = rejectedBy
+	doc.VerifiedAt = rejectedAt
+	doc.UpdatedAt = rejectedAt
+}
+
+// SetDocumentPending - Đặt trạng thái tài liệu thành chờ xác thực
+func SetDocumentPending(doc *Document) {
+	doc.Status = "PENDING"
+	doc.VerifiedBy = ""
+	doc.VerifiedAt = time.Time{}
+	doc.UpdatedAt = time.Now()
 }

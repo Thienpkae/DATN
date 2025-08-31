@@ -183,15 +183,14 @@ const landService = {
           location: filters.location,
           landUsePurpose: filters.landUsePurpose,
           legalStatus: filters.legalStatus,
-          minArea: filters.minArea,
-          maxArea: filters.maxArea,
+          minArea: filters.minArea !== undefined ? filters.minArea.toString() : undefined, // Convert to string
+          maxArea: filters.maxArea !== undefined ? filters.maxArea.toString() : undefined, // Convert to string
           ownerID: filters.ownerID,
           hasCertificate: filters.hasCertificate,
           dateFrom: filters.dateFrom,
           dateTo: filters.dateTo
         })
       };
-      
       return await this.searchLandParcels(searchParams);
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Lỗi khi tìm kiếm nâng cao');
@@ -237,9 +236,7 @@ const landService = {
       errors.push('Mục đích sử dụng đất là bắt buộc');
     }
 
-    if (!landData.legalStatus) {
-      errors.push('Trạng thái pháp lý là bắt buộc');
-    }
+
 
     return {
       isValid: errors.length === 0,

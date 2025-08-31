@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Divider, Alert, Typography } from 'antd';
+import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Alert, Typography } from 'antd';
 import { PlusOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, HistoryOutlined, FileTextOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import transactionService from '../../../services/transactionService';
 import authService from '../../../services/auth';
@@ -22,14 +22,17 @@ const TransactionManagementPage = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [linkDocumentOpen, setLinkDocumentOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [history, setHistory] = useState([]);
   const [form] = Form.useForm();
   const [confirmForm] = Form.useForm();
+  const [linkDocumentForm] = Form.useForm();
   
   // States for document linking
   const [userDocuments, setUserDocuments] = useState([]);
-  const [selectedDocuments, setSelectedDocuments] = useState([]);
+  const [selectedDocuments, setSelectedDocuments] = useState({}); // Object: { docType: docID }
   
   // States for land management
   const [userLands, setUserLands] = useState([]);
@@ -46,9 +49,7 @@ const TransactionManagementPage = () => {
       const res = await documentService.getDocumentsByUploader(user.userId);
       const docs = res?.documents || [];
       
-      // Chỉ lấy các tài liệu đã được xác thực
-      const verifiedDocs = docs.filter(doc => doc.verified === true);
-      setUserDocuments(verifiedDocs);
+      setUserDocuments(docs);
     } catch (e) {
       console.error('Lỗi khi tải tài liệu:', e);
       message.error('Không thể tải danh sách tài liệu');
@@ -159,12 +160,12 @@ const TransactionManagementPage = () => {
       }
       setLoading(true);
       
-      // Chuẩn bị data chung với documentIds
+      // Chuẩn bị data chung với documentIds và reason
       const baseData = {
-        txID: values.txID,
         landParcelID: values.landParcelID,
         fromOwnerID: user.userId, // Tự động lấy từ user hiện tại
-        documentIds: selectedDocuments  // Thêm danh sách tài liệu đã chọn
+        documentIds: Object.values(selectedDocuments),  // Chuyển object thành array
+        reason: values.reason || ''  // Thêm lý do tạo yêu cầu
       };
       
       switch (selectedTransactionType) {
@@ -176,47 +177,40 @@ const TransactionManagementPage = () => {
           break;
         case 'SPLIT':
           await transactionService.createSplitRequest({
-            txID: values.txID,
-            landParcelID: values.landParcelID,
+            ...baseData,
             ownerID: user.userId, // Tự động lấy từ user hiện tại
-            newParcelsStr: values.newParcels,
-            documentIds: selectedDocuments
+            newParcelsStr: values.newParcels
           });
           break;
         case 'MERGE':
           await transactionService.createMergeRequest({
-            txID: values.txID,
+            ...baseData,
             ownerID: user.userId, // Tự động lấy từ user hiện tại
             parcelIDs: values.parcelIDs.split(',').map(id => id.trim()),
-            newParcelStr: values.newParcel,
-            documentIds: selectedDocuments
+            newParcelStr: values.newParcel
           });
           break;
         case 'CHANGE_PURPOSE':
           await transactionService.createChangePurposeRequest({
-            txID: values.txID,
-            landParcelID: values.landParcelID,
+            ...baseData,
             ownerID: user.userId, // Tự động lấy từ user hiện tại
-            newPurpose: values.newPurpose,
-            documentIds: selectedDocuments
+            newPurpose: values.newPurpose
             });
           break;
         case 'REISSUE':
           await transactionService.createReissueRequest({
-            txID: values.txID,
-            landParcelID: values.landParcelID,
-            ownerID: user.userId, // Tự động lấy từ user hiện tại
-            documentIds: selectedDocuments
+            ...baseData,
+            ownerID: user.userId // Tự động lấy từ user hiện tại
           });
           break;
         default:
           throw new Error('Loại giao dịch không được hỗ trợ');
       }
       
-      message.success(`Tạo yêu cầu thành công${selectedDocuments.length > 0 ? ` với ${selectedDocuments.length} tài liệu đính kèm` : ''}`);
+      message.success(`Tạo yêu cầu thành công${Object.keys(selectedDocuments).length > 0 ? ` với ${Object.keys(selectedDocuments).length} tài liệu đính kèm` : ''}`);
       setCreateOpen(false);
       form.resetFields();
-      setSelectedDocuments([]);  // Reset danh sách tài liệu đã chọn
+      setSelectedDocuments({});  // Reset danh sách tài liệu đã chọn
       setSelectedTransactionType(null);  // Reset loại giao dịch đã chọn
       loadMyTransactions();
     } catch (e) {
@@ -245,11 +239,34 @@ const TransactionManagementPage = () => {
     }
   };
 
+  // Link supplement documents to transaction - UC-18
+  const onLinkSupplementDocuments = async () => {
+    try {
+      const values = await linkDocumentForm.validateFields();
+      if (!values.selectedDocuments || values.selectedDocuments.length === 0) {
+        message.warning('Vui lòng chọn ít nhất một tài liệu để bổ sung');
+        return;
+      }
+
+      setLoading(true);
+      await documentService.linkDocumentToTransaction(values.selectedDocuments, selected.txId);
+      
+      message.success(`Đã liên kết ${values.selectedDocuments.length} tài liệu bổ sung với giao dịch thành công`);
+      setLinkDocumentOpen(false);
+      linkDocumentForm.resetFields();
+      loadMyTransactions();
+    } catch (e) {
+      message.error(e.message || 'Liên kết tài liệu bổ sung thất bại');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onViewHistory = async (txID) => {
     try {
       const res = await transactionService.getTransactionHistory(txID);
       setHistory(Array.isArray(res) ? res : (res?.data ?? []));
-      setDetailOpen(true);
+      setHistoryOpen(true);
     } catch (e) {
       message.error(e.message || 'Không tải được lịch sử');
     }
@@ -287,8 +304,12 @@ const TransactionManagementPage = () => {
     return transaction.status === 'APPROVED' && transaction.type === 'TRANSFER';
   };
 
+  const canSupplement = (transaction) => {
+    return transaction.status === 'SUPPLEMENT_REQUESTED';
+  };
+
   const columns = useMemo(() => ([
-    { title: 'Mã giao dịch', dataIndex: 'txID', key: 'txID' },
+    { title: 'Mã giao dịch', dataIndex: 'txId', key: 'txId' },
     { title: 'Loại', dataIndex: 'type', key: 'type', render: v => getTypeTag(v) },
     { title: 'Thửa đất', dataIndex: 'landParcelId', key: 'landParcelId' },
             { 
@@ -315,7 +336,7 @@ const TransactionManagementPage = () => {
             }} />
           </Tooltip>
           <Tooltip title="Lịch sử">
-            <Button icon={<HistoryOutlined />} onClick={() => onViewHistory(record.txID)} />
+            <Button icon={<HistoryOutlined />} onClick={() => onViewHistory(record.txId)} />
           </Tooltip>
           {canConfirm(record) && (
             <Tooltip title="Xác nhận">
@@ -325,7 +346,7 @@ const TransactionManagementPage = () => {
                 onClick={() => {
                   setSelected(record);
                   confirmForm.setFieldsValue({ 
-                    txID: record.txID,
+                    txID: record.txId,
                     landParcelID: record.landParcelId,
                     toOwnerID: record.toOwnerId
                   });
@@ -333,6 +354,21 @@ const TransactionManagementPage = () => {
                 }}
               >
                 Xác nhận
+              </Button>
+            </Tooltip>
+          )}
+          {canSupplement(record) && (
+            <Tooltip title="Bổ sung tài liệu theo yêu cầu">
+              <Button 
+                type="default" 
+                icon={<FileTextOutlined />} 
+                onClick={() => {
+                  setSelected(record);
+                  setLinkDocumentOpen(true);
+                }}
+                style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: 'white' }}
+              >
+                Bổ sung
               </Button>
             </Tooltip>
           )}
@@ -347,104 +383,97 @@ const TransactionManagementPage = () => {
     const requiredDocs = REQUIRED_DOCUMENTS[selectedType] || [];
     
     return (
-      <div style={{ marginTop: 16 }}>
-        <Divider orientation="left">
-          <FileTextOutlined /> Tài liệu cần chuẩn bị & Đính kèm
-        </Divider>
-        
-        <Alert
-          message="Danh sách tài liệu cần chuẩn bị cho thủ tục"
-          description="Dưới đây là danh sách các tài liệu cần thiết theo quy định. Bạn có thể đính kèm các tài liệu đã được xác thực vào yêu cầu."
-          type="info"
-          showIcon
-          style={{ marginBottom: 16 }}
-        />
-
-        <div style={{ background: '#f9f9f9', padding: '16px', borderRadius: '6px', marginBottom: 16 }}>
+      <div>
+        <div style={{ marginBottom: 16 }}>
           {requiredDocs.map((docType, index) => (
             <div key={index} style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: 8,
-              padding: '8px 0'
+              marginBottom: 16,
+              padding: '16px',
+              background: '#fff',
+              borderRadius: '8px',
+              border: '1px solid #e8e8e8',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
             }}>
-              <Text style={{ flex: 1 }}>
-                <span style={{ fontWeight: 500, color: '#1890ff' }}>
-                  {index + 1}.
-                </span>{' '}
-                {docType}
-              </Text>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ 
+                  fontWeight: 'bold', 
+                  color: '#1890ff', 
+                  marginBottom: 6,
+                  fontSize: '14px'
+                }}>
+                  {index + 1}. {docType}
+                </div>
+              </div>
+              <div style={{ 
+              display: 'flex', 
+              alignItems: 'center',
+                gap: 12
+              }}>
                 <Select
                   placeholder="Chọn tài liệu..."
-                  style={{ width: 200 }}
+                  style={{ width: '100%' }}
                   allowClear
+                  value={selectedDocuments[docType] || undefined}
                   onChange={(docID) => {
-                    if (docID && !selectedDocuments.includes(docID)) {
-                      setSelectedDocuments([...selectedDocuments, docID]);
+                    if (docID) {
+                      // Tự động gỡ file cũ cùng loại trước khi thêm file mới
+                      setSelectedDocuments(prev => ({
+                        ...prev,
+                        [docType]: docID
+                      }));
                       message.success('Đã đính kèm tài liệu');
+                    } else {
+                      // Khi clear dropdown, gỡ file cùng loại
+                      setSelectedDocuments(prev => {
+                        const newState = { ...prev };
+                        delete newState[docType];
+                        return newState;
+                      });
+                      message.info('Đã gỡ tài liệu');
                     }
                   }}
                 >
-                  {userDocuments
-                    .filter(doc => !selectedDocuments.includes(doc.docID))
+                  {userDocuments.length === 0 ? (
+                    <Option disabled value="no-docs">
+                      Không có tài liệu nào
+                    </Option>
+                  ) : (
+                    userDocuments
+                      .filter(doc => !Object.values(selectedDocuments).includes(doc.docID)) // Chỉ hiển thị tài liệu chưa được chọn
                     .map((doc) => (
                       <Option key={doc.docID} value={doc.docID}>
                         <Tag color="blue" size="small">{doc.type}</Tag>
                         {doc.title}
                       </Option>
                     ))
-                  }
+                  )}
                 </Select>
-                {selectedDocuments.some(docID => 
-                  userDocuments.find(doc => doc.docID === docID)?.type === docType
-                ) && (
-                  <Tag color="green" icon={<CheckCircleOutlined />}>
-                    Đã đính kèm
-                  </Tag>
+                {selectedDocuments[docType] && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '24px',
+                    height: '24px',
+                    background: '#52c41a',
+                    borderRadius: '50%',
+                    boxShadow: '0 2px 4px rgba(82, 196, 26, 0.3)',
+                    flexShrink: 0
+                  }}>
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      background: '#fff',
+                      borderRadius: '50%'
+                    }} />
+                  </div>
                 )}
               </div>
             </div>
           ))}
         </div>
 
-        {/* Hiển thị tài liệu đã đính kèm */}
-        {selectedDocuments.length > 0 && (
-          <div style={{ marginTop: 16, padding: 16, background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 8 }}>
-            <Text strong style={{ color: '#52c41a', fontSize: '16px' }}>
-              📋 Tài liệu đã đính kèm ({selectedDocuments.length}):
-            </Text>
-            <div style={{ marginTop: 12 }}>
-              {requiredDocs.map((docType, index) => {
-                const attachedDocs = selectedDocuments.filter(docId => {
-                  const doc = userDocuments.find(d => d.docID === docId);
-                  return doc && doc.type === docType;
-                });
-                
-                if (attachedDocs.length === 0) return null;
-                
-                return (
-                  <div key={index} style={{ marginBottom: 12 }}>
-                    <Text strong style={{ color: '#52c41a' }}>
-                      {index + 1}. {docType}:
-                    </Text>
-                    <div style={{ marginTop: 6, marginLeft: 16 }}>
-                      {attachedDocs.map((docId) => {
-                        const doc = userDocuments.find(d => d.docID === docId);
-                        return doc ? (
-                          <Tag key={docId} color="green" style={{ marginBottom: 4 }}>
-                            {doc.title}
-                          </Tag>
-                        ) : null;
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+
       </div>
     );
   };
@@ -518,6 +547,7 @@ const TransactionManagementPage = () => {
             size="small" 
             onClick={() => {
               setSelectedTransactionType(null);
+              setSelectedDocuments({});
               form.resetFields();
             }}
           >
@@ -525,13 +555,22 @@ const TransactionManagementPage = () => {
           </Button>
         </div>
         
-        <Row gutter={16}>
+        {/* Layout 2 cột: Thông tin giao dịch | Tài liệu đính kèm */}
+        <Row gutter={24}>
+          {/* Cột trái: Thông tin giao dịch */}
           <Col span={12}>
-            <Form.Item name="txID" label="Mã giao dịch" rules={[{ required: true, message: 'Bắt buộc' }]}>
-              <Input placeholder="Nhập mã giao dịch duy nhất" />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
+            <div style={{ 
+              padding: '20px', 
+              background: '#fafafa', 
+              borderRadius: '8px',
+              border: '1px solid #e8e8e8',
+              height: '100%',
+              minHeight: '500px'
+            }}>
+              <h4 style={{ marginBottom: '20px', color: '#1890ff', borderBottom: '2px solid #1890ff', paddingBottom: '8px' }}>
+                📝 Thông tin giao dịch
+              </h4>
+              
             <Form.Item name="landParcelID" label="Mã thửa đất" rules={[{ required: true, message: 'Bắt buộc' }]}>
               <Select 
                 placeholder="Chọn thửa đất" 
@@ -561,11 +600,7 @@ const TransactionManagementPage = () => {
                   ⚠️ Bạn chưa có thửa đất nào. Vui lòng liên hệ cơ quan quản lý đất đai.
                 </div>
               )}
-              
-
             </Form.Item>
-          </Col>
-        </Row>
 
         {/* CCCD chủ sở hữu sẽ tự động lấy từ user hiện tại */}
         <Form.Item label="CCCD chủ sở hữu">
@@ -597,7 +632,7 @@ const TransactionManagementPage = () => {
           <Form.Item name="newParcels" label="Thông tin thửa đất mới" rules={[{ required: true, message: 'Bắt buộc' }]}>
             <Input.TextArea 
               placeholder="Nhập thông tin thửa đất mới theo định dạng JSON (VD: [{'id':'L001-1','area':100},{'id':'L001-2','area':150}])" 
-              rows={4}
+                    rows={3}
             />
           </Form.Item>
         )}
@@ -610,16 +645,47 @@ const TransactionManagementPage = () => {
             <Form.Item name="newParcel" label="Thông tin thửa đất mới" rules={[{ required: true, message: 'Bắt buộc' }]}>
               <Input.TextArea 
                 placeholder="Nhập thông tin thửa đất mới theo định dạng JSON (VD: {'id':'L001-MERGED','area':250})" 
-                rows={3}
+                      rows={2}
               />
             </Form.Item>
           </>
         )}
 
+              {/* Lý do tạo yêu cầu */}
+              <Form.Item 
+                name="reason" 
+                label="Lý do tạo yêu cầu" 
+                rules={[{ required: true, message: 'Vui lòng nhập lý do tạo yêu cầu' }]}
+              >
+                <Input.TextArea 
+                  placeholder="Nhập lý do tạo yêu cầu..." 
+                  rows={3}
+                  maxLength={500}
+                  showCount
+                />
+              </Form.Item>
+            </div>
+          </Col>
 
+          {/* Cột phải: Tài liệu đính kèm */}
+          <Col span={12}>
+            <div style={{ 
+              padding: '20px', 
+              background: '#fafafa', 
+              borderRadius: '8px',
+              border: '1px solid #e8e8e8',
+              height: '100%',
+              minHeight: '500px'
+            }}>
+              <h4 style={{ marginBottom: '20px', color: '#52c41a', borderBottom: '2px solid #52c41a', paddingBottom: '8px' }}>
+                📎 Tài liệu đính kèm
+              </h4>
 
         {/* Document section */}
         {renderDocumentSection(selectedTransactionType)}
+            </div>
+          </Col>
+        </Row>
       </Form>
     );
   };
@@ -677,18 +743,18 @@ const TransactionManagementPage = () => {
         onCancel={() => {
           setCreateOpen(false);
           form.resetFields();
-          setSelectedDocuments([]);
+          setSelectedDocuments({});
           setSelectedTransactionType(null);
         }} 
         confirmLoading={loading} 
-        width={900}
+        width={1200}
         okText={selectedTransactionType ? "Tạo yêu cầu" : undefined}
         cancelText="Hủy"
         footer={selectedTransactionType ? undefined : [
           <Button key="cancel" onClick={() => {
             setCreateOpen(false);
             form.resetFields();
-            setSelectedDocuments([]);
+            setSelectedDocuments({});
             setSelectedTransactionType(null);
           }}>
             Hủy
@@ -716,12 +782,12 @@ const TransactionManagementPage = () => {
         </Form>
       </Modal>
 
-      {/* Detail + History */}
+      {/* Transaction Detail */}
       <Drawer title="Chi tiết giao dịch" width={800} open={detailOpen} onClose={() => setDetailOpen(false)}>
         {selected && (
           <div>
             <Row gutter={16}>
-              <Col span={12}><strong>Mã giao dịch:</strong> {selected.txID}</Col>
+              <Col span={12}><strong>Mã giao dịch:</strong> {selected.txId || selected.txID}</Col>
               <Col span={12}><strong>Loại:</strong> {getTypeTag(selected.type)}</Col>
             </Row>
             <Row gutter={16} style={{ marginTop: 12 }}>
@@ -737,9 +803,18 @@ const TransactionManagementPage = () => {
               <Col span={12}><strong>Ngày cập nhật:</strong> {selected.updatedAt ? new Date(selected.updatedAt).toLocaleDateString('vi-VN') : 'N/A'}</Col>
             </Row>
             
-            {selected.description && (
-              <div style={{ marginTop: 12 }}>
-                <strong>Mô tả:</strong> {selected.description}
+            {selected.details && (
+              <div style={{ marginTop: 16 }}>
+                <strong>Chi tiết:</strong>
+                <div style={{ 
+                  marginTop: 8, 
+                  padding: 12, 
+                  background: '#f5f5f5', 
+                  borderRadius: 4,
+                  borderLeft: '4px solid #1890ff'
+                }}>
+                  {selected.details}
+                </div>
               </div>
             )}
             
@@ -749,24 +824,200 @@ const TransactionManagementPage = () => {
               </div>
             )}
 
-            {history.length > 0 && (
-              <div style={{ marginTop: 24 }}>
-                <Divider>Lịch sử giao dịch</Divider>
-                <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                  {history.map((item, index) => (
-                    <div key={index} style={{ 
-                      padding: 12, 
-                      marginBottom: 8, 
-                      background: '#f5f5f5', 
-                      borderRadius: 4,
-                      borderLeft: '4px solid #52c41a'
-                    }}>
-                      <div><strong>Trạng thái:</strong> {getStatusTag(item.status)}</div>
-                      <div><strong>Thời gian:</strong> {item.timestamp ? new Date(item.timestamp).toLocaleString('vi-VN') : 'N/A'}</div>
-                      {item.notes && <div><strong>Ghi chú:</strong> {item.notes}</div>}
-                    </div>
+            {selected.documentIds && selected.documentIds.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <strong>Tài liệu đính kèm:</strong>
+                <div style={{ marginTop: 8 }}>
+                  {selected.documentIds.map((docId, index) => (
+                    <Tag key={index} style={{ marginBottom: 4 }}>
+                      {docId}
+                    </Tag>
                   ))}
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Drawer>
+
+      {/* Link Supplement Documents Modal - UC-18 */}
+      <Modal
+        title="Bổ sung tài liệu cho giao dịch"
+        open={linkDocumentOpen}
+        onOk={onLinkSupplementDocuments}
+        onCancel={() => {
+          setLinkDocumentOpen(false);
+          linkDocumentForm.resetFields();
+        }}
+        confirmLoading={loading}
+        width={800}
+        okText="Liên kết tài liệu"
+        cancelText="Hủy"
+      >
+        <div>
+          <Alert
+            message="Giao dịch cần bổ sung tài liệu"
+            description={
+              <div>
+                <div>Cán bộ UBND cấp xã đã yêu cầu bổ sung tài liệu cho giao dịch này.</div>
+                <div style={{ marginTop: 8 }}>
+                  <strong>Mã giao dịch:</strong> {selected?.txId} | 
+                  <strong> Loại:</strong> {selected ? getTransactionTypeText(selected.type) : ''}
+                </div>
+                {selected?.details && (
+                  <div style={{ marginTop: 8 }}>
+                    <strong>Chi tiết yêu cầu:</strong> {selected.details}
+                  </div>
+                )}
+              </div>
+            }
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+
+          <Form form={linkDocumentForm} layout="vertical">
+            <Form.Item
+              name="selectedDocuments"
+              label="Chọn tài liệu bổ sung:"
+              rules={[{ required: true, message: 'Vui lòng chọn ít nhất một tài liệu' }]}
+            >
+              <Select
+                mode="multiple"
+                placeholder="Chọn tài liệu từ danh sách của bạn"
+                style={{ width: '100%' }}
+                filterOption={(input, option) =>
+                  option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                }
+              >
+                {userDocuments.map(doc => (
+                  <Option key={doc.docID} value={doc.docID}>
+                    <div>
+                      <strong>{doc.title}</strong>
+                      <div style={{ fontSize: '12px', color: '#666' }}>
+                        {doc.type} | {doc.status === 'VERIFIED' ? '✅ Đã xác minh' : doc.status === 'REJECTED' ? '❌ Không hợp lệ' : '⏳ Chờ xác minh'}
+                      </div>
+                    </div>
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            <div style={{ marginTop: 16, padding: 12, backgroundColor: '#f0f0f0', borderRadius: 4 }}>
+              <Text type="secondary" style={{ fontSize: '12px' }}>
+                💡 <strong>Lưu ý:</strong> Sau khi liên kết tài liệu bổ sung, giao dịch sẽ được đặt lại về trạng thái "Chờ xử lý" 
+                để cán bộ UBND cấp xã xem xét lại hồ sơ đã bổ sung.
+              </Text>
+            </div>
+          </Form>
+        </div>
+      </Modal>
+
+      {/* Transaction History */}
+      <Drawer 
+        title="Lịch sử thay đổi giao dịch" 
+        width={800} 
+        open={historyOpen} 
+        onClose={() => setHistoryOpen(false)}
+      >
+        {selected && (
+          <div>
+            <div style={{ marginBottom: 16, padding: 12, background: '#f0f9ff', borderRadius: 4 }}>
+              <Row gutter={16}>
+                <Col span={12}><strong>Mã giao dịch:</strong> {selected.txId || selected.txID}</Col>
+                <Col span={12}><strong>Loại:</strong> {getTypeTag(selected.type)}</Col>
+              </Row>
+              <Row gutter={16} style={{ marginTop: 8 }}>
+                <Col span={12}><strong>Thửa đất:</strong> {selected.landParcelId}</Col>
+                <Col span={12}><strong>Trạng thái hiện tại:</strong> {getStatusTag(selected.status)}</Col>
+              </Row>
+            </div>
+
+            {history.length > 0 ? (
+              <div>
+                <h4>Timeline thay đổi ({history.length} bản ghi):</h4>
+                <div style={{ maxHeight: 600, overflowY: 'auto' }}>
+                  {history.map((item, index) => {
+                    // Xử lý timestamp đúng cách
+                    const formatTimestamp = (timestamp) => {
+                      if (!timestamp) return 'N/A';
+                      
+                      let date;
+                      if (timestamp.seconds) {
+                        // Timestamp từ blockchain (seconds + nanos)
+                        date = new Date(timestamp.seconds * 1000 + (timestamp.nanos || 0) / 1000000);
+                      } else {
+                        // Timestamp thông thường
+                        date = new Date(timestamp);
+                      }
+                      
+                      return date.toLocaleString('vi-VN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                      });
+                    };
+
+                    return (
+                    <div key={index} style={{ 
+                        padding: 16, 
+                        marginBottom: 12, 
+                        background: '#ffffff', 
+                        border: '1px solid #e8e8e8',
+                        borderRadius: 6,
+                        borderLeft: '4px solid #1890ff',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                      }}>
+                        <div style={{ marginBottom: 8 }}>
+                          <strong>Bước {history.length - index}:</strong>
+                          <span style={{ float: 'right', color: '#666', fontSize: '12px' }}>
+                            {formatTimestamp(item.timestamp)}
+                          </span>
+                    </div>
+                        
+                        {item.transaction && (
+                          <div>
+                            <div style={{ marginBottom: 4 }}>
+                              <strong>Trạng thái:</strong> {getStatusTag(item.transaction.status)}
+                            </div>
+                            
+                            {item.transaction.details && (
+                              <div style={{ marginBottom: 4 }}>
+                                <strong>Chi tiết:</strong> {item.transaction.details}
+                              </div>
+                            )}
+                            
+                            {item.transaction.documentIds && item.transaction.documentIds.length > 0 && (
+                              <div style={{ marginBottom: 4 }}>
+                                <strong>Tài liệu đính kèm:</strong> 
+                                <div style={{ marginTop: 4 }}>
+                                  {item.transaction.documentIds.map((docId, docIndex) => (
+                                    <Tag key={docIndex} size="small" style={{ marginBottom: 2 }}>
+                                      {docId}
+                                    </Tag>
+                  ))}
+                </div>
+                              </div>
+                            )}
+                            
+                            <div style={{ marginTop: 8, fontSize: '12px', color: '#999' }}>
+                              <strong>Blockchain TX:</strong> {item.txId?.substring(0, 16)}...
+                              {item.isDelete && <Tag color="red" size="small" style={{ marginLeft: 8 }}>Đã xóa</Tag>}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+                <div style={{ fontSize: '16px', marginBottom: 8 }}>Chưa có lịch sử thay đổi</div>
+                <div style={{ fontSize: '14px' }}>Giao dịch này chưa có bất kỳ thay đổi nào được ghi lại.</div>
               </div>
             )}
           </div>

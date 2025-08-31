@@ -2,6 +2,8 @@ package chaincode
 
 import "time"
 
+
+
 // Land định nghĩa thông tin thửa đất và giấy chứng nhận
 type Land struct {
 	ID             string    `json:"id"`                  // Mã thửa đất
@@ -28,9 +30,9 @@ type Document struct {
 	FileSize    int64     `json:"fileSize"`    // Kích thước file (bytes)
 	FileType    string    `json:"fileType"`    // Loại file (PDF, JPG, PNG, etc.)
 	UploadedBy  string    `json:"uploadedBy"`  // CCCD người upload
-	Verified    bool      `json:"verified"`    // Trạng thái chứng thực
-	VerifiedBy  string    `json:"verifiedBy"`  // CCCD người chứng thực
-	VerifiedAt  time.Time `json:"verifiedAt"`  // Thời gian chứng thực
+	Status      string    `json:"status"`      // Trạng thái: "PENDING", "VERIFIED", "REJECTED"
+	VerifiedBy  string    `json:"verifiedBy"`  // CCCD người xác thực/từ chối
+	VerifiedAt  time.Time `json:"verifiedAt"`  // Thời gian xác thực/từ chối
 	CreatedAt   time.Time `json:"createdAt"`   // Thời gian tạo
 	UpdatedAt   time.Time `json:"updatedAt"`   // Thời gian cập nhật
 }
@@ -46,7 +48,6 @@ type Transaction struct {
 	Status       string    `json:"status"`       // Trạng thái (PENDING, CONFIRMED, FORWARDED, VERIFIED, SUPPLEMENT_REQUESTED, APPROVED, REJECTED)
 	Details      string    `json:"details"`      // Chi tiết giao dịch
 	UserID       string    `json:"userId"`       // CCCD người thực hiện giao dịch
-	Action       string    `json:"action"`       // Hành động cụ thể (CREATE, UPDATE, QUERY, APPROVE, REJECT)
 	DocumentIDs  []string  `json:"documentIds"`  // Danh sách ID tài liệu liên quan
 	CreatedAt    time.Time `json:"createdAt"`    // Thời gian tạo
 	UpdatedAt    time.Time `json:"updatedAt"`    // Thời gian cập nhật

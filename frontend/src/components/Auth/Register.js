@@ -116,7 +116,7 @@ const Register = () => {
             borderRadius: '16px',
             overflow: 'hidden'
           }}
-          bodyStyle={{ padding: '32px' }}
+          styles={{ body: { padding: '32px' } }}
         >
           {/* Header */}
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>

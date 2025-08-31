@@ -181,19 +181,19 @@ const documentService = {
     }
   },
 
-  // Link document to land parcel
-  async linkDocumentToLand(docID, landParcelID) {
+  // Link documents to land parcel (supports multiple documents) - UC-17
+  async linkDocumentToLand(docIDs, landParcelID) {
     try {
-      console.log('Calling linkDocumentToLand API for:', docID, 'land:', landParcelID);
+      console.log('Calling linkDocumentToLand API for:', docIDs, 'land:', landParcelID);
       const response = await apiClient.post(API_ENDPOINTS.DOCUMENT.LINK_TO_LAND, {
-        docID,
-        landParcelID
+        docIDs,
+        landParcelId: landParcelID
       });
       console.log('linkDocumentToLand response:', response);
       return response.data;
     } catch (error) {
       console.error('linkDocumentToLand error:', error);
-      throw new Error(error.response?.data?.message || 'Lỗi khi liên kết tài liệu với thửa đất');
+      throw new Error(error.response?.data?.message || 'Lỗi khi liên kết tài liệu bổ sung với thửa đất');
     }
   },
 
@@ -212,19 +212,19 @@ const documentService = {
     }
   },
 
-  // Link document to transaction
-  async linkDocumentToTransaction(docID, txID) {
+  // Link supplement documents to transaction (supports multiple documents) - UC-18
+  async linkDocumentToTransaction(docIDs, txID) {
     try {
-      console.log('Calling linkDocumentToTransaction API for:', docID, 'transaction:', txID);
+      console.log('Calling linkDocumentToTransaction API for:', docIDs, 'transaction:', txID);
       const response = await apiClient.post(API_ENDPOINTS.DOCUMENT.LINK_TO_TRANSACTION, {
-        docID,
-        txID
+        docIDs,
+        transactionId: txID
       });
       console.log('linkDocumentToTransaction response:', response);
       return response.data;
     } catch (error) {
       console.error('linkDocumentToTransaction error:', error);
-      throw new Error(error.response?.data?.message || 'Lỗi khi liên kết tài liệu với giao dịch');
+      throw new Error(error.response?.data?.message || 'Lỗi khi liên kết tài liệu bổ sung với giao dịch');
     }
   },
 

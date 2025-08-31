@@ -6,11 +6,11 @@ const transactionService = {
   async createTransferRequest(transferData) {
     try {
       const response = await apiClient.post(API_ENDPOINTS.TRANSACTION.TRANSFER, {
-        txID: transferData.txID,
         landParcelId: transferData.landParcelID,
         fromOwnerId: transferData.fromOwnerID,
         toOwnerId: transferData.toOwnerID,
-        documentIds: transferData.documentIds || []
+        documentIds: transferData.documentIds || [],
+        reason: transferData.reason || ''
       });
       return response.data;
     } catch (error) {
@@ -21,7 +21,10 @@ const transactionService = {
   // Create split request
   async createSplitRequest(splitData) {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.TRANSACTION.SPLIT, splitData);
+      const response = await apiClient.post(API_ENDPOINTS.TRANSACTION.SPLIT, {
+        ...splitData,
+        reason: splitData.reason || ''
+      });
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Lỗi khi tạo yêu cầu tách thửa');
@@ -31,7 +34,10 @@ const transactionService = {
   // Create merge request
   async createMergeRequest(mergeData) {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.TRANSACTION.MERGE, mergeData);
+      const response = await apiClient.post(API_ENDPOINTS.TRANSACTION.MERGE, {
+        ...mergeData,
+        reason: mergeData.reason || ''
+      });
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Lỗi khi tạo yêu cầu gộp thửa');
@@ -41,7 +47,10 @@ const transactionService = {
   // Create change purpose request
   async createChangePurposeRequest(changePurposeData) {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.TRANSACTION.CHANGE_PURPOSE, changePurposeData);
+      const response = await apiClient.post(API_ENDPOINTS.TRANSACTION.CHANGE_PURPOSE, {
+        ...changePurposeData,
+        reason: changePurposeData.reason || ''
+      });
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Lỗi khi tạo yêu cầu đổi mục đích sử dụng');
@@ -51,7 +60,10 @@ const transactionService = {
   // Create reissue request
   async createReissueRequest(reissueData) {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.TRANSACTION.REISSUE, reissueData);
+      const response = await apiClient.post(API_ENDPOINTS.TRANSACTION.REISSUE, {
+        ...reissueData,
+        reason: reissueData.reason || ''
+      });
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Lỗi khi tạo yêu cầu cấp lại giấy chứng nhận');
@@ -68,11 +80,11 @@ const transactionService = {
     }
   },
 
-  // Process transaction (Org2)
-  async processTransaction(txID) {
+  // Process transaction with 3 decision states (Org2) - UC-31
+  async processTransaction(txID, decision, reason = '') {
     try {
       const url = API_ENDPOINTS.TRANSACTION.PROCESS.replace(':txID', txID);
-      const response = await apiClient.post(url);
+      const response = await apiClient.post(url, { decision, reason });
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -239,10 +251,6 @@ const transactionService = {
 
     if (!transactionData.landParcelID || transactionData.landParcelID.trim() === '') {
       errors.push('Mã thửa đất là bắt buộc');
-    }
-
-    if (!transactionData.fromOwnerID || transactionData.fromOwnerID.trim() === '') {
-      errors.push('CCCD người gửi là bắt buộc');
     }
 
     switch (type) {

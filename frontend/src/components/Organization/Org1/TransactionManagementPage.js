@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Divider, List } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined, CheckCircleOutlined, CloseCircleOutlined, LinkOutlined, FileTextOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, CheckCircleOutlined, CloseCircleOutlined, LinkOutlined, FileTextOutlined, HistoryOutlined } from '@ant-design/icons';
 import transactionService from '../../../services/transactionService';
 import { DocumentLinker, DocumentViewer } from '../../Common';
 
@@ -20,6 +20,7 @@ const TransactionManagementPage = () => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [history, setHistory] = useState([]);
   const [approveForm] = Form.useForm();
@@ -111,13 +112,24 @@ const TransactionManagementPage = () => {
     }
   };
 
+  // View transaction history - UC-39
+  const onViewHistory = async (txID) => {
+    try {
+      const res = await transactionService.getTransactionHistory(txID);
+      setHistory(Array.isArray(res) ? res : (res?.data ?? []));
+      setHistoryOpen(true);
+    } catch (e) {
+      message.error(e.message || 'Không tải được lịch sử');
+    }
+  };
+
   const openDetail = async (record) => {
     try {
       setSelected(record);
       setDetailOpen(true);
       
       // Load transaction history
-      const res = await transactionService.getTransactionHistory(record.txID);
+      const res = await transactionService.getTransactionHistory(record.txId);
       setHistory(Array.isArray(res) ? res : (res?.data ?? []));
       
       // Load linked documents
@@ -159,6 +171,19 @@ const TransactionManagementPage = () => {
     return typeLabels[type] || type;
   };
 
+  const getStatusTag = (status) => {
+    const statusColors = {
+      'PENDING': 'orange',
+      'VERIFIED': 'blue',
+      'FORWARDED': 'cyan',
+      'APPROVED': 'green',
+      'REJECTED': 'red',
+      'CONFIRMED': 'green',
+      'SUPPLEMENT_REQUESTED': 'gold'
+    };
+    return <Tag color={statusColors[status] || 'default'}>{transactionService.getTransactionStatusText(status)}</Tag>;
+  };
+
   const getStatusColor = (status) => {
     const statusColors = {
       'PENDING': 'orange',
@@ -173,10 +198,10 @@ const TransactionManagementPage = () => {
   };
 
   const columns = useMemo(() => ([
-    { title: 'Mã giao dịch', dataIndex: 'txID', key: 'txID', render: v => <code>{v}</code> },
+    { title: 'Mã giao dịch', dataIndex: 'txId', key: 'txId', render: v => <code>{v}</code> },
     { title: 'Loại giao dịch', dataIndex: 'type', key: 'type', render: v => <Tag color="blue">{getTransactionTypeLabel(v)}</Tag> },
-    { title: 'Thửa đất chính', dataIndex: 'landParcelID', key: 'landParcelID' },
-    { title: 'Người thực hiện', dataIndex: 'userID', key: 'userID' },
+    { title: 'Thửa đất chính', dataIndex: 'landParcelId', key: 'landParcelId' },
+    { title: 'Người thực hiện', dataIndex: 'userId', key: 'userId' },
     { title: 'Trạng thái', dataIndex: 'status', key: 'status', render: v => <Tag color={getStatusColor(v)}>{v}</Tag> },
     { title: 'Ngày tạo', dataIndex: 'createdAt', key: 'createdAt', render: v => v ? new Date(v).toLocaleDateString('vi-VN') : 'N/A' },
     {
@@ -184,6 +209,9 @@ const TransactionManagementPage = () => {
         <Space>
           <Tooltip title="Xem chi tiết">
             <Button icon={<EyeOutlined />} onClick={() => openDetail(record)} />
+          </Tooltip>
+          <Tooltip title="Lịch sử">
+            <Button icon={<HistoryOutlined />} onClick={() => onViewHistory(record.txId)} />
           </Tooltip>
           {record.status === 'VERIFIED' && (
             <Tooltip title="Phê duyệt">
@@ -377,28 +405,118 @@ const TransactionManagementPage = () => {
                 locale={{ emptyText: 'Chưa có tài liệu nào được liên kết' }}
               />
 
-              <Divider>Lịch sử giao dịch</Divider>
-              
-              <List
-                header={<div><strong>Lịch sử thay đổi ({history.length})</strong></div>}
-                bordered
-                dataSource={history}
-                renderItem={(item, index) => (
-                  <List.Item>
-                    <List.Item.Meta
-                      title={`Thay đổi ${index + 1}`}
-                      description={
-                        <div>
-                          <div><strong>Transaction ID:</strong> {item.txId || 'N/A'}</div>
-                          <div><strong>Thời gian:</strong> {item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleString('vi-VN') : 'N/A'}</div>
-                          <div><strong>Trạng thái:</strong> {item.isDelete ? 'Vô hiệu' : 'Hiệu lực'}</div>
+
+            </div>
+          )}
+        </Drawer>
+
+        {/* Transaction History */}
+        <Drawer 
+          title="Lịch sử thay đổi giao dịch" 
+          width={800} 
+          open={historyOpen} 
+          onClose={() => setHistoryOpen(false)}
+        >
+          {selected && (
+            <div>
+              <div style={{ marginBottom: 16, padding: 12, background: '#f0f9ff', borderRadius: 4 }}>
+                <Row gutter={16}>
+                  <Col span={12}><strong>Mã giao dịch:</strong> {selected.txID}</Col>
+                  <Col span={12}><strong>Loại:</strong> <Tag color="blue">{getTransactionTypeLabel(selected.type)}</Tag></Col>
+                </Row>
+                <Row gutter={16} style={{ marginTop: 8 }}>
+                  <Col span={12}><strong>Thửa đất:</strong> {selected.landParcelID}</Col>
+                  <Col span={12}><strong>Trạng thái hiện tại:</strong> {getStatusTag(selected.status)}</Col>
+                </Row>
+              </div>
+
+              {history.length > 0 ? (
+                <div>
+                  <h4>Timeline thay đổi ({history.length} bản ghi):</h4>
+                  <div style={{ maxHeight: 600, overflowY: 'auto' }}>
+                    {history.map((item, index) => {
+                      // Xử lý timestamp đúng cách
+                      const formatTimestamp = (timestamp) => {
+                        if (!timestamp) return 'N/A';
+                        
+                        let date;
+                        if (timestamp.seconds) {
+                          // Timestamp từ blockchain (seconds + nanos)
+                          date = new Date(timestamp.seconds * 1000 + (timestamp.nanos || 0) / 1000000);
+                        } else {
+                          // Timestamp thông thường
+                          date = new Date(timestamp);
+                        }
+                        
+                        return date.toLocaleString('vi-VN', {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit'
+                        });
+                      };
+
+                      return (
+                        <div key={index} style={{ 
+                          padding: 16, 
+                          marginBottom: 12, 
+                          background: '#ffffff', 
+                          border: '1px solid #e8e8e8',
+                          borderRadius: 6,
+                          borderLeft: '4px solid #52c41a',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                        }}>
+                          <div style={{ marginBottom: 8 }}>
+                            <strong>Bước {history.length - index}:</strong>
+                            <span style={{ float: 'right', color: '#666', fontSize: '12px' }}>
+                              {formatTimestamp(item.timestamp)}
+                            </span>
+                          </div>
+                          
+                          {item.transaction && (
+                            <div>
+                              <div style={{ marginBottom: 4 }}>
+                                <strong>Trạng thái:</strong> {getStatusTag(item.transaction.status)}
+                              </div>
+                              
+                              {item.transaction.details && (
+                                <div style={{ marginBottom: 4 }}>
+                                  <strong>Chi tiết:</strong> {item.transaction.details}
+                                </div>
+                              )}
+                              
+                              {item.transaction.documentIds && item.transaction.documentIds.length > 0 && (
+                                <div style={{ marginBottom: 4 }}>
+                                  <strong>Tài liệu đính kèm:</strong> 
+                                  <div style={{ marginTop: 4 }}>
+                                    {item.transaction.documentIds.map((docId, docIndex) => (
+                                      <Tag key={docIndex} size="small" style={{ marginBottom: 2 }}>
+                                        {docId}
+                                      </Tag>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              <div style={{ marginTop: 8, fontSize: '12px', color: '#999' }}>
+                                <strong>Blockchain TX:</strong> {item.txId?.substring(0, 16)}...
+                                {item.isDelete && <Tag color="red" size="small" style={{ marginLeft: 8 }}>Đã xóa</Tag>}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      }
-                    />
-                  </List.Item>
-                )}
-                locale={{ emptyText: 'Chưa có lịch sử thay đổi' }}
-              />
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+                  <div style={{ fontSize: '16px', marginBottom: 8 }}>Chưa có lịch sử thay đổi</div>
+                  <div style={{ fontSize: '14px' }}>Giao dịch này chưa có bất kỳ thay đổi nào được ghi lại.</div>
+                </div>
+              )}
             </div>
           )}
         </Drawer>

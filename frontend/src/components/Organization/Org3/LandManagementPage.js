@@ -4,7 +4,6 @@ import { SearchOutlined, ReloadOutlined, HistoryOutlined, EyeOutlined, FileTextO
 import landService from '../../../services/landService';
 import authService from '../../../services/auth';
 import { LAND_USE_PURPOSES, LEGAL_STATUSES } from '../../../services/index';
-
 const { TabPane } = Tabs;
 const { Text } = Typography;
 
@@ -37,18 +36,18 @@ const LandManagementPage = () => {
   useEffect(() => { loadMyLands(); }, []);
 
   const onSearch = async () => {
-  try {
-    setLoading(true);
-    const filters = {}; // or your actual filters object
-    const res = await landService.advancedSearch({ keyword, filters: JSON.stringify(filters) });
-    const data = Array.isArray(res) ? res : (res?.data ?? []);
-    setLands(data);
-  } catch (e) {
-    message.error(e.message || 'Tìm kiếm thất bại');
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      setLoading(true);
+      const filters = {}; // or your actual filters object
+      const res = await landService.advancedSearch({ keyword, filters: JSON.stringify(filters) });
+      const data = Array.isArray(res) ? res : (res?.data ?? []);
+      setLands(data);
+    } catch (e) {
+      message.error(e.message || 'Tìm kiếm thất bại');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const openDetail = async (record) => {
     try {
@@ -117,12 +116,11 @@ const LandManagementPage = () => {
       align: 'center',
       render: v => {
         const displayValue = v || 'Chưa có';
-        const color = v === 'LUA' ? 'green' : 
-                     v === 'HNK' ? 'blue' : 
-                     v === 'CLN' ? 'orange' : 
-                     v === 'ONT*' ? 'purple' :
-                     !v ? 'default' : 'default';
-        
+        const color = v === 'LUA' ? 'green' :
+          v === 'HNK' ? 'blue' :
+          v === 'CLN' ? 'orange' :
+          v === 'ONT*' ? 'purple' :
+          !v ? 'default' : 'default';
         return (
           <Tag color={color} style={{ fontWeight: 500 }}>
             {displayValue}
@@ -197,8 +195,6 @@ const LandManagementPage = () => {
         }}
         size="middle"
       />
-
-      {/* Enhanced Detail Drawer */}
       <Drawer
         title={`Chi tiết thửa đất: ${selected?.id}`}
         width={800}
@@ -240,11 +236,11 @@ const LandManagementPage = () => {
                 <Col span={12}>
                   <Text strong>Tình trạng pháp lý:</Text>
                   <br />
-                  <Tag color={selected.legalStatus === 'LUA' ? 'green' : 
-                             selected.legalStatus === 'HNK' ? 'blue' : 
-                             selected.legalStatus === 'CLN' ? 'orange' : 
-                             selected.legalStatus === 'ONT*' ? 'purple' :
-                             !selected.legalStatus ? 'default' : 'default'}>
+                  <Tag color={selected.legalStatus === 'LUA' ? 'green' :
+                    selected.legalStatus === 'HNK' ? 'blue' :
+                    selected.legalStatus === 'CLN' ? 'orange' :
+                    selected.legalStatus === 'ONT*' ? 'purple' :
+                    !selected.legalStatus ? 'default' : 'default'}>
                     {selected.legalStatus || 'Chưa có'}
                   </Tag>
                   <Text type="secondary" style={{ marginLeft: 8 }}>
@@ -273,7 +269,6 @@ const LandManagementPage = () => {
                 </Col>
               </Row>
             </TabPane>
-
             <TabPane tab="Tài liệu liên quan" key="2">
               <List
                 header={<div><strong>Danh sách tài liệu ({selected.documentIds?.length || 0})</strong></div>}
@@ -305,47 +300,111 @@ const LandManagementPage = () => {
                 }}
               />
             </TabPane>
-
             <TabPane tab="Lịch sử thửa đất" key="3">
-              <div style={{ marginBottom: 16 }}>
-                <Button
-                  icon={<HistoryOutlined />}
-                  onClick={() => {
-                    openDetail(selected);
-                  }}
-                >
-                  Tải lại lịch sử
-                </Button>
-              </div>
-              <List
-                header={<div><strong>Lịch sử thay đổi thửa đất ({history.length})</strong></div>}
-                bordered
-                dataSource={history}
-                renderItem={(item, index) => (
-                  <List.Item>
-                    <List.Item.Meta
-                      title={`Thay đổi ${index + 1}`}
-                      description={
-                        <div>
-                          <div><strong>Transaction ID:</strong> {item.txId || 'N/A'}</div>
-                          <div><strong>Thời gian:</strong> {item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleString('vi-VN') : 'N/A'}</div>
-                          <div><strong>Trạng thái:</strong> {item.isDelete ? 'Vô hiệu' : 'Hiệu lực'}</div>
+              <div>
+                <div style={{ marginBottom: 16 }}>
+                  <Button
+                    icon={<HistoryOutlined />}
+                    onClick={() => {
+                      openDetail(selected);
+                    }}
+                  >
+                    Tải lại lịch sử
+                  </Button>
+                </div>
+                <List
+                  header={<div><strong>Lịch sử thay đổi thửa đất ({history.length})</strong></div>}
+                  bordered
+                  dataSource={history}
+                  renderItem={(item, index) => (
+                    <List.Item style={{ padding: '20px 24px' }}>
+                      <div style={{ width: '100%' }}>
+                        <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '2px solid #f0f0f0' }}>
+                          <Text strong style={{ fontSize: 16 }}>{`Thay đổi ${history.length - index}`}</Text>
+                          <div style={{ float: 'right' }}>
+                            {item.isDelete ? <Tag color="red">Vô hiệu</Tag> : <Tag color="green">Hiệu lực</Tag>}
+                          </div>
+                        </div>
+                        <div style={{ lineHeight: '1.8' }}>
+                          <div style={{ marginBottom: 12 }}>
+                            <Text strong>Transaction ID: </Text>
+                            <Text type="secondary" style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                              {item.txId || 'Chưa bổ sung'}
+                            </Text>
+                          </div>
+                          <div style={{ marginBottom: 12 }}>
+                            <Text strong>Timestamp: </Text>
+                            <Text type="secondary">
+                              {item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleString('vi-VN') : 'Chưa bổ sung'}
+                            </Text>
+                          </div>
                           {item.land && (
-                            <div style={{ marginTop: 8 }}>
-                              <div><strong>Diện tích:</strong> {item.land.area} m²</div>
-                              <div><strong>Mục đích sử dụng đất:</strong> {item.land.landUsePurpose}</div>
-                              <div><strong>Pháp lý:</strong> {item.land.legalStatus || 'Chưa có'}</div>
-                            </div>
+                            <>
+                              <div style={{ marginBottom: 12 }}>
+                                <Text strong>Diện tích: </Text>
+                                <Text type="secondary">{item.land.area || 'Chưa bổ sung'} m²</Text>
+                              </div>
+                              <div style={{ marginBottom: 12 }}>
+                                <Text strong>Vị trí: </Text>
+                                <Text type="secondary">{item.land.location || 'Chưa bổ sung'}</Text>
+                              </div>
+                              <div style={{ marginBottom: 12 }}>
+                                <Text strong>Mục đích sử dụng: </Text>
+                                {item.land.landUsePurpose ? (
+                                  <Tag color="blue">{item.land.landUsePurpose}</Tag>
+                                ) : (
+                                  <Text type="secondary">Chưa bổ sung</Text>
+                                )}
+                              </div>
+                              <div style={{ marginBottom: 12 }}>
+                                <Text strong>Tình trạng pháp lý: </Text>
+                                {item.land.legalStatus ? (
+                                  <Tag color="purple">{item.land.legalStatus}</Tag>
+                                ) : (
+                                  <Text type="secondary">Chưa bổ sung</Text>
+                                )}
+                              </div>
+                              <div style={{ marginBottom: 12 }}>
+                                <Text strong>Giấy chứng nhận: </Text>
+                                {item.land.certificateId ? (
+                                  <Tag color="green">{item.land.certificateId}</Tag>
+                                ) : (
+                                  <Text type="secondary">Chưa bổ sung</Text>
+                                )}
+                              </div>
+                              <div style={{ marginBottom: 12 }}>
+                                <Text strong>Ngày cấp giấy chứng nhận: </Text>
+                                <Text type="secondary">
+                                  {item.land.issueDate && item.land.issueDate !== '0001-01-01T00:00:00Z'
+                                    ? new Date(item.land.issueDate).toLocaleString('vi-VN')
+                                    : 'Chưa bổ sung'}
+                                </Text>
+                              </div>
+                              <div style={{ marginBottom: 12 }}>
+                                <Text strong>Thông tin pháp lý: </Text>
+                                <Text type="secondary">{item.land.legalInfo || 'Chưa bổ sung'}</Text>
+                              </div>
+                              <div style={{ marginBottom: 12 }}>
+                                <Text strong>Ngày tạo thửa đất: </Text>
+                                <Text type="secondary">
+                                  {item.land.createdAt ? new Date(item.land.createdAt).toLocaleString('vi-VN') : 'Chưa bổ sung'}
+                                </Text>
+                              </div>
+                              <div style={{ marginBottom: 12 }}>
+                                <Text strong>Ngày cập nhật cuối: </Text>
+                                <Text type="secondary">
+                                  {item.land.updatedAt ? new Date(item.land.updatedAt).toLocaleString('vi-VN') : 'Chưa bổ sung'}
+                                </Text>
+                              </div>
+                            </>
                           )}
                         </div>
-                      }
-                    />
-                  </List.Item>
-                )}
-                locale={{
-                  emptyText: 'Chưa có lịch sử thay đổi'
-                }}
-              />
+                      </div>
+                    </List.Item>
+                  )}
+                  locale={{ emptyText: 'Chưa có lịch sử thay đổi' }}
+                />
+              </div>
             </TabPane>
           </Tabs>
         )}
@@ -355,5 +414,3 @@ const LandManagementPage = () => {
 };
 
 export default LandManagementPage;
-
-

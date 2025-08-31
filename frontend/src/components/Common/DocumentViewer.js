@@ -135,8 +135,8 @@ const DocumentViewer = ({
                       
                       <div style={{ marginBottom: 12 }}>
                         <Text strong>Trạng thái xác thực: </Text>
-                        <Tag color={document.verified ? 'green' : 'orange'}>
-                          {document.verified ? 'Đã xác thực' : 'Chờ xác thực'}
+                        <Tag color={document.status === 'VERIFIED' ? 'green' : document.status === 'REJECTED' ? 'red' : 'orange'}>
+                          {document.status === 'VERIFIED' ? 'Đã xác thực' : document.status === 'REJECTED' ? 'Không hợp lệ' : 'Chờ xác thực'}
                         </Tag>
                       </div>
                       
@@ -260,12 +260,12 @@ const DocumentViewer = ({
                 <div style={{ padding: '16px 0' }}>
                   <div style={{ marginBottom: 12 }}>
                     <Text strong>Trạng thái: </Text>
-                    <Tag color={document.verified ? 'green' : 'orange'}>
-                      {document.verified ? 'Đã xác thực' : 'Chờ xác thực'}
+                    <Tag color={document.status === 'VERIFIED' ? 'green' : document.status === 'REJECTED' ? 'red' : 'orange'}>
+                      {document.status === 'VERIFIED' ? 'Đã xác thực' : document.status === 'REJECTED' ? 'Không hợp lệ' : 'Chờ xác thực'}
                     </Tag>
                   </div>
                   
-                  {document.verified && (
+                  {document.status === 'VERIFIED' && (
                     <>
                       <div style={{ marginBottom: 12 }}>
                         <Text strong>Người xác thực: </Text>

@@ -67,7 +67,7 @@ const DocumentManagementPage = () => {
 
   useEffect(() => {
     if (user?.userId) {
-      loadList();
+    loadList();
     }
     
     // Listen for document creation, update and delete events to auto-refresh
@@ -231,8 +231,7 @@ const DocumentManagementPage = () => {
         ipfsHash: ipfsHash,
         fileType: selectedFile.type || selectedFile.name.split('.').pop().toUpperCase(),
         fileSize: selectedFile.size,
-        verified: false, // Org3 tạo tài liệu sẽ chờ xác thực
-        verifiedBy: null
+        status: 'PENDING' // Org3 tạo tài liệu sẽ chờ xác thực
       });
       
       message.success('Tạo tài liệu thành công');
@@ -286,14 +285,13 @@ const DocumentManagementPage = () => {
     { title: 'Loại', dataIndex: 'type', key: 'type', render: v => <Tag>{v}</Tag> },
     { 
       title: 'Trạng thái', 
-      dataIndex: 'verified', 
-      key: 'verified', 
-      render: v => (
-        <Badge 
-          status={v ? 'success' : 'processing'} 
-          text={v ? 'Đã xác thực' : 'Chờ xác thực'} 
-        />
-      )
+      dataIndex: 'status', 
+      key: 'status', 
+      render: v => {
+        if (v === 'VERIFIED') return <Badge status="success" text="Đã xác thực" />;
+        if (v === 'REJECTED') return <Badge status="error" text="Không hợp lệ" />;
+        return <Badge status="processing" text="Chờ xác thực" />;
+      }
     },
     { title: 'Loại file', dataIndex: 'fileType', key: 'fileType', render: v => <Tag color="blue">{documentService.getDisplayFileType(v)}</Tag> },
     { title: 'Kích thước', dataIndex: 'fileSize', key: 'fileSize', render: v => v ? `${(v / 1024).toFixed(2)} KB` : 'N/A' },
@@ -429,7 +427,7 @@ const DocumentManagementPage = () => {
                             <Text type="secondary" style={{ fontSize: 13 }}>Mã: <code>{selected.docID}</code></Text>
                           </div>
                         </Col>
-                      </Row>
+            </Row>
                       
                       <Row gutter={24}>
                         <Col span={12}>
@@ -452,7 +450,7 @@ const DocumentManagementPage = () => {
                             </div>
                           </div>
                         </Col>
-                      </Row>
+            </Row>
                       
                       <Row gutter={24}>
                         <Col span={12}>
@@ -471,7 +469,7 @@ const DocumentManagementPage = () => {
                             </Text>
                           </div>
                         </Col>
-                      </Row>
+            </Row>
                       
                       <Row gutter={24}>
                         <Col span={12}>
@@ -490,7 +488,7 @@ const DocumentManagementPage = () => {
                             </Text>
                           </div>
                         </Col>
-                      </Row>
+            </Row>
                       
                       <Row gutter={24}>
                         <Col span={24}>
@@ -500,7 +498,7 @@ const DocumentManagementPage = () => {
                             <Text type="secondary" style={{ marginTop: 6, display: 'block', lineHeight: 1.6 }}>
                               {selected.description || 'Không có mô tả'}
                             </Text>
-                          </div>
+            </div>
                         </Col>
                       </Row>
                       
@@ -517,17 +515,17 @@ const DocumentManagementPage = () => {
                               >
                                 Xem trực tuyến
                               </Button>
-                              <Button 
-                                icon={<DownloadOutlined />} 
-                                onClick={() => handleDownload(selected)}
-                              >
+                  <Button 
+                    icon={<DownloadOutlined />} 
+                    onClick={() => handleDownload(selected)}
+                  >
                                 Tải về
-                              </Button>
+                  </Button>
                             </Space>
-                          </div>
+                </div>
                         </Col>
                       </Row>
-                    </div>
+            </div>
                   )
                 },
                 {
@@ -537,7 +535,7 @@ const DocumentManagementPage = () => {
                     <div style={{ padding: '16px 0' }}>
                       <div style={{ marginBottom: 16 }}>
                         <Text strong style={{ fontSize: 16 }}>Lịch sử thay đổi tài liệu</Text>
-                      </div>
+                </div>
                       
                       {/* Lịch sử thay đổi từ chaincode GetHistoryForKey */}
                       {documentHistory && documentHistory.length > 0 ? (
@@ -559,7 +557,7 @@ const DocumentManagementPage = () => {
                                     <Text type="secondary" style={{ fontSize: '12px' }}>
                                       {item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleString('vi-VN') : 'N/A'}
                                     </Text>
-                                  </div>
+                </div>
                                 </Col>
                               </Row>
                               
@@ -612,7 +610,7 @@ const DocumentManagementPage = () => {
                                     <br />
                                     <div style={{ marginTop: 4, padding: 8, background: '#f5f5f5', borderRadius: 4, fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>
                                       <Text type="secondary">{item.document.ipfsHash}</Text>
-                                    </div>
+              </div>
                                   </Col>
                                 </Row>
                               )}
@@ -624,8 +622,8 @@ const DocumentManagementPage = () => {
                           <Text type="secondary" style={{ fontSize: 14 }}>
                             Không có lịch sử thay đổi nào được tìm thấy
                           </Text>
-                        </div>
-                      )}
+              </div>
+            )}
                       
                       <Divider />
                       

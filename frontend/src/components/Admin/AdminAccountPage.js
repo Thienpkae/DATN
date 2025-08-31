@@ -71,8 +71,7 @@ const AdminAccountPage = () => {
       setStats({
         totalUsers: data.total || mapped.length,
         activeUsers: mapped.filter(x => x.status === 'active').length,
-        pendingUsers: 0,
-        totalOrganizations: 3
+        lockedUsers: mapped.filter(x => x.status === 'inactive').length,
       });
     } catch (error) {
       message.error(error.message || 'Failed to fetch users');
@@ -229,7 +228,6 @@ const AdminAccountPage = () => {
     switch (status) {
       case 'active': return 'green';
       case 'inactive': return 'red';
-      case 'pending': return 'orange';
       default: return 'default';
     }
   };
@@ -299,14 +297,13 @@ const AdminAccountPage = () => {
       key: 'status',
       render: (status) => (
         <Tag color={getStatusColor(status)}>
-          {status === 'active' ? 'Hoạt động' : status === 'inactive' ? 'Đã khóa' : 'Chờ duyệt'}
+          {status === 'active' ? 'Hoạt động' : 'Đã khóa'}
         </Tag>
       ),
       filters: [
         { text: 'Hoạt động', value: 'active' },
         { text: 'Đã khóa', value: 'inactive' },
-        { text: 'Chờ duyệt', value: 'pending' },
-      ],
+      ],      
     },
     {
       title: 'Ngày tạo',
@@ -393,14 +390,15 @@ const AdminAccountPage = () => {
         <Col span={6}>
           <Card>
             <Statistic
-              title="Chờ duyệt"
-              value={stats.pendingUsers || 0}
-              prefix={<UserOutlined />}
+              title="Đã khóa"
+              value={stats.lockedUsers || 0}
+              prefix={<LockOutlined />}
               valueStyle={{ color: '#cf1322' }}
             />
           </Card>
         </Col>
       </Row>
+
 
       {/* Main Content */}
       <Card
@@ -422,13 +420,11 @@ const AdminAccountPage = () => {
               allowClear
               options={[
                 { label: 'Hoạt động', value: 'active' },
-                { label: 'Đã khóa', value: 'inactive' },
-                { label: 'Chờ duyệt', value: 'pending' },
+                { label: 'Đã khóa', value: 'inactive' },                
               ]}
             >
               <Option value="active">Hoạt động</Option>
               <Option value="inactive">Đã khóa</Option>
-              <Option value="pending">Chờ duyệt</Option>
             </Select>
             <Button icon={<ReloadOutlined />} onClick={fetchUsers}>
               Tải lại

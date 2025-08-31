@@ -16,7 +16,15 @@ const landService = {
             // Validate and convert area
             const areaStr = area !== undefined && area !== null ? area.toString() : '';
             if (!areaStr || isNaN(parseFloat(areaStr)) || parseFloat(areaStr) < 0) {
-            throw new Error('Diện tích không hợp lệ');
+                throw new Error('Diện tích không hợp lệ');
+            }
+
+            // Validate certificate information - khi có trạng thái pháp lý thì phải có đầy đủ thông tin GCN
+            // Trừ các trạng thái đặc biệt: "", "Đang tranh chấp", "Đang thế chấp"
+            if (legalStatus && legalStatus !== "" && legalStatus !== "Đang tranh chấp" && legalStatus !== "Đang thế chấp") {
+                if (!certificateId || !legalInfo) {
+                    throw new Error(`Khi có trạng thái pháp lý '${legalStatus}', certificateId và legalInfo là bắt buộc`);
+                }
             }
 
             await contract.submitTransaction(
@@ -49,7 +57,7 @@ const landService = {
             res.json({
                 success: true,
                 message: 'Thửa đất đã được tạo thành công và thông báo đã được gửi',
-                data: JSON.parse(landResult.toString())
+                data: landResult ? JSON.parse(landResult.toString()) : null
             });
         } catch (error) {
             console.error('Error creating land parcel:', error);
@@ -73,19 +81,27 @@ const landService = {
 
             // Get current land parcel data to fill missing fields
             const currentLandResult = await contract.evaluateTransaction('QueryLandByID', id, userID);
-            const currentLand = JSON.parse(currentLandResult.toString());
+            const currentLand = currentLandResult ? JSON.parse(currentLandResult.toString()) : {};
 
             // Use current values for fields not provided in update
-            const finalArea = area !== undefined && area !== null ? area.toString() : currentLand.area.toString();
-            const finalLocation = location !== undefined ? location : currentLand.location;
-            const finalLandUsePurpose = landUsePurpose !== undefined ? landUsePurpose : currentLand.landUsePurpose;
-            const finalLegalStatus = legalStatus !== undefined ? legalStatus : currentLand.legalStatus;
-            const finalCertificateId = certificateId !== undefined ? certificateId : currentLand.certificateID;
-            const finalLegalInfo = legalInfo !== undefined ? legalInfo : currentLand.legalInfo;
+            const finalArea = area !== undefined && area !== null ? area.toString() : (currentLand.area !== undefined && currentLand.area !== null ? currentLand.area.toString() : '0');
+            const finalLocation = location !== undefined ? location : (currentLand.location || '');
+            const finalLandUsePurpose = landUsePurpose !== undefined ? landUsePurpose : (currentLand.landUsePurpose || '');
+            const finalLegalStatus = legalStatus !== undefined ? legalStatus : (currentLand.legalStatus || '');
+            const finalCertificateId = certificateId !== undefined ? certificateId : (currentLand.certificateID || '');
+            const finalLegalInfo = legalInfo !== undefined ? legalInfo : (currentLand.legalInfo || '');
 
             // Validate area if provided
             if (area !== undefined && area !== null && (isNaN(parseFloat(finalArea)) || parseFloat(finalArea) < 0)) {
                 throw new Error('Diện tích không hợp lệ');
+            }
+
+            // Validate certificate information - khi có trạng thái pháp lý thì phải có đầy đủ thông tin GCN
+            // Trừ các trạng thái đặc biệt: "", "Đang tranh chấp", "Đang thế chấp"
+            if (finalLegalStatus && finalLegalStatus !== "" && finalLegalStatus !== "Đang tranh chấp" && finalLegalStatus !== "Đang thế chấp") {
+                if (!finalCertificateId || !finalLegalInfo) {
+                    throw new Error(`Khi có trạng thái pháp lý '${finalLegalStatus}', certificateId và legalInfo là bắt buộc`);
+                }
             }
 
             await contract.submitTransaction(
@@ -109,7 +125,7 @@ const landService = {
             res.json({
                 success: true,
                 message: 'Thửa đất đã được cập nhật thành công',
-                data: JSON.parse(landResult.toString())
+                data: landResult ? JSON.parse(landResult.toString()) : null
             });
         } catch (error) {
             console.error('Error updating land parcel:', error);
@@ -155,7 +171,7 @@ const landService = {
             res.json({
                 success: true,
                 message: 'Giấy chứng nhận đã được cấp thành công và thông báo đã được gửi',
-                data: JSON.parse(landResult.toString())
+                data: landResult ? JSON.parse(landResult.toString()) : null
             });
         } catch (error) {
             console.error('Error issuing land certificate:', error);
@@ -182,7 +198,7 @@ const landService = {
                 userID
             );
 
-            const land = JSON.parse(result.toString());
+            const land = result ? JSON.parse(result.toString()) : null;
             res.json({
                 success: true,
                 data: land
@@ -212,7 +228,7 @@ const landService = {
                 userID
             );
 
-            const lands = JSON.parse(result.toString());
+            const lands = result ? JSON.parse(result.toString()) : [];
             res.json({
                 success: true,
                 data: lands
@@ -251,7 +267,7 @@ const landService = {
                 userID
             );
 
-            const lands = JSON.parse(result.toString());
+            const lands = result ? JSON.parse(result.toString()) : [];
             res.json({
                 success: true,
                 data: lands
@@ -279,7 +295,7 @@ const landService = {
                 userID
             );
 
-            const lands = JSON.parse(result.toString());
+            const lands = result ? JSON.parse(result.toString()) : [];
             res.json({
                 success: true,
                 data: lands
@@ -309,7 +325,7 @@ const landService = {
                 userID
             );
 
-            const history = JSON.parse(result.toString());
+            const history = result ? JSON.parse(result.toString()) : [];
             res.json({
                 success: true,
                 data: history

@@ -8,7 +8,7 @@ const documentService = {
     // Create document
     async createDocument(req, res) {
         try {
-            const { docID, docType, title, description, ipfsHash, fileType, fileSize, verified } = req.body;
+            const { docID, docType, title, description, ipfsHash, fileType, fileSize, status } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
@@ -25,6 +25,9 @@ const documentService = {
             // Use description directly
             const finalDescription = description || '';
 
+            // Set default status if not provided
+            const documentStatus = status || 'PENDING';
+
             // Create document using existing function
             await contract.submitTransaction(
                 'CreateDocument',
@@ -35,8 +38,8 @@ const documentService = {
                 ipfsHash,
                 fileType,
                 fileSize || 0,
-                verified || false,
-                verified ? userID : ''
+                documentStatus,
+                documentStatus === 'VERIFIED' ? userID : ''
             );
 
             // Send notification to user
@@ -67,70 +70,99 @@ const documentService = {
         }
     },
 
-    // Link document to land parcel (after verification)
+    // Link documents to land parcel (supports multiple documents) - UC-17
     async linkDocumentToLand(req, res) {
         try {
-            const { docID, landParcelId } = req.body;
+            const { docIDs, landParcelId } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
+            // Validate input
+            if (!docIDs || (!Array.isArray(docIDs) && typeof docIDs !== 'string')) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'docIDs phải là mảng ID tài liệu hoặc ID đơn lẻ'
+                });
+            }
+
             const { contract } = await connectToNetwork(org, userID);
+
+            // Convert to JSON string if array, keep as string if single ID
+            const docIDsParam = Array.isArray(docIDs) ? JSON.stringify(docIDs) : docIDs;
 
             await contract.submitTransaction(
                 'LinkDocumentToLand',
-                docID,
+                docIDsParam,
                 landParcelId
             );
 
+            const responseMessage = Array.isArray(docIDs) && docIDs.length > 1 
+                ? `${docIDs.length} tài liệu bổ sung đã được liên kết với thửa đất thành công`
+                : 'Tài liệu bổ sung đã được liên kết với thửa đất thành công';
+
             res.json({
                 success: true,
-                message: 'Tài liệu đã được liên kết với thửa đất thành công',
+                message: responseMessage,
                 data: {
-                    docID,
+                    docIDs: Array.isArray(docIDs) ? docIDs : [docIDs],
                     landParcelId,
                     linkedAt: new Date().toISOString()
                 }
             });
         } catch (error) {
-            console.error('Error linking document to land:', error);
+            console.error('Error linking documents to land:', error);
             res.status(500).json({
                 success: false,
-                message: 'Lỗi khi liên kết tài liệu với thửa đất',
+                message: 'Lỗi khi liên kết tài liệu bổ sung với thửa đất',
                 error: error.message
             });
         }
     },
 
-    // Link document to transaction (after verification)
+    // Link supplement documents to transaction (supports multiple documents) - UC-18
     async linkDocumentToTransaction(req, res) {
         try {
-            const { docID, transactionId } = req.body;
+            const { docIDs, transactionId } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
-            // For document updates, we need to upload a new document with updated information
+            // Validate input
+            if (!docIDs || (!Array.isArray(docIDs) && typeof docIDs !== 'string')) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'docIDs phải là mảng ID tài liệu hoặc ID đơn lẻ'
+                });
+            }
+
             const { contract } = await connectToNetwork(org, userID);
+
+            // Convert to JSON string if array, keep as string if single ID
+            const docIDsParam = Array.isArray(docIDs) ? JSON.stringify(docIDs) : docIDs;
 
             await contract.submitTransaction(
                 'LinkDocumentToTransaction',
-                docID,
+                docIDsParam,
                 transactionId
             );
 
+            const responseMessage = Array.isArray(docIDs) && docIDs.length > 1 
+                ? `${docIDs.length} tài liệu bổ sung đã được liên kết với giao dịch thành công`
+                : 'Tài liệu bổ sung đã được liên kết với giao dịch thành công';
+
             res.json({
                 success: true,
-                message: 'Tài liệu đã được liên kết với giao dịch thành công',
+                message: responseMessage,
                 data: {
-                    docID,
+                    docIDs: Array.isArray(docIDs) ? docIDs : [docIDs],
                     transactionId,
                     linkedAt: new Date().toISOString()
                 }
             });
         } catch (error) {
-            console.error('Error linking document to transaction:', error);
+            console.error('Error linking supplement documents to transaction:', error);
             res.status(500).json({
                 success: false,
-                message: 'Lỗi khi liên kết tài liệu với giao dịch',
+                message: 'Lỗi khi liên kết tài liệu bổ sung với giao dịch',
                 error: error.message
             });
         }

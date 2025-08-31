@@ -148,7 +148,7 @@ const Login = ({ onLogin }) => {
               borderRadius: '16px',
               overflow: 'hidden'
             }}
-            bodyStyle={{ padding: '32px' }}
+            styles={{ body: { padding: '32px' } }}
           >
             {/* Header Section */}
             <div style={{ 

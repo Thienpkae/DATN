@@ -4,30 +4,54 @@ const notificationService = require('./notificationService');
 
 // Transaction Service - Handles all transaction operations
 const transactionService = {
-    // Process a transaction
+    // Process a transaction with 3 decision states (UC-31)
     async processTransaction(req, res) {
         try {
             const { txID } = req.params;
+            const { decision, reason } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
+
+            // Validate decision
+            if (!['APPROVE', 'SUPPLEMENT', 'REJECT'].includes(decision)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Quyết định không hợp lệ. Sử dụng: APPROVE, SUPPLEMENT, hoặc REJECT'
+                });
+            }
+
+            // Validate reason for REJECT
+            if (decision === 'REJECT' && !reason) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Phải có lý do khi từ chối hồ sơ'
+                });
+            }
 
             const { contract } = await connectToNetwork(org, userID);
 
             await contract.submitTransaction(
                 'ProcessTransaction',
-                txID
+                txID,
+                decision,
+                reason || ''
             );
 
             // Get the updated transaction to return as response data
             const transactionResult = await contract.evaluateTransaction(
                 'QueryTransactionByID',
-                txID,
-                userID
+                txID
             );
+
+            const actionMessage = {
+                'APPROVE': 'Giao dịch đã được xác nhận đạt yêu cầu',
+                'SUPPLEMENT': 'Đã yêu cầu bổ sung tài liệu cho giao dịch',
+                'REJECT': 'Giao dịch đã bị từ chối'
+            };
 
             res.json({
                 success: true,
-                message: 'Giao dịch đã được xử lý thành công',
+                message: actionMessage[decision],
                 data: JSON.parse(transactionResult.toString())
             });
         } catch (error) {
@@ -43,55 +67,65 @@ const transactionService = {
     // Create transfer request
     async createTransferRequest(req, res) {
         try {
-            const { txID, landParcelId, fromOwnerId, toOwnerId, documentIds } = req.body;
+            const { landParcelId, toOwnerId, documentIds, reason } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
             const { contract } = await connectToNetwork(org, userID);
 
+            // Tạo giao dịch với documents - chaincode sẽ tự động tạo txID và link documents
+            const documentIdsStr = documentIds && Array.isArray(documentIds) ? JSON.stringify(documentIds) : "[]";
             await contract.submitTransaction(
                 'CreateTransferRequest',
-                txID,
                 landParcelId,
-                fromOwnerId,
-                toOwnerId
+                toOwnerId,
+                documentIdsStr,
+                reason || ''
             );
 
-            // Link documents if provided
-            if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
-                for (const docID of documentIds) {
-                    try {
-                        await contract.submitTransaction(
-                            'LinkDocumentToTransaction',
-                            docID,
-                            txID
-                        );
-                    } catch (linkError) {
-                        console.warn(`Warning: Could not link document ${docID} to transaction ${txID}:`, linkError.message);
-                        // Continue with other documents instead of failing completely
-                    }
-                }
+            // Tìm giao dịch vừa tạo
+            let createdTransaction = null;
+            try {
+                const allTransactionsResult = await contract.evaluateTransaction(
+                    'QueryTransactionsByOwner',
+                    userID
+                );
+                const allTransactions = JSON.parse(allTransactionsResult.toString());
+                
+                // Tìm transaction vừa tạo (có timestamp gần nhất và type TRANSFER)
+                createdTransaction = allTransactions
+                    .filter(tx => tx.type === 'TRANSFER' && tx.landParcelId === landParcelId && tx.toOwnerId === toOwnerId)
+                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+                    
+            } catch (queryError) {
+                console.warn('Could not find created transaction:', queryError.message);
             }
 
-            // Get the created transaction to return as response data
-            const transactionResult = await contract.evaluateTransaction(
-                'QueryTransactionByID',
-                txID,
-                userID
-            );
+            const actualTxID = createdTransaction ? createdTransaction.txId : null;
+
+            // Get the final transaction data
+            let transactionResult = null;
+            if (actualTxID) {
+                transactionResult = await contract.evaluateTransaction(
+                    'QueryTransactionByID',
+                    actualTxID
+                );
+            }
 
             // Send notifications to both parties
-            await notificationService.notifyTransferRequest(
-                fromOwnerId,  // Person creating the request
-                toOwnerId,    // Person receiving the request
-                txID, 
-                landParcelId
-            );
+            if (actualTxID) {
+                await notificationService.notifyTransferRequest(
+                    userID,     // requester (fromOwner is caller)
+                    toOwnerId,  // recipient
+                    actualTxID, 
+                    landParcelId
+                );
+            }
 
             res.json({
                 success: true,
                 message: `Yêu cầu chuyển nhượng đã được tạo thành công${documentIds?.length > 0 ? ` với ${documentIds.length} tài liệu đính kèm` : ''} và thông báo đã được gửi`,
-                data: JSON.parse(transactionResult.toString())
+                data: transactionResult ? JSON.parse(transactionResult.toString()) : { success: true, txID: actualTxID }
             });
         } catch (error) {
             console.error('Error creating transfer request:', error);
@@ -122,8 +156,7 @@ const transactionService = {
             // Get the updated transaction to return as response data
             const transactionResult = await contract.evaluateTransaction(
                 'QueryTransactionByID',
-                txID,
-                userID
+                txID
             );
 
             // Send notification to both parties
@@ -152,47 +185,55 @@ const transactionService = {
     // Create split request
     async createSplitRequest(req, res) {
         try {
-            const { txID, landParcelID, ownerID, newParcels, documentIds } = req.body;
+            const { landParcelID, newParcels, documentIds, reason } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
             const { contract } = await connectToNetwork(org, userID);
 
             const newParcelsStr = JSON.stringify(newParcels);
+            const documentIdsStr = documentIds && Array.isArray(documentIds) ? JSON.stringify(documentIds) : "[]";
             await contract.submitTransaction(
                 'CreateSplitRequest',
-                txID,
                 landParcelID,
-                ownerID,
-                newParcelsStr
+                newParcelsStr,
+                documentIdsStr,
+                reason || ''
             );
 
-            // Link documents if provided
-            if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
-                for (const docID of documentIds) {
-                    try {
-                        await contract.submitTransaction(
-                            'LinkDocumentToTransaction',
-                            docID,
-                            txID
-                        );
-                    } catch (linkError) {
-                        console.warn(`Warning: Could not link document ${docID} to transaction ${txID}:`, linkError.message);
-                    }
-                }
+            // Tìm giao dịch vừa tạo
+            let createdTransaction = null;
+            try {
+                const allTransactionsResult = await contract.evaluateTransaction(
+                    'QueryTransactionsByOwner',
+                    userID
+                );
+                const allTransactions = JSON.parse(allTransactionsResult.toString());
+                
+                createdTransaction = allTransactions
+                    .filter(tx => tx.type === 'SPLIT' && tx.landParcelId === landParcelID)
+                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+                    
+            } catch (queryError) {
+                console.warn('Could not find created transaction:', queryError.message);
             }
 
-            // Get the created transaction to return as response data
-            const transactionResult = await contract.evaluateTransaction(
-                'QueryTransactionByID',
-                txID,
-                userID
-            );
+            const actualTxID = createdTransaction ? createdTransaction.txId : null;
+
+            // Get the final transaction data
+            let transactionResult = null;
+            if (actualTxID) {
+                transactionResult = await contract.evaluateTransaction(
+                    'QueryTransactionByID',
+                    actualTxID,
+                    userID
+                );
+            }
 
             res.json({
                 success: true,
                 message: `Yêu cầu tách thửa đã được tạo thành công${documentIds?.length > 0 ? ` với ${documentIds.length} tài liệu đính kèm` : ''}`,
-                data: JSON.parse(transactionResult.toString())
+                data: transactionResult ? JSON.parse(transactionResult.toString()) : { success: true, txID: actualTxID }
             });
         } catch (error) {
             console.error('Error creating split request:', error);
@@ -207,7 +248,7 @@ const transactionService = {
     // Create merge request
     async createMergeRequest(req, res) {
         try {
-            const { txID, ownerID, parcelIDs, newParcel, documentIds } = req.body;
+            const { parcelIDs, newParcel, documentIds, reason } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
@@ -215,40 +256,48 @@ const transactionService = {
 
             const parcelIDsStr = JSON.stringify(parcelIDs);
             const newParcelStr = JSON.stringify(newParcel);
+            const documentIdsStr = documentIds && Array.isArray(documentIds) ? JSON.stringify(documentIds) : "[]";
             await contract.submitTransaction(
                 'CreateMergeRequest',
-                txID,
-                ownerID,
                 parcelIDsStr,
-                newParcelStr
+                newParcelStr,
+                documentIdsStr,
+                reason || ''
             );
 
-            // Link documents if provided
-            if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
-                for (const docID of documentIds) {
-                    try {
-                        await contract.submitTransaction(
-                            'LinkDocumentToTransaction',
-                            docID,
-                            txID
-                        );
-                    } catch (linkError) {
-                        console.warn(`Warning: Could not link document ${docID} to transaction ${txID}:`, linkError.message);
-                    }
-                }
+            // Tìm giao dịch vừa tạo
+            let createdTransaction = null;
+            try {
+                const allTransactionsResult = await contract.evaluateTransaction(
+                    'QueryTransactionsByOwner',
+                    userID
+                );
+                const allTransactions = JSON.parse(allTransactionsResult.toString());
+                
+                createdTransaction = allTransactions
+                    .filter(tx => tx.type === 'MERGE' && tx.landParcelId === newParcel.id)
+                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+                    
+            } catch (queryError) {
+                console.warn('Could not find created transaction:', queryError.message);
             }
 
-            // Get the created transaction to return as response data
-            const transactionResult = await contract.evaluateTransaction(
-                'QueryTransactionByID',
-                txID,
-                userID
-            );
+            const actualTxID = createdTransaction ? createdTransaction.txId : null;
+
+            // Get the final transaction data
+            let transactionResult = null;
+            if (actualTxID) {
+                transactionResult = await contract.evaluateTransaction(
+                    'QueryTransactionByID',
+                    actualTxID,
+                    userID
+                );
+            }
 
             res.json({
                 success: true,
                 message: `Yêu cầu hợp thửa đã được tạo thành công${documentIds?.length > 0 ? ` với ${documentIds.length} tài liệu đính kèm` : ''}`,
-                data: JSON.parse(transactionResult.toString())
+                data: transactionResult ? JSON.parse(transactionResult.toString()) : { success: true, txID: actualTxID }
             });
         } catch (error) {
             console.error('Error creating merge request:', error);
@@ -263,46 +312,53 @@ const transactionService = {
     // Create change purpose request
     async createChangePurposeRequest(req, res) {
         try {
-            const { txID, landParcelID, ownerID, newPurpose, documentIds } = req.body;
+            const { landParcelID, newPurpose, documentIds, reason } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
             const { contract } = await connectToNetwork(org, userID);
 
+            const documentIdsStr = documentIds && Array.isArray(documentIds) ? JSON.stringify(documentIds) : "[]";
             await contract.submitTransaction(
                 'CreateChangePurposeRequest',
-                txID,
                 landParcelID,
-                ownerID,
-                newPurpose
+                newPurpose,
+                documentIdsStr,
+                reason || ''
             );
 
-            // Link documents if provided
-            if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
-                for (const docID of documentIds) {
-                    try {
-                        await contract.submitTransaction(
-                            'LinkDocumentToTransaction',
-                            docID,
-                            txID
-                        );
-                    } catch (linkError) {
-                        console.warn(`Warning: Could not link document ${docID} to transaction ${txID}:`, linkError.message);
-                    }
-                }
+            // Tìm giao dịch vừa tạo
+            let createdTransaction = null;
+            try {
+                const allTransactionsResult = await contract.evaluateTransaction(
+                    'QueryTransactionsByOwner',
+                    userID
+                );
+                const allTransactions = JSON.parse(allTransactionsResult.toString());
+                
+                createdTransaction = allTransactions
+                    .filter(tx => tx.type === 'CHANGE_PURPOSE' && tx.landParcelId === landParcelID)
+                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+                    
+            } catch (queryError) {
+                console.warn('Could not find created transaction:', queryError.message);
             }
 
+            const actualTxID = createdTransaction ? createdTransaction.txId : null;
+
             // Get the created transaction to return as response data
-            const transactionResult = await contract.evaluateTransaction(
-                'QueryTransactionByID',
-                txID,
-                userID
-            );
+            let transactionResult = null;
+            if (actualTxID) {
+                transactionResult = await contract.evaluateTransaction(
+                    'QueryTransactionByID',
+                    actualTxID
+                );
+            }
 
             res.json({
                 success: true,
                 message: `Yêu cầu thay đổi mục đích sử dụng đã được tạo thành công${documentIds?.length > 0 ? ` với ${documentIds.length} tài liệu đính kèm` : ''}`,
-                data: JSON.parse(transactionResult.toString())
+                data: transactionResult ? JSON.parse(transactionResult.toString()) : { success: true, txID: actualTxID }
             });
         } catch (error) {
             console.error('Error creating change purpose request:', error);
@@ -317,45 +373,52 @@ const transactionService = {
     // Create reissue request
     async createReissueRequest(req, res) {
         try {
-            const { txID, landParcelID, ownerID, documentIds } = req.body;
+            const { landParcelID, documentIds, reason } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
             const { contract } = await connectToNetwork(org, userID);
 
+            const documentIdsStr = documentIds && Array.isArray(documentIds) ? JSON.stringify(documentIds) : "[]";
             await contract.submitTransaction(
                 'CreateReissueRequest',
-                txID,
                 landParcelID,
-                ownerID
+                documentIdsStr,
+                reason || ''
             );
 
-            // Link documents if provided
-            if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
-                for (const docID of documentIds) {
-                    try {
-                        await contract.submitTransaction(
-                            'LinkDocumentToTransaction',
-                            docID,
-                            txID
-                        );
-                    } catch (linkError) {
-                        console.warn(`Warning: Could not link document ${docID} to transaction ${txID}:`, linkError.message);
-                    }
-                }
+            // Tìm giao dịch vừa tạo
+            let createdTransaction = null;
+            try {
+                const allTransactionsResult = await contract.evaluateTransaction(
+                    'QueryTransactionsByOwner',
+                    userID
+                );
+                const allTransactions = JSON.parse(allTransactionsResult.toString());
+                
+                createdTransaction = allTransactions
+                    .filter(tx => tx.type === 'REISSUE' && tx.landParcelId === landParcelID)
+                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+                    
+            } catch (queryError) {
+                console.warn('Could not find created transaction:', queryError.message);
             }
 
+            const actualTxID = createdTransaction ? createdTransaction.txId : null;
+
             // Get the created transaction to return as response data
-            const transactionResult = await contract.evaluateTransaction(
-                'QueryTransactionByID',
-                txID,
-                userID
-            );
+            let transactionResult = null;
+            if (actualTxID) {
+                transactionResult = await contract.evaluateTransaction(
+                    'QueryTransactionByID',
+                    actualTxID
+                );
+            }
 
             res.json({
                 success: true,
                 message: `Yêu cầu cấp lại GCN đã được tạo thành công${documentIds?.length > 0 ? ` với ${documentIds.length} tài liệu đính kèm` : ''}`,
-                data: JSON.parse(transactionResult.toString())
+                data: transactionResult ? JSON.parse(transactionResult.toString()) : { success: true, txID: actualTxID }
             });
         } catch (error) {
             console.error('Error creating reissue request:', error);
@@ -384,8 +447,7 @@ const transactionService = {
             // Get the updated transaction to return as response data
             const transactionResult = await contract.evaluateTransaction(
                 'QueryTransactionByID',
-                txID,
-                userID
+                txID
             );
 
             res.json({
@@ -420,8 +482,7 @@ const transactionService = {
             // Get the updated transaction to return as response data
             const transactionResult = await contract.evaluateTransaction(
                 'QueryTransactionByID',
-                txID,
-                userID
+                txID
             );
 
             res.json({
@@ -456,8 +517,7 @@ const transactionService = {
             // Get the updated transaction to return as response data
             const transactionResult = await contract.evaluateTransaction(
                 'QueryTransactionByID',
-                txID,
-                userID
+                txID
             );
 
             res.json({
@@ -491,8 +551,7 @@ const transactionService = {
             // Get the updated transaction to return as response data
             const transactionResult = await contract.evaluateTransaction(
                 'QueryTransactionByID',
-                txID,
-                userID
+                txID
             );
 
             res.json({
@@ -526,8 +585,7 @@ const transactionService = {
             // Get the updated transaction to return as response data
             const transactionResult = await contract.evaluateTransaction(
                 'QueryTransactionByID',
-                txID,
-                userID
+                txID
             );
 
             res.json({
@@ -561,8 +619,7 @@ const transactionService = {
             // Get the updated transaction to return as response data
             const transactionResult = await contract.evaluateTransaction(
                 'QueryTransactionByID',
-                txID,
-                userID
+                txID
             );
 
             res.json({
@@ -605,8 +662,7 @@ const transactionService = {
             // Get the updated transaction to return as response data
             const transactionResult = await contract.evaluateTransaction(
                 'QueryTransactionByID',
-                txID,
-                userID
+                txID
             );
 
             res.json({
@@ -643,8 +699,7 @@ const transactionService = {
             // Get the updated transaction to return as response data
             const transactionResult = await contract.evaluateTransaction(
                 'QueryTransactionByID',
-                txID,
-                userID
+                txID
             );
 
             res.json({
@@ -673,8 +728,7 @@ const transactionService = {
             
             const result = await contract.evaluateTransaction(
                 'QueryTransactionByID',
-                txID,
-                userID
+                txID
             );
 
             const transaction = JSON.parse(result.toString());
@@ -705,8 +759,7 @@ const transactionService = {
             const result = await contract.evaluateTransaction(
                 'QueryTransactionsByKeyword',
                 keyword || '',
-                filtersJSON,
-                userID
+                filtersJSON
             );
 
             const transactions = JSON.parse(result.toString());
@@ -736,8 +789,7 @@ const transactionService = {
             const result = await contract.evaluateTransaction(
                 'QueryTransactionsByKeyword',
                 '',
-                JSON.stringify({ landParcelId: landParcelID }),
-                userID
+                JSON.stringify({ landParcelId: landParcelID })
             );
 
             const transactions = JSON.parse(result.toString());
@@ -766,8 +818,7 @@ const transactionService = {
             
             const result = await contract.evaluateTransaction(
                 'GetTransactionHistory',
-                txID,
-                userID
+                txID
             );
 
             const history = JSON.parse(result.toString());
@@ -796,8 +847,7 @@ const transactionService = {
 
             const result = await contract.evaluateTransaction(
                 'QueryTransactionsByStatus',
-                status,
-                userID
+                status
             );
 
             const transactions = JSON.parse(result.toString());
@@ -826,8 +876,7 @@ const transactionService = {
 
             const result = await contract.evaluateTransaction(
                 'QueryTransactionsByOwner',
-                ownerID,
-                userID
+                ownerID
             );
 
             const transactions = JSON.parse(result.toString());
@@ -854,8 +903,7 @@ const transactionService = {
             const { contract } = await connectToNetwork(org, userID);
 
             const result = await contract.evaluateTransaction(
-                'QueryAllTransactions',
-                userID
+                'QueryAllTransactions'
             );
 
             const transactions = JSON.parse(result.toString());
