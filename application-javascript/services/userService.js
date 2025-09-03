@@ -45,13 +45,31 @@ const updateProfile = async (req, res) => {
     const { fullName, phone } = req.body;
     const { cccd } = req.user;
     try {
+        const currentUser = await User.findOne({ cccd });
+        if (!currentUser) {
+            return res.status(404).json({ error: 'Không tìm thấy người dùng' });
+        }
+
         const updateData = {};
+        let phoneChanged = false;
+
         if (fullName) updateData.fullName = sanitizeInput(fullName);
+        
         if (phone) {
             validatePhone(phone);
-            updateData.phone = phone;
-            updateData.isPhoneVerified = false;
+            // Kiểm tra xem số điện thoại có thay đổi không
+            if (phone !== currentUser.phone) {
+                phoneChanged = true;
+                // Kiểm tra số điện thoại đã tồn tại chưa
+                const existingUser = await User.findOne({ phone, cccd: { $ne: cccd } });
+                if (existingUser) {
+                    return res.status(400).json({ error: 'Số điện thoại đã tồn tại' });
+                }
+                updateData.phone = phone;
+                updateData.isPhoneVerified = false; // Yêu cầu xác thực lại
+            }
         }
+
         const user = await User.findOneAndUpdate(
             { cccd },
             updateData,
@@ -65,7 +83,17 @@ const updateProfile = async (req, res) => {
             console.error('Notification error:', notificationError);
         }
 
-        res.json({ message: 'Cập nhật hồ sơ thành công và thông báo đã được gửi', user });
+        let message = 'Cập nhật hồ sơ thành công và thông báo đã được gửi';
+        if (phoneChanged) {
+            message += '. Vui lòng xác thực số điện thoại mới để tiếp tục sử dụng tài khoản.';
+        }
+
+        res.json({ 
+            message, 
+            user,
+            phoneChanged,
+            requiresVerification: phoneChanged
+        });
     } catch (error) {
         if (error.code === 11000) {
             return res.status(400).json({ error: 'Số điện thoại đã tồn tại' });
@@ -165,11 +193,125 @@ const getCurrentUser = async (req, res) => {
     }
 };
 
+const getSelfByCccd = async (req, res) => {
+    try {
+        const { cccd } = req.params;
+        const requestingUserCccd = req.user.cccd;
+        
+        // Chỉ cho phép user lấy thông tin của chính mình
+        if (sanitizeInput(cccd) !== requestingUserCccd) {
+            return res.status(403).json({ error: 'Bạn chỉ có thể xem thông tin của chính mình' });
+        }
+        
+        const user = await User.findOne({ cccd: sanitizeInput(cccd) }).select('-password -otp -otpExpires');
+        if (!user) {
+            return res.status(404).json({ error: 'Không tìm thấy người dùng' });
+        }
+        
+        res.json({ user });
+    } catch (error) {
+        res.status(500).json({ error: `Lấy thông tin người dùng thất bại: ${error.message}` });
+    }
+};
+
+const requestPhoneVerification = async (req, res) => {
+    const { cccd } = req.user;
+    try {
+        const user = await User.findOne({ cccd });
+        if (!user) {
+            return res.status(404).json({ error: 'Không tìm thấy người dùng' });
+        }
+
+        if (user.isPhoneVerified) {
+            return res.status(400).json({ error: 'Số điện thoại đã được xác thực' });
+        }
+
+        const { sendOTP } = require('../enroll/registerUser');
+        const { otp, otpExpires } = await sendOTP(user.phone);
+        
+        user.otp = otp;
+        user.otpExpires = otpExpires;
+        user.otpAttempts = 0;
+        await user.save();
+
+        res.json({ 
+            message: 'OTP đã được gửi đến số điện thoại mới', 
+            phone: user.phone 
+        });
+    } catch (error) {
+        res.status(500).json({ error: `Gửi OTP thất bại: ${error.message}` });
+    }
+};
+
+const verifyPhoneChange = async (req, res) => {
+    const { otp } = req.body;
+    const { cccd } = req.user;
+    try {
+        const user = await User.findOne({ cccd });
+        if (!user) {
+            return res.status(404).json({ error: 'Không tìm thấy người dùng' });
+        }
+
+        if (user.isPhoneVerified) {
+            return res.status(400).json({ error: 'Số điện thoại đã được xác thực' });
+        }
+
+        if (!user.otp || !user.otpExpires) {
+            return res.status(400).json({ error: 'Không tìm thấy OTP. Vui lòng yêu cầu gửi lại OTP' });
+        }
+
+        if (new Date() > user.otpExpires) {
+            return res.status(400).json({ error: 'OTP đã hết hạn. Vui lòng yêu cầu gửi lại OTP' });
+        }
+
+        if (user.otpAttempts >= 5) {
+            return res.status(400).json({ error: 'Đã vượt quá số lần thử OTP cho phép. Vui lòng thử lại sau' });
+        }
+
+        if (user.otp !== sanitizeInput(otp)) {
+            user.otpAttempts = (user.otpAttempts || 0) + 1;
+            await user.save();
+            return res.status(400).json({ error: 'OTP không đúng' });
+        }
+
+        // Xác thực thành công
+        user.isPhoneVerified = true;
+        user.otp = undefined;
+        user.otpExpires = undefined;
+        user.otpAttempts = 0;
+        await user.save();
+
+        // Send notification
+        try {
+            await notificationService.notifyUserProfileUpdated(cccd);
+        } catch (notificationError) {
+            console.error('Notification error:', notificationError);
+        }
+
+        res.json({ 
+            message: 'Xác thực số điện thoại thành công', 
+            user: {
+                cccd: user.cccd,
+                fullName: user.fullName,
+                phone: user.phone,
+                org: user.org,
+                role: user.role,
+                isPhoneVerified: user.isPhoneVerified
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: `Xác thực OTP thất bại: ${error.message}` });
+    }
+};
+
 module.exports = {
     getUsers,
     getProfile,
     updateProfile,
     getUserByCCCD,
     updateUser,
-    getCurrentUser
+    getCurrentUser,
+    getSelfByCccd,
+    requestPhoneVerification,
+    verifyPhoneChange
 };

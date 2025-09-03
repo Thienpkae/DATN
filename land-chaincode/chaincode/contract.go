@@ -339,6 +339,11 @@ func (s *LandRegistryChaincode) CreateDocument(ctx contractapi.TransactionContex
 		return err
 	}
 
+	// Validate loại tài liệu
+	if err := ValidateDocumentType(docType); err != nil {
+		return fmt.Errorf("loại tài liệu không hợp lệ: %v", err)
+	}
+
 	// Kiểm tra tính hợp lệ của IPFS hash
 	if err := ValidateIPFSHash(ipfsHash); err != nil {
 		return fmt.Errorf("hash IPFS không hợp lệ: %v", err)
@@ -1130,8 +1135,8 @@ func (s *LandRegistryChaincode) CreateReissueRequest(ctx contractapi.Transaction
 	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "CREATE_REISSUE_REQUEST", callerID, fmt.Sprintf("Tạo yêu cầu cấp lại GCN %s", txID))
 }
 
-// ConfirmTransfer - Xác nhận chuyển nhượng (bởi người nhận)
-func (s *LandRegistryChaincode) ConfirmTransfer(ctx contractapi.TransactionContextInterface, txID, landParcelID, toOwnerID string) error {
+// ConfirmTransfer - Xác nhận hoặc từ chối chuyển nhượng (bởi người nhận)
+func (s *LandRegistryChaincode) ConfirmTransfer(ctx contractapi.TransactionContextInterface, txID, landParcelID, toOwnerID, isAcceptedStr, reason string) error {
 	if err := CheckOrganization(ctx, []string{"Org3MSP"}); err != nil {
 		return err
 	}
@@ -1150,39 +1155,32 @@ func (s *LandRegistryChaincode) ConfirmTransfer(ctx contractapi.TransactionConte
 		return fmt.Errorf("người dùng %s không phải là người nhận chuyển nhượng", userID)
 	}
 	if tx.Status != "APPROVED" {
-		return fmt.Errorf("giao dịch %s chưa được phê duyệt", txID)
+		return fmt.Errorf("giao dịch %s không ở trạng thái APPROVED để xác nhận", txID)
 	}
-	land, err := s.QueryLandByID(ctx, landParcelID)
-	if err != nil {
-		return fmt.Errorf("lỗi khi truy vấn thửa đất %s: %v", landParcelID, err)
-	}
-	land.OwnerID = toOwnerID
+
+	// Parse isAccepted
+	isAccepted := isAcceptedStr == "true"
+	
 	txTime, err := GetTxTimestampAsTime(ctx)
 	if err != nil {
 		return fmt.Errorf("lỗi khi lấy timestamp: %v", err)
 	}
-	land.UpdatedAt = txTime
-	landJSON, err := json.Marshal(land)
-	if err != nil {
-		return fmt.Errorf("lỗi khi mã hóa thửa đất: %v", err)
-	}
-	if err := ctx.GetStub().PutState(landParcelID, landJSON); err != nil {
-		return fmt.Errorf("lỗi khi cập nhật thửa đất: %v", err)
-	}
-	// Cập nhật giấy chứng nhận nếu có
-	if land.CertificateID != "" {
-		// Cập nhật thông tin chủ sử dụng trong land struct
-		land.UpdatedAt = txTime
-		landJSON, err := json.Marshal(land)
-		if err != nil {
-			return fmt.Errorf("lỗi khi mã hóa thửa đất: %v", err)
+
+	var actionLog string
+	if isAccepted {
+		tx.Status = "CONFIRMED"
+		tx.Details = fmt.Sprintf("%s; Người nhận đã chấp nhận chuyển nhượng", tx.Details)
+		actionLog = "CONFIRM_TRANSFER_ACCEPTED"
+	} else {
+		tx.Status = "REJECTED"
+		if reason != "" {
+			tx.Details = fmt.Sprintf("%s; Người nhận từ chối chuyển nhượng - Lý do: %s", tx.Details, reason)
+		} else {
+			tx.Details = fmt.Sprintf("%s; Người nhận từ chối chuyển nhượng", tx.Details)
 		}
-		if err := ctx.GetStub().PutState(landParcelID, landJSON); err != nil {
-			return fmt.Errorf("lỗi khi cập nhật thửa đất: %v", err)
-		}
+		actionLog = "CONFIRM_TRANSFER_REJECTED"
 	}
-	tx.Status = "CONFIRMED"
-	tx.Details = fmt.Sprintf("%s; Đã xác nhận chuyển nhượng", tx.Details)
+	
 	tx.UpdatedAt = txTime
 	txJSON, err := json.Marshal(tx)
 	if err != nil {
@@ -1191,7 +1189,12 @@ func (s *LandRegistryChaincode) ConfirmTransfer(ctx contractapi.TransactionConte
 	if err := ctx.GetStub().PutState(txID, txJSON); err != nil {
 		return fmt.Errorf("lỗi khi cập nhật giao dịch: %v", err)
 	}
-	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "CONFIRM_TRANSFER", userID, fmt.Sprintf("Xác nhận chuyển nhượng %s", txID))
+	
+	actionText := "chấp nhận"
+	if !isAccepted {
+		actionText = "từ chối"
+	}
+	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), actionLog, userID, fmt.Sprintf("Người nhận %s chuyển nhượng %s", actionText, txID))
 }
 
 // ========================================
@@ -1211,8 +1214,17 @@ func (s *LandRegistryChaincode) ProcessTransaction(ctx contractapi.TransactionCo
 	if err != nil {
 		return err
 	}
-	if tx.Status != "PENDING" && tx.Status != "CONFIRMED" {
-		return fmt.Errorf("giao dịch %s không ở trạng thái chờ xử lý", txID)
+	// Kiểm tra trạng thái dựa trên loại giao dịch
+	if tx.Type == "TRANSFER" {
+		// Giao dịch TRANSFER cần có xác nhận từ người nhận trước
+		if tx.Status != "CONFIRMED" {
+			return fmt.Errorf("giao dịch chuyển nhượng %s chưa được người nhận xác nhận", txID)
+		}
+	} else {
+		// Các loại giao dịch khác (SPLIT, MERGE, CHANGE_PURPOSE, REISSUE) xử lý trực tiếp từ PENDING
+		if tx.Status != "PENDING" {
+			return fmt.Errorf("giao dịch %s không ở trạng thái chờ xử lý", txID)
+		}
 	}
 
 	// Kiểm tra và xác minh tài liệu trước khi quyết định

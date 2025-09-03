@@ -49,34 +49,51 @@ async function changePassword(cccd, oldPassword, newPassword) {
 
 async function forgotPassword(cccd, phone) {
     try {
-        validatePhone(phone);
-        const sanitizedCccd = sanitizeInput(cccd);
-        const sanitizedPhone = sanitizeInput(phone);
+        let user;
 
-        const user = await User.findOne({ cccd: sanitizedCccd, phone: sanitizedPhone });
-        if (!user) {
-            throw new Error('User or phone not found');
+        if (cccd && cccd.trim()) {
+            // Tìm user theo CCCD, tự động lấy phone từ database
+            const sanitizedCccd = sanitizeInput(cccd);
+            user = await User.findOne({ cccd: sanitizedCccd });
+            if (!user) {
+                throw new Error('Không tìm thấy tài khoản với CCCD được cung cấp');
+            }
+        } else if (phone && phone.trim()) {
+            // Fallback: Tìm user theo phone (trường hợp user đăng nhập bằng phone)
+            validatePhone(phone);
+            const sanitizedPhone = sanitizeInput(phone);
+            user = await User.findOne({ phone: sanitizedPhone });
+            if (!user) {
+                throw new Error('Không tìm thấy tài khoản với số điện thoại được cung cấp');
+            }
+        } else {
+            throw new Error('Vui lòng cung cấp CCCD hoặc số điện thoại');
         }
 
         if (!user.isPhoneVerified) {
-            throw new Error('Phone number not verified');
+            throw new Error('Số điện thoại chưa được xác thực');
         }
 
-        const { otp, otpExpires } = await sendOTP(sanitizedPhone);
+        // Sử dụng phone từ database
+        const { otp, otpExpires } = await sendOTP(user.phone);
         user.otp = otp;
         user.otpExpires = otpExpires;
         user.otpAttempts = 0;
         await user.save();
 
         const log = new Log({
-            cccd: sanitizedCccd,
+            cccd: user.cccd,
             action: 'Forgot Password Request',
-            details: `User with CCCD ${sanitizedCccd} requested password reset OTP`
+            details: `User with CCCD ${user.cccd} requested password reset OTP`
         });
         await log.save();
 
-        console.log(`OTP sent for password reset for user with CCCD ${sanitizedCccd}`);
-        return { message: 'OTP sent to phone for password reset', cccd: sanitizedCccd, phone: sanitizedPhone };
+        console.log(`OTP sent for password reset for user with CCCD ${user.cccd}`);
+        return { 
+            message: 'OTP đã được gửi đến số điện thoại đã đăng ký', 
+            cccd: user.cccd, 
+            phone: user.phone 
+        };
     } catch (error) {
         console.error(`Error in forgotPassword: ${error.message}`);
         throw error;
@@ -120,10 +137,11 @@ async function resetPassword(cccd, otp, newPassword) {
     }
 }
 
-async function lockUnlockAccount(authorityCccd, targetCccd, lock) {
+async function lockUnlockAccount(authorityCccd, targetCccd, lock, reason) {
     try {
         const sanitizedAuthorityCccd = sanitizeInput(authorityCccd);
         const sanitizedTargetCccd = sanitizeInput(targetCccd);
+        const sanitizedReason = reason ? sanitizeInput(reason) : '';
 
         const authority = await User.findOne({ cccd: sanitizedAuthorityCccd });
         if (!authority || authority.role !== 'admin') {
@@ -143,15 +161,25 @@ async function lockUnlockAccount(authorityCccd, targetCccd, lock) {
         await user.save();
 
         const action = lock ? 'Lock Account' : 'Unlock Account';
+        const logDetails = `User with CCCD ${sanitizedTargetCccd} ${lock ? 'locked' : 'unlocked'} by ${sanitizedAuthorityCccd}${sanitizedReason ? `. Reason: ${sanitizedReason}` : ''}`;
+        
         const log = new Log({
             cccd: sanitizedAuthorityCccd,
             action,
-            details: `User with CCCD ${sanitizedTargetCccd} ${lock ? 'locked' : 'unlocked'} by ${sanitizedAuthorityCccd}`
+            details: logDetails
         });
         await log.save();
 
-        console.log(`User with CCCD ${sanitizedTargetCccd} ${lock ? 'locked' : 'unlocked'} successfully`);
-        return { message: `User with CCCD ${sanitizedTargetCccd} ${lock ? 'locked' : 'unlocked'} successfully` };
+        console.log(`User with CCCD ${sanitizedTargetCccd} ${lock ? 'locked' : 'unlocked'} successfully. Reason: ${sanitizedReason}`);
+        return { 
+            message: `User with CCCD ${sanitizedTargetCccd} ${lock ? 'locked' : 'unlocked'} successfully`,
+            reason: sanitizedReason,
+            targetUser: {
+                cccd: user.cccd,
+                phone: user.phone,
+                fullName: user.fullName
+            }
+        };
     } catch (error) {
         console.error(`Error in lockUnlockAccount: ${error.message}`);
         throw error;

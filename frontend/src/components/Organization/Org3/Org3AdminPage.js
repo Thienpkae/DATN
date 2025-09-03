@@ -1,10 +1,9 @@
 import React from 'react';
 import { Layout, Typography, Tabs, Space, Dropdown, Avatar } from 'antd';
-import { UserOutlined, TeamOutlined, ToolOutlined } from '@ant-design/icons';
+import { UserOutlined, TeamOutlined } from '@ant-design/icons';
 import authService from '../../../services/auth';
 
 import AdminAccountPage from '../../Admin/AdminAccountPage';
-import SystemConfigPage from '../../Admin/SystemConfigPage';
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
@@ -23,16 +22,7 @@ const Org3AdminPage = ({ onLogout }) => {
       ),
       children: <AdminAccountPage />,
     },
-    {
-      key: 'system-configs',
-      label: (
-        <Space>
-          <ToolOutlined />
-          <span>Thiết lập hệ thống</span>
-        </Space>
-      ),
-      children: <SystemConfigPage />,
-    },
+
   ];
 
   return (

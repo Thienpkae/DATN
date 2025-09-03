@@ -45,6 +45,11 @@ const AdminAccountPage = () => {
   const [searchText, setSearchText] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [stats, setStats] = useState({});
+  
+  // Thêm state cho modal lý do khóa/mở khóa
+  const [reasonModalVisible, setReasonModalVisible] = useState(false);
+  const [reasonForm] = Form.useForm();
+  const [pendingLockAction, setPendingLockAction] = useState(null);
 
   useEffect(() => {
     fetchUsers();
@@ -128,20 +133,47 @@ const AdminAccountPage = () => {
     }
   };
 
-  const handleToggleUserStatus = async (userId, isActive) => {
+  // Hiển thị modal nhập lý do
+  const showReasonModal = (userId, isActive) => {
+    setPendingLockAction({ userId, lock: isActive });
+    reasonForm.resetFields();
+    setReasonModalVisible(true);
+  };
+
+  // Xử lý xác nhận khóa/mở khóa với lý do
+  const handleReasonModalOk = async () => {
     try {
-      if (isActive) {
-        await userService.lockUnlockAccount(userId, true);
-        message.success('Đã vô hiệu hóa tài khoản');
-      } else {
-        await userService.lockUnlockAccount(userId, false);
-        message.success('Đã kích hoạt tài khoản');
-      }
+      const values = await reasonForm.validateFields();
+      const { userId, lock } = pendingLockAction;
+      const reason = values.reason?.trim() || '';
+      
+      setLoading(true);
+      await userService.lockUnlockAccount(userId, lock, reason);
+      
+      const actionText = lock ? 'vô hiệu hóa' : 'kích hoạt';
+      message.success(`Đã ${actionText} tài khoản${reason ? ' với lý do: ' + reason : ''}`);
+      
+      setReasonModalVisible(false);
+      setPendingLockAction(null);
       fetchUsers();
       fetchStats();
     } catch (error) {
-      message.error(error?.response?.data?.error || error.message || `Không thể ${isActive ? 'vô hiệu hóa' : 'kích hoạt'} tài khoản`);
+      const actionText = pendingLockAction?.lock ? 'vô hiệu hóa' : 'kích hoạt';
+      message.error(error?.response?.data?.error || error.message || `Không thể ${actionText} tài khoản`);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  // Hủy modal lý do
+  const handleReasonModalCancel = () => {
+    setReasonModalVisible(false);
+    setPendingLockAction(null);
+    reasonForm.resetFields();
+  };
+
+  const handleToggleUserStatus = (userId, isActive) => {
+    showReasonModal(userId, isActive);
   };
 
   const handleModalOk = async () => {
@@ -594,6 +626,59 @@ const AdminAccountPage = () => {
             </Row>
           )}
         </Form>
+      </Modal>
+
+      {/* Modal lý do khóa/mở khóa tài khoản */}
+      <Modal
+        title={
+          pendingLockAction?.lock 
+            ? `🔒 Khóa tài khoản` 
+            : `🔓 Mở khóa tài khoản`
+        }
+        open={reasonModalVisible}
+        onOk={handleReasonModalOk}
+        onCancel={handleReasonModalCancel}
+        confirmLoading={loading}
+        width={500}
+        okText={pendingLockAction?.lock ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
+        cancelText="Hủy"
+      >
+        <Form
+          form={reasonForm}
+          layout="vertical"
+        >
+          <Form.Item
+            label={
+              <span>
+                {pendingLockAction?.lock ? 'Lý do khóa tài khoản' : 'Lý do mở khóa tài khoản'}
+                <span style={{ color: '#999', marginLeft: 8 }}>(Tùy chọn)</span>
+              </span>
+            }
+            name="reason"
+            rules={[
+              {
+                max: 500,
+                message: 'Lý do không được vượt quá 500 ký tự'
+              }
+            ]}
+          >
+            <Input.TextArea
+              placeholder={`Nhập lý do ${pendingLockAction?.lock ? 'khóa' : 'mở khóa'} tài khoản (tùy chọn)...`}
+              rows={4}
+              showCount
+              maxLength={500}
+            />
+          </Form.Item>
+        </Form>
+        
+        <div style={{ marginTop: 16, padding: 12, backgroundColor: '#f6f8fa', borderRadius: 6 }}>
+          <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>
+            ℹ️ {pendingLockAction?.lock 
+              ? 'Người dùng sẽ nhận được SMS và thông báo về việc tài khoản bị khóa.'
+              : 'Người dùng sẽ nhận được SMS và thông báo về việc tài khoản được mở khóa.'
+            }
+          </p>
+        </div>
       </Modal>
     </div>
   );

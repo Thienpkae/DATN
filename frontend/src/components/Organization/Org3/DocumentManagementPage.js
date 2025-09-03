@@ -59,7 +59,8 @@ const DocumentManagementPage = () => {
       setDocuments(data);
     } catch (e) {
       console.error('Error loading documents:', e);
-      message.error(e.message || 'Không tải được danh sách tài liệu');
+      // Don't show error alert, just set empty documents - UI will show empty state
+      setDocuments([]);
     } finally {
       setLoading(false);
     }
@@ -702,10 +703,11 @@ const DocumentManagementPage = () => {
             <Col span={12}>
               <Form.Item name="docType" label="Loại tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
                 <Select placeholder="Chọn loại">
-                  <Option value="CERTIFICATE">Giấy chứng nhận</Option>
-                  <Option value="CONTRACT">Hợp đồng</Option>
-                  <Option value="REPORT">Báo cáo</Option>
-                  <Option value="OTHER">Khác</Option>
+                  {documentService.getDocumentTypes().map(type => (
+                    <Option key={type} value={type}>
+                      {documentService.getDocumentTypeName(type)}
+                    </Option>
+                  ))}
                 </Select>
               </Form.Item>
             </Col>

@@ -14,6 +14,7 @@ const {
     logout,
     changeUserPassword,
     forgotUserPassword,
+    verifyOTPForForgotPassword,
     resetUserPassword,
     lockUnlockUserAccount,
     deleteUserAccount
@@ -25,7 +26,6 @@ const reportService = require('./services/reportService');
 const userService = require('./services/userService');
 const dashboardService = require('./services/dashboardService');
 const logService = require('./services/logService');
-const systemService = require('./services/systemService');
 const { initializeAdminAccounts, initializeUserAccounts } = require('./services/initializationService');
 const notificationRoutes = require('./routes/notificationRoutes');
 require('dotenv').config({ path: path.resolve(__dirname, './.env') });
@@ -57,19 +57,23 @@ app.post('/api/auth/login', login);
 app.post('/api/auth/logout', authenticateJWT, logout);
 app.post('/api/auth/change-password', authenticateJWT, changeUserPassword);
 app.post('/api/auth/forgot-password', forgotUserPassword);
+app.post('/api/auth/verify-otp-forgot-password', verifyOTPForForgotPassword);
 app.post('/api/auth/reset-password', resetUserPassword);
 app.post('/api/auth/lock-unlock', authenticateJWT, requireAdmin, lockUnlockUserAccount);
 app.post('/api/auth/delete', authenticateJWT, requireAdmin, deleteUserAccount);
+
+// User Routes (Profile Management - No Admin Required) - Must come before parameterized routes
+app.get('/api/users/profile', authenticateJWT, userService.getProfile);
+app.put('/api/users/profile', authenticateJWT, userService.updateProfile);
+app.post('/api/users/request-phone-verification', authenticateJWT, userService.requestPhoneVerification);
+app.post('/api/users/verify-phone-change', authenticateJWT, userService.verifyPhoneChange);
+app.get('/api/users/current', authenticateJWT, userService.getCurrentUser);
+app.get('/api/users/self/:cccd', authenticateJWT, userService.getSelfByCccd);
 
 // User Routes (Account Management - Require Admin)
 app.get('/api/users', authenticateJWT, requireAdmin, userService.getUsers);
 app.get('/api/users/:cccd', authenticateJWT, requireAdmin, userService.getUserByCCCD);
 app.put('/api/users/:cccd', authenticateJWT, requireAdmin, userService.updateUser);
-
-// User Routes (Profile Management - No Admin Required)
-app.get('/api/users/profile', authenticateJWT, userService.getProfile);
-app.put('/api/users/profile', authenticateJWT, userService.updateProfile);
-app.get('/api/users/current', authenticateJWT, userService.getCurrentUser);
 
 // Land Parcel Routes
 app.post('/api/land-parcels', authenticateJWT, checkOrg(['Org1']), landService.createLandParcel);
@@ -133,15 +137,6 @@ app.get('/api/dashboard', authenticateJWT, dashboardService.getDashboardStats);
 
 // Log Route
 app.get('/api/logs/:txID', authenticateJWT, checkOrg(['Org1', 'Org2']), logService.searchLogs);
-
-// System Configuration Routes (UC-67)
-app.get('/api/system/configs', authenticateJWT, systemService.getSystemConfigs);
-app.get('/api/system/configs/categories', authenticateJWT, systemService.getConfigCategories);
-app.get('/api/system/configs/:key', authenticateJWT, systemService.getSystemConfig);
-app.put('/api/system/configs/:key', authenticateJWT, requireAdmin, systemService.updateSystemConfig);
-app.delete('/api/system/configs/:key', authenticateJWT, requireAdmin, systemService.deleteSystemConfig);
-app.post('/api/system/configs/:key/reset', authenticateJWT, requireAdmin, systemService.resetToDefault);
-app.post('/api/system/configs/initialize', authenticateJWT, requireAdmin, systemService.initializeDefaultConfigs);
 
 // Notification Routes
 app.use('/api/notifications', notificationRoutes);

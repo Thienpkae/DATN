@@ -42,6 +42,8 @@ const notificationSchema = new mongoose.Schema({
             // User notifications
             'USER_PROFILE_UPDATED',         // Hồ sơ đã cập nhật
             'PASSWORD_CHANGED',             // Mật khẩu đã thay đổi
+            'ACCOUNT_LOCKED',               // Tài khoản bị khóa
+            'ACCOUNT_UNLOCKED',             // Tài khoản được mở khóa
             
             // System notifications
             'SYSTEM_ANNOUNCEMENT'           // Thông báo hệ thống
@@ -145,6 +147,8 @@ notificationSchema.virtual('actionUrl').get(function() {
             return `/land-parcels/${landParcelId}`;
         case 'USER_PROFILE_UPDATED':
         case 'PASSWORD_CHANGED':
+        case 'ACCOUNT_LOCKED':
+        case 'ACCOUNT_UNLOCKED':
             return `/profile`;
         default:
             return '/notifications';

@@ -268,6 +268,7 @@ const NotificationCenter = () => {
             dataSource={Array.isArray(notifications) ? notifications.slice(0, 10) : []}
             renderItem={(notification) => (
               <List.Item
+                key={notification._id || notification.id}
                 style={{
                   padding: '12px 16px',
                   backgroundColor: notification.read ? 'transparent' : token.colorPrimaryBg,
@@ -342,7 +343,7 @@ const NotificationCenter = () => {
 
   return (
     <Dropdown 
-      overlay={notificationMenu} 
+      popupRender={() => notificationMenu}
       trigger={['click']} 
       placement="bottomRight"
       overlayStyle={{ zIndex: 1000 }}

@@ -32,8 +32,20 @@ var validLegalStatuses = map[string]bool{
 	"Đang thế chấp":   true, // Đất đang thế chấp
 }
 
+// Các loại tài liệu hợp lệ trong hệ thống
+var validDocumentTypes = map[string]bool{
+	"CERTIFICATE":   true, // Giấy chứng nhận
+	"CONTRACT":      true, // Hợp đồng
+	"MAP":           true, // Bản đồ
+	"FORM":          true, // Đơn đăng ký
+	"TAX_DOCUMENT":  true, // Tài liệu thuế
+	"TECHNICAL_DOC": true, // Tài liệu kỹ thuật
+	"LEGAL_DOC":     true, // Tài liệu pháp lý
+	"OTHER":         true, // Khác
+}
+
 var requiredDocuments = map[string][]string{
-	"TRANSFER":       {"Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo Mẫu số 09/ĐK", "Hợp đồng chuyển nhượng quyền sử dụng đất", "Giấy chứng nhận quyền sử dụng đất"},
+	"TRANSFER":       {"Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo Mẫu số 09/ĐK", "Hợp đồng chuyển nhượng quyền sử dụng đất", "Giấy chứng nhận quyền sử dụng đất", "Mảnh trích đo bản đồ địa chính thửa đất", "Bản kê khai nộp thuế"},
 	"SPLIT":          {"Đơn đề nghị tách thửa đất, hợp thửa đất theo Mẫu số 21 ban hành kèm theo Nghị định số 151/2025/NĐ-CP", "Giấy chứng nhận quyền sử dụng đất", "Bản vẽ tách thửa đất, hợp thửa đất lập theo Mẫu số 22 ban hành kèm theo Nghị định số 151/2025/NĐ-CP"},
 	"MERGE":          {"Đơn đề nghị tách thửa đất, hợp thửa đất theo Mẫu số 21 ban hành kèm theo Nghị định số 151/2025/NĐ-CP", "Giấy chứng nhận quyền sử dụng đất", "Bản vẽ tách thửa đất, hợp thửa đất lập theo Mẫu số 22 ban hành kèm theo Nghị định số 151/2025/NĐ-CP"},
 	"CHANGE_PURPOSE": {"Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo Mẫu số 09/ĐK", "Giấy chứng nhận quyền sử dụng đất"},
@@ -112,6 +124,17 @@ func ValidateLand(ctx contractapi.TransactionContextInterface, land Land, isUpda
 		if exists {
 			return fmt.Errorf("thửa đất %s đã tồn tại", land.ID)
 		}
+	}
+	return nil
+}
+
+// ValidateDocumentType kiểm tra loại tài liệu có hợp lệ không
+func ValidateDocumentType(docType string) error {
+	if docType == "" {
+		return fmt.Errorf("loại tài liệu không được để trống")
+	}
+	if !validDocumentTypes[docType] {
+		return fmt.Errorf("loại tài liệu %s không hợp lệ", docType)
 	}
 	return nil
 }

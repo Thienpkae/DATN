@@ -51,7 +51,19 @@ const authService = {
       }
       return response.data;
     } catch (error) {
-      throw handleApiError(error);
+      // Custom error handling for login - don't use global handleApiError
+      // to avoid triggering session expiry logic
+      if (error.response) {
+        const errorData = error.response.data;
+        const errorMessage = errorData?.error || errorData?.message || 'Đăng nhập thất bại';
+        const loginError = new Error(errorMessage);
+        loginError.response = error.response;
+        throw loginError;
+      } else if (error.request) {
+        throw new Error('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.');
+      } else {
+        throw new Error(error.message || 'Đã xảy ra lỗi không xác định');
+      }
     }
   },
 
@@ -59,6 +71,16 @@ const authService = {
   async verifyOTP(cccd, otp) {
     try {
       const response = await apiClient.post(API_ENDPOINTS.AUTH.VERIFY_OTP, { cccd, otp });
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  // Verify OTP for forgot password
+  async verifyOTPForForgotPassword(cccd, otp) {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.AUTH.VERIFY_OTP_FORGOT_PASSWORD, { cccd, otp });
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -100,13 +122,9 @@ const authService = {
   },
 
   // Change password
-  async changePassword(oldPassword, newPassword, confirmPassword) {
+  async changePassword(passwordData) {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.AUTH.CHANGE_PASSWORD, {
-        oldPassword,
-        newPassword,
-        confirmPassword
-      });
+      const response = await apiClient.post(API_ENDPOINTS.AUTH.CHANGE_PASSWORD, passwordData);
       return response.data;
     } catch (error) {
       throw handleApiError(error);

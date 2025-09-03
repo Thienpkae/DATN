@@ -153,7 +153,9 @@ const DocumentLinker = ({
             allowClear
           >
             {documentService.getDocumentTypes().map(type => (
-              <Option key={type} value={type}>{type}</Option>
+              <Option key={type} value={type}>
+                {documentService.getDocumentTypeName(type)}
+              </Option>
             ))}
           </Select>
           <Button
@@ -225,7 +227,7 @@ const DocumentLinker = ({
               }
               description={
                 <div>
-                  <div><strong>Loại:</strong> <Tag>{document.docType || document.Type}</Tag></div>
+                  <div><strong>Loại:</strong> <Tag>{documentService.getDocumentTypeName(document.docType || document.Type)}</Tag></div>
                   <div><strong>Mô tả:</strong> {document.displayDescription || document.description || 'Không có'}</div>
                   {document.metadata && document.metadata.hasMetadata && (
                     <div style={{ marginTop: 4 }}>

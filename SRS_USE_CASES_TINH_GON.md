@@ -46,7 +46,7 @@ Hệ thống quản lý đất đai dựa trên blockchain Hyperledger Fabric v�
 | **UC-22** | Tìm kiếm tài liệu | Tất cả người dùng | Tìm kiếm theo tiêu chí đa dạng |
 | **UC-23** | Xem lịch sử thay đổi tài liệu | Tất cả người dùng | Theo dõi lịch sử biến động tài liệu |
 
-### **🔄 MODULE 4: QUẢN LÝ GIAO DỊCH (15 chức năng)**
+### **🔄 MODULE 4: QUẢN LÝ GIAO DỊCH (16 chức năng)**
 | **STT** | **Tên chức năng** | **Actor** | **Mô tả** |
 |---------|-------------------|-----------|-----------|
 | **UC-24** | Tạo giao dịch chuyển nhượng | Công dân | Khởi tạo yêu cầu chuyển nhượng đất |
@@ -65,6 +65,7 @@ Hệ thống quản lý đất đai dựa trên blockchain Hyperledger Fabric v�
 | **UC-37** | Từ chối giao dịch | Cán bộ Sở TN&MT | Từ chối giao dịch không đáp ứng yêu cầu |
 | **UC-38** | Tìm kiếm giao dịch | Tất cả người dùng | Tìm kiếm theo tiêu chí đa dạng |
 | **UC-39** | Xem lịch sử thay đổi giao dịch | Tất cả người dùng | Theo dõi lịch sử xử lý và thay đổi giao dịch |
+| **UC-40** | Xem lịch sử giao dịch | Tất cả người dùng | Xem danh sách tất cả giao dịch đã thực hiện |
 
 
 ---
@@ -168,13 +169,13 @@ Hệ thống quản lý đất đai dựa trên blockchain Hyperledger Fabric v�
 | **Thuộc tính** | **Mô tả** |
 |----------------|-----------|
 | **Tên chức năng** | Cập nhật thông tin tài khoản |
-| **Tác nhân** | Admin |
-| **Mục đích** | Admin quản lý và cập nhật thông tin tài khoản người dùng trong tổ chức |
-| **Tiền điều kiện** | - Admin đã đăng nhập với quyền quản trị tổ chức<br/>- Có yêu cầu cập nhật thông tin từ người dùng hoặc cần thiết |
-| **Kết quả đạt được** | - Thông tin tài khoản người dùng được cập nhật thành công<br/>- Lịch sử thay đổi được ghi lại với người thực hiện<br/>- Người dùng được thông báo về thay đổi |
-| **Quy trình thực hiện** | 1. Admin truy cập "Quản lý người dùng"<br/>2. Admin tìm và chọn tài khoản cần cập nhật<br/>3. Admin chọn "Cập nhật thông tin"<br/>4. Admin chỉnh sửa các thông tin: họ tên, số điện thoại, trạng thái tài khoản<br/>5. Hệ thống kiểm tra tính hợp lệ của thông tin mới<br/>6. Hệ thống kiểm tra số điện thoại mới có bị trùng không<br/>7. Hệ thống lưu thông tin mới<br/>8. Hệ thống ghi lại lịch sử thay đổi với Admin thực hiện<br/>9. Hệ thống gửi thông báo cho người dùng về thay đổi |
-| **Trường hợp ngoại lệ** | - Số điện thoại đã được sử dụng: Hệ thống thông báo "Số điện thoại đã được đăng ký"<br/>- Thông tin không hợp lệ: Hệ thống yêu cầu nhập lại<br/>- Không có quyền quản lý tài khoản: Hệ thống từ chối thay đổi |
-| **Quy tắc nghiệp vụ** | - CCCD không được phép thay đổi<br/>- Số điện thoại phải duy nhất trong hệ thống<br/>- Chỉ Admin mới có quyền cập nhật thông tin tài khoản<br/>- Ghi lại đầy đủ thông tin: ai thay đổi, khi nào, thay đổi gì<br/>- Thông báo ngay cho người dùng về thay đổi |
+| **Tác nhân** | Tất cả người dùng |
+| **Mục đích** | Người dùng cập nhật thông tin cá nhân của chính mình |
+| **Tiền điều kiện** | - Người dùng đã đăng nhập vào hệ thống<br/>- Tài khoản đang hoạt động bình thường |
+| **Kết quả đạt được** | - Thông tin cá nhân được cập nhật thành công<br/>- Lịch sử thay đổi được ghi lại<br/>- Hệ thống gửi thông báo xác nhận cập nhật |
+| **Quy trình thực hiện** | 1. Người dùng truy cập "Thông tin cá nhân"<br/>2. Người dùng chọn "Cập nhật thông tin"<br/>3. Người dùng chỉnh sửa các thông tin: họ tên, số điện thoại<br/>4. Nếu thay đổi số điện thoại: Hệ thống gửi OTP đến số mới<br/>5. Người dùng nhập OTP để xác thực (nếu đổi SĐT)<br/>6. Hệ thống kiểm tra tính hợp lệ của thông tin mới<br/>7. Hệ thống kiểm tra số điện thoại mới có bị trùng không<br/>8. Hệ thống lưu thông tin mới<br/>9. Hệ thống ghi lại lịch sử thay đổi<br/>10. Hệ thống gửi thông báo xác nhận cập nhật thành công |
+| **Trường hợp ngoại lệ** | - Số điện thoại đã được sử dụng: Hệ thống thông báo "Số điện thoại đã được đăng ký"<br/>- Thông tin không hợp lệ: Hệ thống yêu cầu nhập lại<br/>- OTP không đúng hoặc hết hạn: Hệ thống yêu cầu nhập lại hoặc gửi lại OTP<br/>- Không thể gửi OTP: Hệ thống thông báo lỗi và yêu cầu thử lại |
+| **Quy tắc nghiệp vụ** | - CCCD không được phép thay đổi<br/>- Số điện thoại phải duy nhất trong hệ thống<br/>- Bắt buộc xác thực OTP khi thay đổi số điện thoại<br/>- OTP có hiệu lực trong 5 phút<br/>- Ghi lại đầy đủ thông tin: ai thay đổi, khi nào, thay đổi gì<br/>- Thông báo xác nhận sau khi cập nhật thành công |
 
 ---
 
@@ -509,7 +510,7 @@ Hệ thống quản lý đất đai dựa trên blockchain Hyperledger Fabric v�
 | **Mục đích** | Xem đầy đủ thông tin và trạng thái hiện tại của giao dịch |
 | **Tiền điều kiện** | - Đã đăng nhập vào hệ thống<br/>- Có mã giao dịch cần xem<br/>- Có quyền xem giao dịch này |
 | **Kết quả đạt được** | - Thông tin đầy đủ của giao dịch được hiển thị<br/>- Lịch sử xử lý được xem<br/>- Tài liệu liên quan được liệt kê<br/>- Trạng thái hiện tại được kiểm tra |
-| **Quy trình thực hiện** | 1. Người dùng chọn giao dịch để xem chi tiết<br/>2. Hệ thống kiểm tra quyền truy cập của người dùng<br/>3. Hệ thống tải thông tin chi tiết từ blockchain<br/>4. Hệ thống hiển thị thông tin cơ bản: mã giao dịch, loại, trạng thái, ngày tạo<br/>5. Hệ thống hiển thị thông tin các bên tham gia<br/>6. Hệ thống hiển thị thông tin thửa đất liên quan<br/>7. Hệ thống hiển thị danh sách tài liệu đã liên kết<br/>8. Hệ thống hiển thị lịch sử xử lý giao dịch |
+| **Quy trình thực hiện** | 1. Người dùng chọn giao dịch để xem chi tiết<br/>2. Hệ thống kiểm tra quyền truy cập của người dùng<br/>3. Hệ thống tải thông tin chi tiết từ blockchain<br/>4. Hệ thống hiển thị thông tin cơ bản: mã giao dịch, loại, trạng thái, ngày tạo<br/>5. Hệ thống hiển thị thông tin các bên tham gia<br/>6. Hệ thống hiển thị thông tin thửa đất liên quan<br/>7. Hệ thống hiển thị danh sách tài liệu đã liên kết|
 | **Trường hợp ngoại lệ** | - Giao dịch không tồn tại: Hệ thống thông báo "Giao dịch không tìm thấy"<br/>- Không có quyền xem: Hệ thống từ chối truy cập<br/>- Lỗi tải dữ liệu: Hệ thống thông báo lỗi |
 | **Quy tắc nghiệp vụ** | - Thông tin được lấy trực tiếp từ blockchain<br/>- Người dùng chỉ xem được giao dịch được phép theo quyền hạn<br/>- Lịch sử hiển thị theo thứ tự thời gian mới nhất<br/>- Chỉ hiển thị tài liệu đã được liên kết |
 
@@ -521,12 +522,12 @@ Hệ thống quản lý đất đai dựa trên blockchain Hyperledger Fabric v�
 |----------------|-----------|
 | **Tên chức năng** | Xác nhận nhận chuyển nhượng đất |
 | **Tác nhân** | Công dân (Org3) |
-| **Mục đích** | Xác nhận đồng ý tham gia vào giao dịch chuyển nhượng |
-| **Tiền điều kiện** | - Đã đăng nhập với quyền Org3<br/>- Đã xem chi tiết giao dịch (UC-29)<br/>- Được chỉ định là bên nhận trong yêu cầu<br/>- Yêu cầu chuyển nhượng đang ở trạng thái chờ xác nhận |
-| **Kết quả đạt được** | - Xác nhận nhận chuyển nhượng được ghi nhận<br/>- Giao dịch chuyển sang trạng thái tiếp theo<br/>- Các bên liên quan nhận thông báo<br/>- Quy trình xử lý tiếp tục |
-| **Quy trình thực hiện** | 1. Bên nhận xem chi tiết giao dịch chuyển nhượng (UC-29)<br/>2. Bên nhận kiểm tra thông tin thửa đất và điều kiện<br/>3. Bên nhận xác nhận đồng ý hoặc từ chối<br/>4. Hệ thống cập nhật trạng thái giao dịch<br/>5. Hệ thống gửi thông báo cho bên chuyển nhượng<br/>6. Hệ thống gửi thông báo cho cơ quan hành chính cấp xã (Org2) |
-| **Trường hợp ngoại lệ** | - Từ chối chuyển nhượng: Hệ thống hủy giao dịch và thông báo<br/>- Quá thời hạn xác nhận: Hệ thống tự động hủy<br/>- Không có quyền xác nhận: Hệ thống từ chối |
-| **Quy tắc nghiệp vụ** | - Thời hạn xác nhận là 7 ngày<br/>- Sau khi xác nhận không thể hủy bỏ<br/>- Quyết định được ghi nhận bất biến<br/>- Chỉ áp dụng cho giao dịch chuyển nhượng |
+| **Mục đích** | Bên nhận quyết định đồng ý hoặc từ chối nhận chuyển nhượng thửa đất |
+| **Tiền điều kiện** | - Đã đăng nhập với quyền Org3<br/>- Được chỉ định là bên nhận trong yêu cầu chuyển nhượng<br/>- Giao dịch chuyển nhượng đã được cán bộ cấp xã thẩm định và chuyển tiếp<br/>- Nhận được thông báo về yêu cầu xác nhận |
+| **Kết quả đạt được** | - Quyết định của bên nhận được ghi nhận và thông báo<br/>- Giao dịch tiếp tục quy trình nếu được chấp nhận<br/>- Giao dịch kết thúc nếu bị từ chối<br/>- Bên chuyển nhượng được thông báo về quyết định |
+| **Quy trình thực hiện** | 1. Bên nhận truy cập hệ thống và xem danh sách giao dịch liên quan<br/>2. Bên nhận xem chi tiết yêu cầu chuyển nhượng được gửi đến mình<br/>3. Bên nhận xem xét thông tin thửa đất, điều kiện chuyển nhượng và tài liệu đính kèm<br/>4. Bên nhận đưa ra quyết định: Đồng ý hoặc Từ chối<br/>5. Nếu từ chối, bên nhận có thể ghi rõ lý do<br/>6. Hệ thống ghi nhận quyết định của bên nhận<br/>7. Hệ thống thông báo cho bên chuyển nhượng về quyết định<br/>8. Hệ thống thông báo cho cán bộ cấp xã (Org2) để tiếp tục xử lý hồ sơ (nếu được chấp nhận) |
+| **Trường hợp ngoại lệ** | - Từ chối nhận chuyển nhượng: Hệ thống kết thúc giao dịch và thông báo cho các bên<br/>- Quá thời hạn xác nhận: Hệ thống tự động hủy giao dịch<br/>- Không có quyền xác nhận: Hệ thống từ chối truy cập |
+| **Quy tắc nghiệp vụ** | - Chỉ bên nhận được chỉ định mới có quyền xác nhận<br/>- Thời hạn xác nhận là 7 ngày kể từ khi nhận thông báo<br/>- Sau khi xác nhận không thể thay đổi quyết định<br/>- Quyết định từ chối phải có lý do rõ ràng<br/>- Thông báo được gửi tự động cho các bên liên quan |
 
 ---
 
@@ -657,9 +658,9 @@ Hệ thống quản lý đất đai dựa trên blockchain Hyperledger Fabric v�
 | **Tên chức năng** | Xem lịch sử thay đổi của giao dịch |
 | **Tác nhân** | Tất cả người dùng |
 | **Mục đích** | Theo dõi quá trình xử lý và thay đổi trạng thái của giao dịch theo thời gian |
-| **Tiền điều kiện** | - Đã đăng nhập vào hệ thống<br/>- Đã xem chi tiết giao dịch (UC-30)<br/>- Có quyền xem lịch sử giao dịch này |
+| **Tiền điều kiện** | - Đã đăng nhập vào hệ thống<br/>- Đã xem chi tiết giao dịch (UC-29)<br/>- Có quyền xem lịch sử giao dịch này |
 | **Kết quả đạt được** | - Lịch sử đầy đủ các thay đổi trạng thái được hiển thị<br/>- Thông tin về mỗi lần xử lý được xem chi tiết<br/>- Thời gian và người thực hiện được ghi rõ<br/>- Ghi chú và lý do thay đổi được hiển thị |
-| **Quy trình thực hiện** | 1. Người dùng đang xem chi tiết giao dịch (UC-30)<br/>2. Người dùng chọn tab "Lịch sử xử lý" hoặc nút "Xem lịch sử"<br/>3. Hệ thống kiểm tra quyền truy cập lịch sử giao dịch<br/>4. Hệ thống truy vấn lịch sử xử lý từ blockchain<br/>5. Hệ thống hiển thị timeline các thay đổi theo thứ tự thời gian<br/>6. Hệ thống hiển thị chi tiết từng bước: trạng thái cũ/mới, người thực hiện, thời gian, ghi chú |
+| **Quy trình thực hiện** | 1. Người dùng đang xem chi tiết giao dịch (UC-29)<br/>2. Người dùng chọn tab "Lịch sử xử lý" hoặc nút "Xem lịch sử"<br/>3. Hệ thống kiểm tra quyền truy cập lịch sử giao dịch<br/>4. Hệ thống truy vấn lịch sử xử lý từ blockchain<br/>5. Hệ thống hiển thị timeline các thay đổi theo thứ tự thời gian<br/>6. Hệ thống hiển thị chi tiết từng bước: trạng thái cũ/mới, người thực hiện, thời gian, ghi chú |
 | **Trường hợp ngoại lệ** | - Giao dịch không có lịch sử thay đổi: Hệ thống thông báo "Chưa có thay đổi nào"<br/>- Không có quyền xem lịch sử: Hệ thống từ chối truy cập<br/>- Lỗi truy vấn blockchain: Hệ thống thông báo lỗi |
 | **Quy tắc nghiệp vụ** | - Lịch sử xử lý được lưu trữ bất biến trên blockchain<br/>- Org3 chỉ xem được lịch sử giao dịch thuộc quyền sở hữu<br/>- Org1, Org2 có thể xem lịch sử tất cả giao dịch trong phạm vi quản lý<br/>- Mỗi lần thay đổi trạng thái đều có timestamp, người thực hiện và lý do|
 

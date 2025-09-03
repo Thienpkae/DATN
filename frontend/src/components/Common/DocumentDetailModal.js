@@ -17,7 +17,8 @@ const DocumentDetailModal = ({
   visible, 
   onClose, 
   onVerify, 
-  onReject, 
+  onReject,
+  userRole = 'Org2', // 'Org1', 'Org2', 'Org3'
 }) => {
   const [documentHistory, setDocumentHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -161,8 +162,9 @@ const DocumentDetailModal = ({
     });
   };
 
-  const tabItems = [
-    {
+  // Tạo tabs dựa trên userRole
+  const createTabItems = () => {
+    const basicTab = {
       key: "1",
       label: "Thông tin cơ bản",
       children: (
@@ -360,72 +362,105 @@ const DocumentDetailModal = ({
           )}
         </div>
       )
-    },
-    {
-      key: '2',
-      label: 'Phân tích tài liệu',
-      children: (
-        <div>
-          <div style={{ marginBottom: 16 }}>
-            <Button
-              type='primary'
-              icon={<AnalyzeIcon />}
-              onClick={() => onAnalyze(document?.docID)}
-              loading={analyzing}
-            >
-              Phân tích tài liệu với Gemini
-            </Button>
-          </div>
-          <div style={{ textAlign: 'center', padding: 32 }}>
-            <Text type='secondary'>Chưa có kết quả phân tích</Text>
-            <br />
-            <Text type='secondary' style={{ fontSize: '12px' }}>
-              Nhấn nút "Phân tích tài liệu" để bắt đầu phân tích và hỗ trợ quyết định xác thực
-            </Text>
-          </div>
-          <Divider />
-          <div
-            style={{
-              background: '#f0f8ff',
-              border: '1px solid #d6e4ff',
-              borderRadius: '8px',
-              padding: '20px',
-              textAlign: 'center',
-            }}
-          >
-            <Text strong style={{ fontSize: '16px', marginBottom: '16px', display: 'block' }}>
-              🎯 Chức năng xác thực tài liệu
-            </Text>
-            <Text type='secondary' style={{ marginBottom: '16px', display: 'block' }}>
-              Xác thực hoặc từ chối tài liệu này sau khi phân tích
-            </Text>
-            <Space size='large'>
+    };
+
+    // Tạo analysisTab khác nhau cho từng userRole
+    const getAnalysisTabContent = () => {
+      if (userRole === 'Org1') {
+        // Org1: Chỉ có phân tích, không có phần xác thực
+        return (
+          <div>
+            <div style={{ marginBottom: 16 }}>
               <Button
                 type='primary'
-                icon={<FileTextOutlined />}
-                onClick={() => setVerifyModalOpen(true)}
-                size='large'
-                style={{ minWidth: '120px' }}
-                disabled={document?.status === 'VERIFIED' || document?.status === 'REJECTED'}
+                icon={<AnalyzeIcon />}
+                onClick={() => onAnalyze(document?.docID)}
+                loading={analyzing}
               >
-                Xác thực
+                Phân tích tài liệu với Gemini
               </Button>
-              <Button
-                danger
-                icon={<FileTextOutlined />}
-                onClick={() => setRejectModalOpen(true)}
-                size='large'
-                style={{ minWidth: '120px' }}
-                disabled={document?.status === 'VERIFIED' || document?.status === 'REJECTED'}
-              >
-                Từ chối
-              </Button>
-            </Space>
+            </div>
+            <div style={{ textAlign: 'center', padding: 32 }}>
+              <Text type='secondary'>Chưa có kết quả phân tích</Text>
+              <br />
+              <Text type='secondary' style={{ fontSize: '12px' }}>
+                Nhấn nút "Phân tích tài liệu" để bắt đầu phân tích
+              </Text>
+            </div>
           </div>
-        </div>
-      ),
-    },
-    {
+        );
+      } else {
+        // Org2: Đầy đủ phân tích + xác thực
+        return (
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <Button
+                type='primary'
+                icon={<AnalyzeIcon />}
+                onClick={() => onAnalyze(document?.docID)}
+                loading={analyzing}
+              >
+                Phân tích tài liệu với Gemini
+              </Button>
+            </div>
+            <div style={{ textAlign: 'center', padding: 32 }}>
+              <Text type='secondary'>Chưa có kết quả phân tích</Text>
+              <br />
+              <Text type='secondary' style={{ fontSize: '12px' }}>
+                Nhấn nút "Phân tích tài liệu" để bắt đầu phân tích và hỗ trợ quyết định xác thực
+              </Text>
+            </div>
+            <Divider />
+            <div
+              style={{
+                background: '#f0f8ff',
+                border: '1px solid #d6e4ff',
+                borderRadius: '8px',
+                padding: '20px',
+                textAlign: 'center',
+              }}
+            >
+              <Text strong style={{ fontSize: '16px', marginBottom: '16px', display: 'block' }}>
+                🎯 Chức năng xác thực tài liệu
+              </Text>
+              <Text type='secondary' style={{ marginBottom: '16px', display: 'block' }}>
+                Xác thực hoặc từ chối tài liệu này sau khi phân tích
+              </Text>
+              <Space size='large'>
+                <Button
+                  type='primary'
+                  icon={<FileTextOutlined />}
+                  onClick={() => setVerifyModalOpen(true)}
+                  size='large'
+                  style={{ minWidth: '120px' }}
+                  disabled={document?.status === 'VERIFIED' || document?.status === 'REJECTED'}
+                >
+                  Xác thực
+                </Button>
+                <Button
+                  danger
+                  icon={<FileTextOutlined />}
+                  onClick={() => setRejectModalOpen(true)}
+                  size='large'
+                  style={{ minWidth: '120px' }}
+                  disabled={document?.status === 'VERIFIED' || document?.status === 'REJECTED'}
+                >
+                  Từ chối
+                </Button>
+              </Space>
+            </div>
+          </div>
+        );
+      }
+    };
+
+    const analysisTab = {
+      key: '2',
+      label: 'Phân tích tài liệu',
+      children: getAnalysisTabContent()
+    };
+
+    const historyTab = {
       key: "4",
       label: "Lịch sử thay đổi",
       children: (
@@ -554,8 +589,22 @@ const DocumentDetailModal = ({
           )}
         </div>
       )
+    };
+
+    // Trả về tabs tùy theo userRole
+    if (userRole === 'Org3') {
+      // Org3: Chỉ có tab thông tin cơ bản và lịch sử
+      return [basicTab, historyTab];
+    } else if (userRole === 'Org2') {
+      // Org2: Có tất cả tabs
+      return [basicTab, analysisTab, historyTab];
+    } else {
+      // Org1: Có tab thông tin, phân tích và lịch sử (không có nút xác thực/từ chối)
+      return [basicTab, analysisTab, historyTab];
     }
-  ];
+  };
+
+  const tabItems = createTabItems();
 
   return (
     <>

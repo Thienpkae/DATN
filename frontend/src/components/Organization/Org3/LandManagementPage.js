@@ -272,12 +272,14 @@ const LandManagementPage = () => {
             <TabPane tab="Tài liệu liên quan" key="2">
               <List
                 header={<div><strong>Danh sách tài liệu ({selected.documentIds?.length || 0})</strong></div>}
-                bordered
+                variant="bordered"
                 dataSource={selected.documentIds || []}
                 renderItem={(docId, index) => (
                   <List.Item
+                    key={`doc-${docId}-${index}`}
                     actions={[
                       <Button
+                        key={`btn-${docId}`}
                         size="small"
                         icon={<EyeOutlined />}
                         onClick={() => {
@@ -314,7 +316,7 @@ const LandManagementPage = () => {
                 </div>
                 <List
                   header={<div><strong>Lịch sử thay đổi thửa đất ({history.length})</strong></div>}
-                  bordered
+                  variant="bordered"
                   dataSource={history}
                   renderItem={(item, index) => (
                     <List.Item style={{ padding: '20px 24px' }}>

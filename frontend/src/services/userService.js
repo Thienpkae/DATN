@@ -18,8 +18,8 @@ const userService = {
 
   async updateProfile(payload) {
     const response = await apiClient.put(API_ENDPOINTS.USER.UPDATE_PROFILE, payload);
-    // Return user object for simpler consumers
-    return response.data?.user || response.data;
+    // Return full response data to include phoneChanged flag
+    return response.data;
   },
 
   async getByCccd(cccd) {
@@ -52,13 +52,23 @@ const userService = {
   },
 
   // Admin actions
-  async lockUnlockAccount(targetCccd, lock) {
-    const response = await apiClient.post(API_ENDPOINTS.AUTH.LOCK_UNLOCK, { targetCccd, lock });
+  async lockUnlockAccount(targetCccd, lock, reason = '') {
+    const response = await apiClient.post(API_ENDPOINTS.AUTH.LOCK_UNLOCK, { targetCccd, lock, reason });
     return response.data;
   },
 
   async deleteAccount(targetCccd) {
     const response = await apiClient.post(API_ENDPOINTS.AUTH.DELETE_ACCOUNT, { targetCccd });
+    return response.data;
+  },
+
+  async requestPhoneVerification() {
+    const response = await apiClient.post(API_ENDPOINTS.USER.REQUEST_PHONE_VERIFICATION);
+    return response.data;
+  },
+
+  async verifyPhoneChange(otp) {
+    const response = await apiClient.post(API_ENDPOINTS.USER.VERIFY_PHONE_CHANGE, { otp });
     return response.data;
   },
 };

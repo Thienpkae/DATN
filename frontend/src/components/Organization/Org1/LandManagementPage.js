@@ -5,7 +5,7 @@ import landService from '../../../services/landService';
 import authService from '../../../services/auth';
 import documentService from '../../../services/documentService';
 import ipfsService from '../../../services/ipfs';
-import landTypeMatchService from '../../../services/landTypeMatchService';
+
 import { DocumentLinker, DocumentViewer } from '../../Common';
 import { LAND_USE_PURPOSES, LEGAL_STATUSES } from '../../../services/index';
 

@@ -11,6 +11,7 @@ export const API_ENDPOINTS = {
     LOGIN: '/auth/login',
     LOGOUT: '/auth/logout',
     VERIFY_OTP: '/auth/verify-otp',
+    VERIFY_OTP_FORGOT_PASSWORD: '/auth/verify-otp-forgot-password',
     RESEND_OTP: '/auth/resend-otp',
     FORGOT_PASSWORD: '/auth/forgot-password',
     RESET_PASSWORD: '/auth/reset-password',
@@ -21,6 +22,8 @@ export const API_ENDPOINTS = {
   USER: {
     PROFILE: '/users/profile',
     UPDATE_PROFILE: '/users/profile',
+    REQUEST_PHONE_VERIFICATION: '/users/request-phone-verification',
+    VERIFY_PHONE_CHANGE: '/users/verify-phone-change',
     LIST_ALL: '/users',
     GET_BY_CCCD: '/users/:cccd',
     UPDATE_BY_CCCD: '/users/:cccd',
@@ -88,15 +91,7 @@ export const API_ENDPOINTS = {
     ANALYTICS: '/reports/analytics',
     EXPORT: '/reports/export/:dataType',
   },
-  SYSTEM: {
-    CONFIGS: '/system/configs',
-    CONFIG_CATEGORIES: '/system/configs/categories',
-    GET_CONFIG: '/system/configs/:key',
-    UPDATE_CONFIG: '/system/configs/:key',
-    DELETE_CONFIG: '/system/configs/:key',
-    RESET_CONFIG: '/system/configs/:key/reset',
-    INITIALIZE_CONFIG: '/system/configs/initialize',
-  },
+
   NOTIFICATIONS: {
     LIST: '/notifications',
     UNREAD_COUNT: '/notifications/unread-count',

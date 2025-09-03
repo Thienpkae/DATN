@@ -383,6 +383,48 @@ const forgotUserPassword = async (req, res) => {
     }
 };
 
+const verifyOTPForForgotPassword = async (req, res) => {
+    const { cccd, otp } = req.body;
+    try {
+        const sanitizedCccd = sanitizeInput(cccd);
+        const user = await User.findOne({ cccd: sanitizedCccd });
+        
+        if (!user) {
+            return res.status(404).json({ error: 'Không tìm thấy tài khoản' });
+        }
+
+        if (!user.otp || !user.otpExpires) {
+            return res.status(400).json({ error: 'Không tìm thấy OTP. Vui lòng yêu cầu gửi lại OTP' });
+        }
+
+        if (new Date() > user.otpExpires) {
+            return res.status(400).json({ error: 'OTP đã hết hạn. Vui lòng yêu cầu gửi lại OTP' });
+        }
+
+        if (user.otpAttempts >= 5) {
+            return res.status(400).json({ error: 'Đã vượt quá số lần thử OTP cho phép. Vui lòng thử lại sau' });
+        }
+
+        if (user.otp !== sanitizeInput(otp)) {
+            user.otpAttempts = (user.otpAttempts || 0) + 1;
+            await user.save();
+            return res.status(400).json({ error: 'OTP không đúng' });
+        }
+
+        // OTP đúng - reset otpAttempts nhưng giữ OTP để dùng cho reset password
+        user.otpAttempts = 0;
+        await user.save();
+
+        res.json({ 
+            message: 'OTP xác thực thành công', 
+            cccd: user.cccd,
+            success: true 
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 const resetUserPassword = async (req, res) => {
     const { cccd, otp, newPassword } = req.body;
     try {
@@ -395,7 +437,7 @@ const resetUserPassword = async (req, res) => {
 };
 
 const lockUnlockUserAccount = async (req, res) => {
-    const { targetCccd, lock } = req.body;
+    const { targetCccd, lock, reason } = req.body;
     const { cccd, org } = req.user;
     try {
         if (!targetCccd) {
@@ -409,7 +451,33 @@ const lockUnlockUserAccount = async (req, res) => {
         if (targetUser.org !== org) {
             return res.status(403).json({ error: `Admin can only manage users in their own organization (${org})` });
         }
-        const result = await lockUnlockAccount(cccd, sanitizeInput(targetCccd), lock);
+        
+        const result = await lockUnlockAccount(cccd, sanitizeInput(targetCccd), lock, reason);
+        
+        // Gửi SMS thông báo cho người dùng bị khóa/mở khóa
+        try {
+            const actionText = lock ? 'khóa' : 'mở khóa';
+            const reasonText = reason ? `. Lý do: ${reason}` : '';
+            const smsMessage = `[LAND_REGISTRY] Tài khoản của bạn đã được ${actionText}${reasonText}. Liên hệ quản trị viên nếu cần hỗ trợ.`;
+            
+            // Giả lập gửi SMS (tương tự như sendOTP)
+            console.log(`📱 SMS to ${targetUser.phone}: ${smsMessage}`);
+            
+            // Gửi thông báo in-app
+            await notificationService.createNotification(
+                lock ? 'ACCOUNT_LOCKED' : 'ACCOUNT_UNLOCKED',
+                sanitizeInput(targetCccd),
+                {
+                    customTitle: lock ? '🔒 Tài khoản đã bị khóa' : '🔓 Tài khoản đã được mở khóa',
+                    customMessage: `Tài khoản của bạn đã được ${actionText} bởi quản trị viên${reasonText}.`,
+                    priority: 'HIGH',
+                    adminCccd: cccd
+                }
+            );
+        } catch (notifyError) {
+            console.warn('Could not send SMS/notification for account lock/unlock:', notifyError.message);
+        }
+        
         res.json(result);
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -449,6 +517,7 @@ module.exports = {
     logout,
     changeUserPassword,
     forgotUserPassword,
+    verifyOTPForForgotPassword,
     resetUserPassword,
     lockUnlockUserAccount,
     deleteUserAccount,

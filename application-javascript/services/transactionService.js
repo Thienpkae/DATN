@@ -137,10 +137,10 @@ const transactionService = {
         }
     },
 
-    // Confirm transfer (by recipient)
+    // Confirm transfer (by recipient) - Accept or Reject
     async confirmTransfer(req, res) {
         try {
-            const { txID, landParcelID, toOwnerID } = req.body;
+            const { txID, landParcelID, toOwnerID, isAccepted, reason } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
@@ -150,7 +150,9 @@ const transactionService = {
                 'ConfirmTransfer',
                 txID,
                 landParcelID,
-                toOwnerID
+                toOwnerID,
+                isAccepted.toString(),
+                reason || ''
             );
 
             // Get the updated transaction to return as response data
@@ -162,14 +164,19 @@ const transactionService = {
             // Send notification to both parties
             try {
                 const tx = JSON.parse(transactionResult.toString());
-                await notificationService.notifyTransferConfirmed(tx.FromOwnerID, tx.ToOwnerID, landParcelID);
+                if (isAccepted) {
+                    await notificationService.notifyTransferConfirmed(tx.FromOwnerID, tx.ToOwnerID, landParcelID);
+                } else {
+                    await notificationService.notifyTransferRejected(tx.FromOwnerID, tx.ToOwnerID, landParcelID, reason);
+                }
             } catch (notificationError) {
                 console.error('Notification error:', notificationError);
             }
 
+            const actionText = isAccepted ? 'chấp nhận' : 'từ chối';
             res.json({
                 success: true,
-                message: 'Chuyển nhượng đã được xác nhận thành công và thông báo đã được gửi',
+                message: `Giao dịch chuyển nhượng đã được ${actionText} thành công và thông báo đã được gửi`,
                 data: JSON.parse(transactionResult.toString())
             });
         } catch (error) {

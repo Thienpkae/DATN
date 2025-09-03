@@ -1,13 +1,62 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Alert, Typography } from 'antd';
+import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Alert, Typography, Divider } from 'antd';
 import { PlusOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, HistoryOutlined, FileTextOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import transactionService from '../../../services/transactionService';
 import authService from '../../../services/auth';
 import documentService from '../../../services/documentService';
+import { DocumentDetailModal } from '../../Common';
 import { REQUIRED_DOCUMENTS, LAND_USE_PURPOSES } from '../../../services/index';
+
+const { TextArea } = Input;
 
 const { Option } = Select;
 const { Text } = Typography;
+
+// Hàm phân loại tài liệu dựa trên tên
+const getDocumentTypeFromTitle = (documentTitle) => {
+  if (!documentTitle) return null;
+  
+  const title = documentTitle.toLowerCase();
+  
+  // Giấy chứng nhận -> Certificate
+  if (title.includes('giấy chứng nhận') || title.includes('chứng nhận')) {
+    return 'CERTIFICATE';
+  }
+  
+  // Hợp đồng -> Contract
+  if (title.includes('hợp đồng')) {
+    return 'CONTRACT';
+  }
+  
+  // Đơn đăng ký -> Form
+  if (title.includes('đơn đăng ký') || 
+      title.includes('đơn đề nghị') || 
+      title.includes('đơn xin')) {
+    return 'FORM';
+  }
+  
+  // Bản đồ -> Map
+  if (title.includes('bản vẽ') ||
+      title.includes('mảnh trích')) {
+    return 'MAP';
+  }
+  
+  // Các loại khác không cần check
+  return null;
+};
+
+// Hàm kiểm tra tài liệu có phù hợp với yêu cầu không
+const isDocumentValidForRequirement = (documentTitle, documentType, requiredDocumentName) => {
+  const expectedType = getDocumentTypeFromTitle(requiredDocumentName);
+  
+  // Nếu không cần kiểm tra loại (expectedType = null), chấp nhận mọi tài liệu
+  if (!expectedType) {
+    return true;
+  }
+  
+  // Nếu cần kiểm tra, phải đúng loại
+  return documentType === expectedType;
+};
 
 const TransactionManagementPage = () => {
   const [loading, setLoading] = useState(false);
@@ -33,10 +82,17 @@ const TransactionManagementPage = () => {
   // States for document linking
   const [userDocuments, setUserDocuments] = useState([]);
   const [selectedDocuments, setSelectedDocuments] = useState({}); // Object: { docType: docID }
+
   
   // States for land management
   const [userLands, setUserLands] = useState([]);
   const [landLoading, setLandLoading] = useState(false);
+
+  // Document detail modal states
+  const [documentDetailOpen, setDocumentDetailOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [documents, setDocuments] = useState([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
   
   // State for transaction type selection
   const [selectedTransactionType, setSelectedTransactionType] = useState(null);
@@ -153,6 +209,47 @@ const TransactionManagementPage = () => {
         }
       }
 
+      // Validation loại tài liệu đính kèm
+      const requiredDocs = REQUIRED_DOCUMENTS[selectedTransactionType] || [];
+      const documentValidationErrors = [];
+      
+      for (const requiredDocName of requiredDocs) {
+        const selectedDocId = selectedDocuments[requiredDocName];
+        if (selectedDocId) {
+          // Tìm thông tin tài liệu được chọn
+          const selectedDoc = userDocuments.find(doc => doc.docID === selectedDocId);
+          if (selectedDoc) {
+            // Kiểm tra loại tài liệu có phù hợp không
+            if (!isDocumentValidForRequirement(selectedDoc.title, selectedDoc.type, requiredDocName)) {
+              const expectedType = getDocumentTypeFromTitle(requiredDocName);
+              if (expectedType) {
+                const typeMapping = {
+                  'CERTIFICATE': 'Giấy chứng nhận',
+                  'CONTRACT': 'Hợp đồng', 
+                  'FORM': 'Đơn đăng ký',
+                  'MAP': 'Bản đồ'
+                };
+                documentValidationErrors.push(
+                  `Tài liệu "${selectedDoc.title}" (loại ${selectedDoc.type}) không phù hợp với yêu cầu "${requiredDocName}". Cần loại: ${typeMapping[expectedType] || expectedType}`
+                );
+              }
+            }
+          }
+        }
+      }
+      
+      if (documentValidationErrors.length > 0) {
+        message.error(
+          <div>
+            <div style={{ marginBottom: 8, fontWeight: 'bold' }}>Tài liệu đính kèm không phù hợp:</div>
+            {documentValidationErrors.map((error, index) => (
+              <div key={`error-${index}`} style={{ marginBottom: 4 }}>• {error}</div>
+            ))}
+          </div>
+        );
+        return;
+      }
+
       const validation = transactionService.validateTransactionData(values, selectedTransactionType);
       if (!validation.isValid) {
         message.warning(validation.errors.join('\n'));
@@ -220,20 +317,26 @@ const TransactionManagementPage = () => {
     }
   };
 
-  const onConfirm = async () => {
+  const onConfirm = async (isAccepted) => {
     try {
       const values = await confirmForm.validateFields();
       setLoading(true);
+      
       await transactionService.confirmTransfer({
         txID: values.txID,
         landParcelID: values.landParcelID,
-        toOwnerID: values.toOwnerID
+        toOwnerID: values.toOwnerID,
+        isAccepted: isAccepted,
+        reason: values.reason || ''
       });
-      message.success('Xác nhận giao dịch thành công');
+      
+      const actionText = isAccepted ? 'chấp nhận' : 'từ chối';
+      message.success(`${actionText} giao dịch chuyển nhượng thành công!`);
       setConfirmOpen(false);
+      confirmForm.resetFields();
       loadMyTransactions();
     } catch (e) {
-      message.error(e.message || 'Xác nhận thất bại');
+      message.error(e.message || 'Xử lý thất bại');
     } finally {
       setLoading(false);
     }
@@ -272,6 +375,48 @@ const TransactionManagementPage = () => {
     }
   };
 
+  const onViewDetail = async (record) => {
+    setSelected(record);
+    setDetailOpen(true);
+    
+    // Load documents if available
+    if (record.documentIds && record.documentIds.length > 0) {
+      setDocuments([]);
+      setDocumentsLoading(true);
+      
+      try {
+        const docPromises = record.documentIds.map(async (docId) => {
+          try {
+            return await documentService.getDocument(docId);
+          } catch (e) {
+            console.warn(`Không thể load tài liệu ${docId}:`, e);
+            return null;
+          }
+        });
+        
+        const docs = await Promise.all(docPromises);
+        const validDocs = docs.filter(doc => doc !== null);
+        setDocuments(validDocs);
+        
+        console.log('📄 Loaded documents:', validDocs.length, 'out of', record.documentIds.length);
+      } catch (e) {
+        console.warn('Không thể load danh sách tài liệu:', e);
+        setDocuments([]);
+      } finally {
+        setDocumentsLoading(false);
+      }
+    } else {
+      setDocuments([]);
+      setDocumentsLoading(false);
+    }
+  };
+
+  const onViewDocumentDetail = async (document) => {
+    setSelectedDocument(document);
+    setDocumentDetailOpen(true);
+    console.log('🔗 Mở modal xem chi tiết tài liệu:', document.docID);
+  };
+
   const getStatusTag = (status) => {
     const statusColors = {
       'PENDING': 'orange',
@@ -289,6 +434,18 @@ const TransactionManagementPage = () => {
     return <Tag color="blue">{transactionService.getTransactionTypeText(type)}</Tag>;
   };
 
+  const getDocumentStatusColor = (doc) => {
+    if (doc.status === 'VERIFIED') return 'green';
+    if (doc.status === 'REJECTED') return 'red';
+    return 'orange';
+  };
+
+  const getDocumentStatusText = (doc) => {
+    if (doc.status === 'VERIFIED') return 'Đã xác thực';
+    if (doc.status === 'REJECTED') return 'Không hợp lệ';
+    return 'Chờ xác thực';
+  };
+
   const getTransactionTypeText = (type) => {
     const typeTexts = {
       'TRANSFER': 'Chuyển nhượng quyền sử dụng đất',
@@ -301,7 +458,14 @@ const TransactionManagementPage = () => {
   };
 
   const canConfirm = (transaction) => {
-    return transaction.status === 'APPROVED' && transaction.type === 'TRANSFER';
+    const user = authService.getCurrentUser();
+    // Chỉ hiển thị button xác nhận khi:
+    // 1. Giao dịch đã được APPROVED
+    // 2. Là giao dịch TRANSFER 
+    // 3. User hiện tại là người nhận chuyển nhượng (toOwnerId)
+    return transaction.status === 'APPROVED' && 
+           transaction.type === 'TRANSFER' &&
+           user?.userId === transaction.toOwnerId;
   };
 
   const canSupplement = (transaction) => {
@@ -330,10 +494,7 @@ const TransactionManagementPage = () => {
       title: 'Thao tác', key: 'actions', fixed: 'right', render: (_, record) => (
         <Space>
           <Tooltip title="Xem chi tiết">
-            <Button icon={<EyeOutlined />} onClick={() => {
-              setSelected(record);
-              setDetailOpen(true);
-            }} />
+            <Button icon={<EyeOutlined />} onClick={() => onViewDetail(record)} />
           </Tooltip>
           <Tooltip title="Lịch sử">
             <Button icon={<HistoryOutlined />} onClick={() => onViewHistory(record.txId)} />
@@ -403,6 +564,41 @@ const TransactionManagementPage = () => {
                 }}>
                   {index + 1}. {docType}
                 </div>
+                {(() => {
+                  const expectedType = getDocumentTypeFromTitle(docType);
+                  if (expectedType) {
+                    const typeMapping = {
+                      'CERTIFICATE': 'Giấy chứng nhận',
+                      'CONTRACT': 'Hợp đồng', 
+                      'FORM': 'Đơn đăng ký',
+                      'MAP': 'Bản đồ'
+                    };
+                    return (
+                      <div style={{ 
+                        fontSize: '12px', 
+                        color: '#666',
+                        background: '#f6f6f6',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        marginBottom: 8
+                      }}>
+                        💡 Cần loại tài liệu: <strong>{typeMapping[expectedType] || expectedType}</strong>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{ 
+                      fontSize: '12px', 
+                      color: '#52c41a',
+                      background: '#f6ffed',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      marginBottom: 8
+                    }}>
+                      ✅ Chấp nhận mọi loại tài liệu
+                    </div>
+                  );
+                })()}
               </div>
               <div style={{ 
               display: 'flex', 
@@ -440,10 +636,16 @@ const TransactionManagementPage = () => {
                   ) : (
                     userDocuments
                       .filter(doc => !Object.values(selectedDocuments).includes(doc.docID)) // Chỉ hiển thị tài liệu chưa được chọn
+                      .filter(doc => isDocumentValidForRequirement(doc.title, doc.type, docType)) // Kiểm tra loại tài liệu phù hợp
                     .map((doc) => (
                       <Option key={doc.docID} value={doc.docID}>
                         <Tag color="blue" size="small">{doc.type}</Tag>
                         {doc.title}
+                        {!isDocumentValidForRequirement(doc.title, doc.type, docType) && (
+                          <Tag color="orange" size="small" style={{ marginLeft: 4 }}>
+                            Không phù hợp
+                          </Tag>
+                        )}
                       </Option>
                     ))
                   )}
@@ -765,20 +967,77 @@ const TransactionManagementPage = () => {
       </Modal>
 
       {/* Confirm Transaction */}
-      <Modal title="Xác nhận giao dịch" open={confirmOpen} onOk={onConfirm} onCancel={() => setConfirmOpen(false)} confirmLoading={loading} width={640}>
+      <Modal 
+        title="Xác nhận giao dịch chuyển nhượng" 
+        open={confirmOpen} 
+        footer={[
+          <Button key="cancel" onClick={() => {
+            setConfirmOpen(false);
+            confirmForm.resetFields();
+          }}>
+            Hủy
+          </Button>,
+          <Button 
+            key="reject" 
+            danger 
+            loading={loading}
+            onClick={() => onConfirm(false)}
+          >
+            Từ chối
+          </Button>,
+          <Button 
+            key="accept" 
+            type="primary" 
+            loading={loading}
+            onClick={() => onConfirm(true)}
+          >
+            Chấp nhận
+          </Button>
+        ]}
+        onCancel={() => {
+          setConfirmOpen(false);
+          confirmForm.resetFields();
+        }} 
+        width={600}
+      >
         <Form layout="vertical" form={confirmForm}>
-          <Form.Item name="txID" label="Mã giao dịch">
-            <Input disabled />
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="txID" label="Mã giao dịch">
+                <Input disabled />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="landParcelID" label="Mã thửa đất">
+                <Input disabled />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="toOwnerID" label="CCCD người nhận">
+                <Input disabled />
+              </Form.Item>
+            </Col>
+          </Row>
+          
+          <Form.Item 
+            label="Lý do (nếu từ chối)" 
+            name="reason"
+          >
+            <TextArea 
+              rows={3} 
+              placeholder="Nhập lý do từ chối (tùy chọn)"
+            />
           </Form.Item>
-          <Form.Item name="landParcelID" label="Mã thửa đất">
-            <Input disabled />
-          </Form.Item>
-          <Form.Item name="toOwnerID" label="CCCD người nhận">
-            <Input disabled />
-          </Form.Item>
-          <div style={{ marginTop: 16, color: '#666', fontSize: '14px' }}>
-            Bạn có chắc chắn muốn xác nhận giao dịch chuyển nhượng này? Hành động này sẽ hoàn tất quá trình chuyển nhượng thửa đất.
-          </div>
+          
+          <Alert
+            message="Quyết định về giao dịch chuyển nhượng"
+            description="Bạn có thể chấp nhận hoặc từ chối giao dịch chuyển nhượng này. Nếu chấp nhận, giao dịch sẽ được chuyển đến cơ quan có thẩm quyền để xác minh và phê duyệt. Nếu từ chối, giao dịch sẽ được đóng."
+            type="info"
+            showIcon
+            style={{ marginTop: 16 }}
+          />
         </Form>
       </Modal>
 
@@ -824,15 +1083,103 @@ const TransactionManagementPage = () => {
               </div>
             )}
 
+            <Divider>Tài liệu đính kèm</Divider>
+            
             {selected.documentIds && selected.documentIds.length > 0 && (
               <div style={{ marginTop: 16 }}>
                 <strong>Tài liệu đính kèm:</strong>
                 <div style={{ marginTop: 8 }}>
-                  {selected.documentIds.map((docId, index) => (
-                    <Tag key={index} style={{ marginBottom: 4 }}>
-                      {docId}
-                    </Tag>
-                  ))}
+                  {documentsLoading ? (
+                    // Loading skeleton giống Org2
+                    <div>
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between',
+                          padding: '8px 12px',
+                          marginBottom: '8px',
+                          background: '#f8f9fa',
+                          borderRadius: '6px',
+                          border: '1px solid #e9ecef'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ width: '60%', height: '16px', background: '#e9ecef', borderRadius: '4px', marginBottom: '4px' }} />
+                            <div style={{ width: '40%', height: '12px', background: '#e9ecef', borderRadius: '4px' }} />
+                          </div>
+                          <Space>
+                            <div style={{ width: '60px', height: '24px', background: '#e9ecef', borderRadius: '4px' }} />
+                          </Space>
+                        </div>
+                      ))}
+                    </div>
+                  ) : documents && documents.length > 0 ? (
+                    // Hiển thị tài liệu giống hệt Org2
+                    <div>
+                      <div style={{ marginBottom: '8px', color: '#666', fontSize: '12px' }}>
+                        {documents.length} tài liệu
+                      </div>
+                      {documents.map((doc, index) => (
+                        <div key={index} style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between',
+                          padding: '8px 12px',
+                          marginBottom: '8px',
+                          background: '#f8f9fa',
+                          borderRadius: '6px',
+                          border: '1px solid #e9ecef'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: '500', color: '#1890ff' }}>
+                              {doc.title || doc.docID}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                              {doc.type} • {doc.fileSize ? `${(doc.fileSize / 1024).toFixed(2)} KB` : 'N/A'}
+                            </div>
+                          </div>
+                          <Space>
+                            <Tooltip title="Xem chi tiết tài liệu">
+                              <Button 
+                                type="text" 
+                                icon={<FileTextOutlined />} 
+                                size="small"
+                                onClick={() => onViewDocumentDetail(doc)}
+                                style={{ color: '#1890ff' }}
+                              />
+                            </Tooltip>
+                            <Tag 
+                              color={getDocumentStatusColor(doc)} 
+                              size="small"
+                              style={{ 
+                                width: '120px',
+                                minWidth: '120px',
+                                textAlign: 'center',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                padding: '4px 12px'
+                              }}
+                            >
+                              {getDocumentStatusText(doc)}
+                            </Tag>
+                          </Space>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    // Không có tài liệu giống Org2
+                    <div style={{ 
+                      padding: '16px', 
+                      textAlign: 'center', 
+                      color: '#999',
+                      background: '#f8f9fa',
+                      borderRadius: '6px',
+                      border: '1px dashed #e9ecef'
+                    }}>
+                      <FileTextOutlined style={{ fontSize: '24px', marginBottom: '8px', color: '#ccc' }} />
+                      <div>Chưa có tài liệu đính kèm</div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1023,6 +1370,16 @@ const TransactionManagementPage = () => {
           </div>
         )}
       </Drawer>
+
+      {/* Document Detail Modal */}
+      <DocumentDetailModal
+        document={selectedDocument}
+        visible={documentDetailOpen}
+        onClose={() => setDocumentDetailOpen(false)}
+        onVerify={null} // Org3 không có quyền xác thực
+        onReject={null} // Org3 không có quyền từ chối
+        userRole="Org3"
+      />
     </Card>
   );
 };

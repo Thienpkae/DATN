@@ -232,6 +232,20 @@ class NotificationService {
                     priority: 'HIGH'
                 };
 
+            case 'ACCOUNT_LOCKED':
+                return {
+                    title: '🔒 Tài khoản đã bị khóa',
+                    message: customMessage || 'Tài khoản của bạn đã bị khóa bởi quản trị viên. Liên hệ hỗ trợ nếu cần thiết.',
+                    priority: 'HIGH'
+                };
+
+            case 'ACCOUNT_UNLOCKED':
+                return {
+                    title: '🔓 Tài khoản đã được mở khóa',
+                    message: customMessage || 'Tài khoản của bạn đã được mở khóa bởi quản trị viên. Bạn có thể đăng nhập lại.',
+                    priority: 'HIGH'
+                };
+
             default:
                 return {
                     title: '🔔 Thông báo mới',

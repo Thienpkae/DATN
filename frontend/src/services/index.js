@@ -4,7 +4,6 @@ export { default as authService } from './auth';
 export { default as landService } from './landService';
 export { default as documentService } from './documentService';
 export { default as transactionService } from './transactionService';
-export { default as dashboardService } from './dashboard';
 export { default as notificationService } from './notification';
 
 // Export service types for TypeScript-like usage
@@ -104,10 +103,26 @@ export const TRANSACTION_STATUSES = {
 
 // Export document types - EXACTLY match chaincode
 export const DOCUMENT_TYPES = {
-  CERTIFICATE: 'CERTIFICATE',
-  CONTRACT: 'CONTRACT',
-  MAP: 'MAP',
-  OTHER: 'OTHER'
+  CERTIFICATE: 'CERTIFICATE',     // Giấy chứng nhận
+  CONTRACT: 'CONTRACT',           // Hợp đồng
+  MAP: 'MAP',                     // Bản đồ
+  FORM: 'FORM',                   // Đơn đăng ký
+  TAX_DOCUMENT: 'TAX_DOCUMENT',   // Tài liệu thuế
+  TECHNICAL_DOC: 'TECHNICAL_DOC', // Tài liệu kỹ thuật
+  LEGAL_DOC: 'LEGAL_DOC',         // Tài liệu pháp lý
+  OTHER: 'OTHER'                  // Khác
+};
+
+// Export document type display names
+export const DOCUMENT_TYPE_NAMES = {
+  CERTIFICATE: 'Giấy chứng nhận',
+  CONTRACT: 'Hợp đồng',
+  MAP: 'Bản đồ',
+  FORM: 'Đơn đăng ký',
+  TAX_DOCUMENT: 'Tài liệu thuế',
+  TECHNICAL_DOC: 'Tài liệu kỹ thuật',
+  LEGAL_DOC: 'Tài liệu pháp lý',
+  OTHER: 'Khác'
 };
 
 // Export land use purposes - EXACTLY match chaincode
@@ -250,7 +265,9 @@ export const REQUIRED_DOCUMENTS = {
   TRANSFER: [
     'Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo Mẫu số 09/ĐK',
     'Hợp đồng chuyển nhượng quyền sử dụng đất',
-    'Giấy chứng nhận quyền sử dụng đất'
+    'Giấy chứng nhận quyền sử dụng đất',
+    'Mảnh trích đo bản đồ địa chính thửa đất',
+    'Bản kê khai nộp thuế'
   ],
   SPLIT: [
     'Đơn đề nghị tách thửa đất, hợp thửa đất theo Mẫu số 21 ban hành kèm theo Nghị định số 151/2025/NĐ-CP',

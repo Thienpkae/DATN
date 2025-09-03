@@ -9,11 +9,12 @@ import ErrorBoundary from './components/Common/ErrorBoundary';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import VerifyOTP from './components/Auth/VerifyOTP';
+import ForgotPassword from './components/Auth/ForgotPassword';
+import ResetPassword from './components/Auth/ResetPassword';
 import AdminAccountPage from './components/Admin/AdminAccountPage';
 import Org1AdminPage from './components/Organization/Org1/Org1AdminPage';
 import Org2AdminPage from './components/Organization/Org2/Org2AdminPage';
 import Org3AdminPage from './components/Organization/Org3/Org3AdminPage';
-import SystemConfigPage from './components/Admin/SystemConfigPage';
 import LogsPage from './components/Admin/LogsPage';
 
 // Organization Dashboards
@@ -268,6 +269,18 @@ function App() {
                       user ? <Navigate to="/" replace /> : <VerifyOTP />
                     } 
                   />
+                  <Route
+                    path="/forgot-password"
+                    element={
+                      user ? <Navigate to="/" replace /> : <ForgotPassword />
+                    }
+                  />
+                  <Route
+                    path="/reset-password"
+                    element={
+                      user ? <Navigate to="/" replace /> : <ResetPassword />
+                    }
+                  />
                   <Route 
                     path="/admin/accounts" 
                     element={
@@ -290,16 +303,7 @@ function App() {
                       )
                     }
                   />
-                  <Route 
-                    path="/admin/system-configs" 
-                    element={
-                      user && isAdmin() ? (
-                        <SystemConfigPage />
-                      ) : (
-                        <Navigate to={user ? "/" : "/login"} replace />
-                      )
-                    }
-                  />
+
                   <Route 
                     path="/admin/logs" 
                     element={

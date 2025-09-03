@@ -165,7 +165,7 @@ export const useAuth = () => {
   // Organization-specific functions
   const belongsToOrg = useCallback((targetOrg) => {
     if (!user) return false;
-    return belongsToOrg(user.org, targetOrg);
+    return user.org === targetOrg;
   }, [user]);
 
   const getUserOrg = useCallback(() => {

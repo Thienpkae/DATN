@@ -43,7 +43,9 @@ const DocumentManagementPage = () => {
       const docs = await documentService.getAllDocumentsWithMetadata();
       setDocuments(docs);
     } catch (e) {
-      message.error(e.message || 'Lỗi khi tải danh sách tài liệu');
+      console.error('Error loading documents:', e);
+      // Don't show error alert, just set empty documents - UI will show empty state
+      setDocuments([]);
     } finally {
       setLoading(false);
     }
@@ -351,10 +353,11 @@ const DocumentManagementPage = () => {
             onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
           />
           <Select placeholder="Loại tài liệu" allowClear style={{ width: 150 }} value={filters.docType} onChange={(v) => setFilters({ ...filters, docType: v })}>
-            <Option value="CERTIFICATE">Giấy chứng nhận</Option>
-            <Option value="CONTRACT">Hợp đồng</Option>
-            <Option value="REPORT">Báo cáo</Option>
-            <Option value="OTHER">Khác</Option>
+            {documentService.getDocumentTypes().map(type => (
+              <Option key={type} value={type}>
+                {documentService.getDocumentTypeName(type)}
+              </Option>
+            ))}
           </Select>
           <Select placeholder="Trạng thái xác thực" allowClear style={{ width: 150 }} value={filters.verified} onChange={(v) => setFilters({ ...filters, verified: v })}>
             <Option value={true}>Đã xác thực</Option>
@@ -406,10 +409,11 @@ const DocumentManagementPage = () => {
             <Col span={12}>
               <Form.Item name="docType" label="Loại tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
                 <Select placeholder="Chọn loại">
-                  <Option value="CERTIFICATE">Giấy chứng nhận</Option>
-                  <Option value="CONTRACT">Hợp đồng</Option>
-                  <Option value="REPORT">Báo cáo</Option>
-                  <Option value="OTHER">Khác</Option>
+                  {documentService.getDocumentTypes().map(type => (
+                    <Option key={type} value={type}>
+                      {documentService.getDocumentTypeName(type)}
+                    </Option>
+                  ))}
                 </Select>
               </Form.Item>
             </Col>

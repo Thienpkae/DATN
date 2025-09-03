@@ -280,6 +280,22 @@ const Login = ({ onLogin }) => {
                 </Button>
               </Form.Item>
 
+              {/* Forgot Password Link */}
+              <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                <Link 
+                  to="/forgot-password" 
+                  style={{ 
+                    fontSize: '14px', 
+                    fontWeight: '500',
+                    textDecoration: 'none',
+                    color: themeToken.colorPrimary
+                  }}
+                >
+                  <KeyOutlined style={{ marginRight: '8px' }} />
+                  Quên mật khẩu?
+                </Link>
+              </div>
+
               <Divider style={{ margin: '1.5rem 0' }}>
                 <Text type="secondary" style={{ fontSize: '14px' }}>Mới với hệ thống?</Text>
               </Divider>

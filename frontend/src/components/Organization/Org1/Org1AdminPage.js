@@ -1,10 +1,9 @@
 import React from 'react';
 import { Layout, Typography, Tabs, Space, Dropdown, Avatar } from 'antd';
-import { BankOutlined, TeamOutlined, ToolOutlined, FileSearchOutlined, UserOutlined } from '@ant-design/icons';
+import { BankOutlined, TeamOutlined, FileSearchOutlined, UserOutlined } from '@ant-design/icons';
 import authService from '../../../services/auth';
 
 import AdminAccountPage from '../../Admin/AdminAccountPage';
-import SystemConfigPage from '../../Admin/SystemConfigPage';
 import LogsPage from '../../Admin/LogsPage';
 
 const { Header, Content } = Layout;
@@ -23,16 +22,6 @@ const Org1AdminPage = ({ onLogout }) => {
         </Space>
       ),
       children: <AdminAccountPage />,
-    },
-    {
-      key: 'system-configs',
-      label: (
-        <Space>
-          <ToolOutlined />
-          <span>Thiết lập hệ thống</span>
-        </Space>
-      ),
-      children: <SystemConfigPage />,
     },
     {
       key: 'logs',

@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Divider, List } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined, CheckCircleOutlined, CloseCircleOutlined, LinkOutlined, FileTextOutlined, HistoryOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip } from 'antd';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, CheckCircleOutlined, CloseCircleOutlined, FileTextOutlined, HistoryOutlined } from '@ant-design/icons';
 import transactionService from '../../../services/transactionService';
-import { DocumentLinker, DocumentViewer } from '../../Common';
+import documentService from '../../../services/documentService';
+import { DocumentDetailModal } from '../../Common';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -26,11 +27,13 @@ const TransactionManagementPage = () => {
   const [approveForm] = Form.useForm();
   const [rejectForm] = Form.useForm();
   
-  // Document linking states
-  const [documentLinkerOpen, setDocumentLinkerOpen] = useState(false);
-  const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
+  // Document states
   const [selectedDocument, setSelectedDocument] = useState(null);
-  const [linkedDocuments, setLinkedDocuments] = useState([]);
+  
+  // Document detail modal states
+  const [documentDetailOpen, setDocumentDetailOpen] = useState(false);
+  const [documents, setDocuments] = useState([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
 
   const loadList = async () => {
     try {
@@ -132,32 +135,49 @@ const TransactionManagementPage = () => {
       const res = await transactionService.getTransactionHistory(record.txId);
       setHistory(Array.isArray(res) ? res : (res?.data ?? []));
       
-      // Load linked documents
-      if (record.documentIDs && record.documentIDs.length > 0) {
-        setLinkedDocuments(record.documentIDs);
+
+
+      // Load documents for detail modal - tương tự như Org2
+      if (record.documentIds && record.documentIds.length > 0) {
+        setDocuments([]);
+        setDocumentsLoading(true);
+        
+        try {
+          const docPromises = record.documentIds.map(async (docId) => {
+            try {
+              return await documentService.getDocument(docId);
+            } catch (e) {
+              console.warn(`Không thể load tài liệu ${docId}:`, e);
+              return null;
+            }
+          });
+          
+          const docs = await Promise.all(docPromises);
+          const validDocs = docs.filter(doc => doc !== null);
+          setDocuments(validDocs);
+          
+          console.log('📄 Loaded documents:', validDocs.length, 'out of', record.documentIds.length);
+        } catch (e) {
+          console.warn('Không thể load danh sách tài liệu:', e);
+          setDocuments([]);
+        } finally {
+          setDocumentsLoading(false);
+        }
       } else {
-        setLinkedDocuments([]);
+        setDocuments([]);
+        setDocumentsLoading(false);
       }
     } catch (e) {
       setHistory([]);
-      setLinkedDocuments([]);
+      setDocuments([]);
+      setDocumentsLoading(false);
     }
   };
 
-  const openDocumentLinker = () => {
-    setDocumentLinkerOpen(true);
-  };
-
-  const openDocumentViewer = (document) => {
+  const onViewDocumentDetail = async (document) => {
     setSelectedDocument(document);
-    setDocumentViewerOpen(true);
-  };
-
-  const handleDocumentLinkSuccess = () => {
-    // Reload transaction details to get updated document list
-    if (selected) {
-      openDetail(selected);
-    }
+    setDocumentDetailOpen(true);
+    console.log('🔗 Mở modal xem chi tiết tài liệu:', document.docID);
   };
 
   const getTransactionTypeLabel = (type) => {
@@ -195,6 +215,18 @@ const TransactionManagementPage = () => {
       'REJECTED': 'red'
     };
     return statusColors[status] || 'default';
+  };
+
+  const getDocumentStatusColor = (doc) => {
+    if (doc.status === 'VERIFIED') return 'green';
+    if (doc.status === 'REJECTED') return 'red';
+    return 'orange';
+  };
+
+  const getDocumentStatusText = (doc) => {
+    if (doc.status === 'VERIFIED') return 'Đã xác thực';
+    if (doc.status === 'REJECTED') return 'Không hợp lệ';
+    return 'Chờ xác thực';
   };
 
   const columns = useMemo(() => ([
@@ -318,94 +350,151 @@ const TransactionManagementPage = () => {
         </Modal>
 
         {/* Transaction Detail Drawer */}
-        <Drawer title={`Chi tiết giao dịch: ${selected?.txID}`} width={800} open={detailOpen} onClose={() => setDetailOpen(false)}>
+        <Drawer title="Chi tiết giao dịch" width={800} open={detailOpen} onClose={() => setDetailOpen(false)}>
           {selected && (
             <div>
               <Row gutter={16}>
-                <Col span={12}>
-                  <strong>Mã giao dịch:</strong>
-                  <br />
-                  <code>{selected.txID}</code>
-                </Col>
-                <Col span={12}>
-                  <strong>Loại giao dịch:</strong>
-                  <br />
-                  <Tag color="blue">{getTransactionTypeLabel(selected.type)}</Tag>
-                </Col>
-                <Col span={12}>
-                  <strong>Thửa đất chính:</strong>
-                  <br />
-                  {selected.landParcelID}
-                </Col>
-                <Col span={12}>
-                  <strong>Trạng thái:</strong>
-                  <br />
-                  <Tag color={getStatusColor(selected.status)}>{selected.status}</Tag>
-                </Col>
-                <Col span={12}>
-                  <strong>Người thực hiện:</strong>
-                  <br />
-                  {selected.userID}
-                </Col>
-                <Col span={12}>
-                  <strong>Ngày tạo:</strong>
-                  <br />
-                  {selected.createdAt ? new Date(selected.createdAt).toLocaleString('vi-VN') : 'N/A'}
-                </Col>
-                <Col span={24}>
-                  <strong>Chi tiết:</strong>
-                  <br />
-                  {selected.details || 'Không có'}
-                </Col>
+                <Col span={12}><strong>Mã giao dịch:</strong> {selected.txID}</Col>
+                <Col span={12}><strong>Loại:</strong> {getTransactionTypeLabel(selected.type)}</Col>
               </Row>
-
-              <Divider>Tài liệu liên quan</Divider>
+              <Row gutter={16} style={{ marginTop: 12 }}>
+                <Col span={12}><strong>Thửa đất:</strong> {selected.landParcelId}</Col>
+                <Col span={12}><strong>Trạng thái:</strong> {getStatusTag(selected.status)}</Col>
+              </Row>
+              <Row gutter={16} style={{ marginTop: 12 }}>
+                <Col span={12}><strong>Người gửi:</strong> {selected.fromOwnerId}</Col>
+                <Col span={12}><strong>Người nhận:</strong> {selected.toOwnerId || '-'}</Col>
+              </Row>
+              <Row gutter={16} style={{ marginTop: 12 }}>
+                <Col span={12}><strong>Ngày tạo:</strong> {selected.createdAt ? new Date(selected.createdAt).toLocaleDateString('vi-VN') : 'N/A'}</Col>
+                <Col span={12}><strong>Ngày cập nhật:</strong> {selected.updatedAt ? new Date(selected.updatedAt).toLocaleDateString('vi-VN') : 'N/A'}</Col>
+              </Row>
               
-              <div style={{ marginBottom: 16 }}>
-                <Button
-                  type="primary"
-                  icon={<LinkOutlined />}
-                  onClick={openDocumentLinker}
-                >
-                  Liên kết tài liệu
-                </Button>
-              </div>
+              {selected.description && (
+                <div style={{ marginTop: 12 }}>
+                  <strong>Mô tả:</strong> {selected.description}
+                </div>
+              )}
               
-              <List
-                header={<div><strong>Danh sách tài liệu ({linkedDocuments.length})</strong></div>}
-                bordered
-                dataSource={linkedDocuments}
-                renderItem={(docId, index) => (
-                  <List.Item
-                    actions={[
-                      <Button
-                        size="small"
-                        icon={<EyeOutlined />}
-                        onClick={() => {
-                          // Tìm tài liệu và mở viewer
-                          const doc = linkedDocuments.find(d => d.docID === docId);
-                          if (doc) {
-                            openDocumentViewer(doc);
-                          } else {
-                            message.info('Không thể tìm thấy thông tin tài liệu');
-                          }
-                        }}
-                      >
-                        Xem
-                      </Button>
-                    ]}
-                  >
-                    <List.Item.Meta
-                      avatar={<FileTextOutlined />}
-                      title={`Tài liệu ${index + 1}`}
-                      description={`ID: ${docId}`}
-                    />
-                  </List.Item>
-                )}
-                locale={{ emptyText: 'Chưa có tài liệu nào được liên kết' }}
-              />
+              {selected.details && (
+                <div style={{ marginTop: 16 }}>
+                  <strong>Chi tiết:</strong>
+                  <div style={{ 
+                    marginTop: 8, 
+                    padding: 12, 
+                    background: '#f5f5f5', 
+                    borderRadius: 4,
+                    borderLeft: '4px solid #722ed1'
+                  }}>
+                    {selected.details}
+                  </div>
+                </div>
+              )}
+              
+              {selected.notes && (
+                <div style={{ marginTop: 12 }}>
+                  <strong>Ghi chú:</strong> {selected.notes}
+                </div>
+              )}
 
-
+              {selected.documentIds && selected.documentIds.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <strong>Tài liệu đính kèm:</strong>
+                  <div style={{ marginTop: 8 }}>
+                    {documentsLoading ? (
+                      // Loading skeleton
+                      <div>
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between',
+                            padding: '8px 12px',
+                            marginBottom: '8px',
+                            background: '#f8f9fa',
+                            borderRadius: '6px',
+                            border: '1px solid #e9ecef'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ width: '60%', height: '16px', background: '#e9ecef', borderRadius: '4px', marginBottom: '4px' }} />
+                              <div style={{ width: '40%', height: '12px', background: '#e9ecef', borderRadius: '4px' }} />
+                            </div>
+                            <Space>
+                              <div style={{ width: '60px', height: '24px', background: '#e9ecef', borderRadius: '4px' }} />
+                            </Space>
+                          </div>
+                        ))}
+                      </div>
+                    ) : documents && documents.length > 0 ? (
+                      // Hiển thị tài liệu - giống hệt Org2
+                      <div>
+                        <div style={{ marginBottom: '8px', color: '#666', fontSize: '12px' }}>
+                          {documents.length} tài liệu
+                        </div>
+                        {documents.map((doc, index) => (
+                          <div key={index} style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between',
+                            padding: '8px 12px',
+                            marginBottom: '8px',
+                            background: '#f8f9fa',
+                            borderRadius: '6px',
+                            border: '1px solid #e9ecef'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: '500', color: '#1890ff' }}>
+                                {doc.title || doc.docID}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                                {doc.type} • {doc.fileSize ? `${(doc.fileSize / 1024).toFixed(2)} KB` : 'N/A'}
+                              </div>
+                            </div>
+                            <Space>
+                              <Tooltip title="Xem chi tiết tài liệu">
+                                <Button 
+                                  type="text" 
+                                  icon={<FileTextOutlined />} 
+                                  size="small"
+                                  onClick={() => onViewDocumentDetail(doc)}
+                                  style={{ color: '#1890ff' }}
+                                />
+                              </Tooltip>
+                              <Tag 
+                                color={getDocumentStatusColor(doc)} 
+                                size="small"
+                                style={{ 
+                                  width: '120px',
+                                  minWidth: '120px',
+                                  textAlign: 'center',
+                                  fontSize: '12px',
+                                  fontWeight: '500',
+                                  padding: '4px 12px'
+                                }}
+                              >
+                                {getDocumentStatusText(doc)}
+                              </Tag>
+                            </Space>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      // Không có tài liệu - giống Org2
+                      <div style={{ 
+                        padding: '16px', 
+                        textAlign: 'center', 
+                        color: '#999',
+                        background: '#f8f9fa',
+                        borderRadius: '6px',
+                        border: '1px dashed #e9ecef'
+                      }}>
+                        <FileTextOutlined style={{ fontSize: '24px', marginBottom: '8px', color: '#ccc' }} />
+                        <div>Chưa có tài liệu đính kèm</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </Drawer>
@@ -521,21 +610,14 @@ const TransactionManagementPage = () => {
           )}
         </Drawer>
 
-        {/* Document Linker Modal */}
-        <DocumentLinker
-          open={documentLinkerOpen}
-          onCancel={() => setDocumentLinkerOpen(false)}
-          onSuccess={handleDocumentLinkSuccess}
-          targetType="transaction"
-          targetID={selected?.txID}
-          linkedDocuments={linkedDocuments}
-        />
-
-        {/* Document Viewer Modal */}
-        <DocumentViewer
-          open={documentViewerOpen}
-          onCancel={() => setDocumentViewerOpen(false)}
-          documentData={selectedDocument}
+        {/* Document Detail Modal */}
+        <DocumentDetailModal
+          document={selectedDocument}
+          visible={documentDetailOpen}
+          onClose={() => setDocumentDetailOpen(false)}
+          onVerify={null} // Org1 không có quyền xác thực
+          onReject={null} // Org1 không có quyền từ chối
+          userRole="Org1"
         />
       </Card>
     </div>

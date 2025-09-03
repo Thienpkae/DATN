@@ -1,6 +1,29 @@
 import apiClient from './api';
 import { API_ENDPOINTS } from './api';
 
+// Define constants locally to avoid circular dependency
+const DOCUMENT_TYPES = {
+  CERTIFICATE: 'CERTIFICATE',     // Giấy chứng nhận
+  CONTRACT: 'CONTRACT',           // Hợp đồng
+  MAP: 'MAP',                     // Bản đồ
+  FORM: 'FORM',                   // Đơn đăng ký
+  TAX_DOCUMENT: 'TAX_DOCUMENT',   // Tài liệu thuế
+  TECHNICAL_DOC: 'TECHNICAL_DOC', // Tài liệu kỹ thuật
+  LEGAL_DOC: 'LEGAL_DOC',         // Tài liệu pháp lý
+  OTHER: 'OTHER'                  // Khác
+};
+
+const DOCUMENT_TYPE_NAMES = {
+  CERTIFICATE: 'Giấy chứng nhận',
+  CONTRACT: 'Hợp đồng',
+  MAP: 'Bản đồ',
+  FORM: 'Đơn đăng ký',
+  TAX_DOCUMENT: 'Tài liệu thuế',
+  TECHNICAL_DOC: 'Tài liệu kỹ thuật',
+  LEGAL_DOC: 'Tài liệu pháp lý',
+  OTHER: 'Khác'
+};
+
 // Document Management Service
 const documentService = {
   // Create new document
@@ -446,14 +469,17 @@ const documentService = {
 
   // Get document type options
   getDocumentTypes() {
-    return [
-      'CERTIFICATE',    // Giấy chứng nhận
-      'CONTRACT',       // Hợp đồng
-      'MAP',           // Bản đồ
-      'IDENTITY',      // Giấy tờ tùy thân
-      'APPLICATION',   // Đơn từ
-      'OTHER'          // Khác
-    ];
+    return Object.values(DOCUMENT_TYPES);
+  },
+
+  // Get document type display names
+  getDocumentTypeNames() {
+    return DOCUMENT_TYPE_NAMES;
+  },
+
+  // Get document type display name by type
+  getDocumentTypeName(type) {
+    return DOCUMENT_TYPE_NAMES[type] || type;
   },
 
   // Get document status options

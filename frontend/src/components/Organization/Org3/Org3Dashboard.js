@@ -29,48 +29,41 @@ const { Title } = Typography;
  * Dashboard đơn giản chỉ để routing
  */
 const Org3Dashboard = ({ user, onLogout }) => {
-  const userMenu = (
-    <div style={{ padding: '8px 0', minWidth: '200px' }}>
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', backgroundColor: '#fafafa' }}>
-        <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{normalizeVietnameseName(user.name)}</div>
-        <div style={{ fontSize: '12px', color: '#666', display: 'flex', alignItems: 'center', marginTop: '4px' }}>
-          <UserOutlined style={{ marginRight: '8px' }} />
-          Công dân
-        </div>
-      </div>
-      <div
-        style={{
-          padding: '12px 16px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          backgroundColor: '#ffffff',
-          transition: 'background-color 0.2s'
-        }}
-        onClick={() => { window.location.href = '/profile'; }}
-        onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
-        onMouseLeave={(e) => e.target.style.backgroundColor = '#ffffff'}
-      >
-        Quản lý hồ sơ
-      </div>
-      <div
-        style={{
-          padding: '12px 16px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          backgroundColor: '#ffffff',
-          transition: 'background-color 0.2s'
-        }}
-        onClick={onLogout}
-        onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
-        onMouseLeave={(e) => e.target.style.backgroundColor = '#ffffff'}
-      >
-        <LogoutOutlined style={{ marginRight: '8px' }} />
-        Đăng xuất
-      </div>
-    </div>
-  );
+  const userMenu = {
+    items: [
+      {
+        key: 'user-info',
+        label: (
+          <div style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0', backgroundColor: '#fafafa' }}>
+            <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{normalizeVietnameseName(user.name)}</div>
+            <div style={{ fontSize: '12px', color: '#666', display: 'flex', alignItems: 'center', marginTop: '4px' }}>
+              <UserOutlined style={{ marginRight: '8px' }} />
+              Công dân
+            </div>
+          </div>
+        ),
+        disabled: true
+      },
+      {
+        type: 'divider'
+      },
+      {
+        key: 'profile',
+        label: 'Quản lý hồ sơ',
+        onClick: () => { window.location.href = '/profile'; }
+      },
+      {
+        key: 'logout',
+        label: (
+          <span>
+            <LogoutOutlined style={{ marginRight: '8px' }} />
+            Đăng xuất
+          </span>
+        ),
+        onClick: onLogout
+      }
+    ]
+  };
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -90,7 +83,7 @@ const Org3Dashboard = ({ user, onLogout }) => {
         </div>
         <Space size="large">
           <NotificationCenter />
-          <Dropdown overlay={userMenu} trigger={['click']} placement="bottomRight">
+          <Dropdown menu={userMenu} trigger={['click']} placement="bottomRight">
             <Avatar
               style={{ 
                 backgroundColor: '#52c41a', 
@@ -122,7 +115,7 @@ const Org3Dashboard = ({ user, onLogout }) => {
                   </span>
                 ),
                 children: (
-                  <Card bordered={false} style={{ padding: 0 }}>
+                  <Card variant="borderless" style={{ padding: 0 }}>
                     <LandManagementPage />
                   </Card>
                 )
@@ -135,7 +128,7 @@ const Org3Dashboard = ({ user, onLogout }) => {
                   </span>
                 ),
                 children: (
-                  <Card bordered={false} style={{ padding: 0 }}>
+                  <Card variant="borderless" style={{ padding: 0 }}>
                     <DocumentManagementPage />
                   </Card>
                 )
@@ -148,7 +141,7 @@ const Org3Dashboard = ({ user, onLogout }) => {
                   </span>
                 ),
                 children: (
-                  <Card bordered={false} style={{ padding: 0 }}>
+                  <Card variant="borderless" style={{ padding: 0 }}>
                     <TransactionManagementPage />
                   </Card>
                 )

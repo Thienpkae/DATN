@@ -23,7 +23,7 @@ type Land struct {
 // Document định nghĩa tài liệu độc lập
 type Document struct {
 	DocID       string    `json:"docID"`       // Mã tài liệu
-	Type        string    `json:"type"`        // Loại tài liệu (CERTIFICATE, CONTRACT, MAP, OTHER)
+	Type        string    `json:"type"`        // Loại tài liệu (CERTIFICATE, CONTRACT, MAP, FORM, TAX_DOCUMENT, TECHNICAL_DOC, LEGAL_DOC, OTHER)
 	Title       string    `json:"title"`       // Tiêu đề tài liệu
 	Description string    `json:"description"` // Mô tả tài liệu
 	IPFSHash    string    `json:"ipfsHash"`    // Hash tài liệu trên IPFS
