@@ -5,7 +5,8 @@ const notificationService = {
   // Get all notifications for current user
   async getMyNotifications() {
     try {
-      const response = await apiClient.get(API_ENDPOINTS.NOTIFICATION.GET_MY);
+      // Sử dụng LIST endpoint thay vì GET_MY không tồn tại
+      const response = await apiClient.get(API_ENDPOINTS.NOTIFICATIONS.LIST);
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -15,7 +16,8 @@ const notificationService = {
   // Get all notifications (for admin users)
   async getAllNotifications() {
     try {
-      const response = await apiClient.get(API_ENDPOINTS.NOTIFICATION.GET_ALL);
+      // Thay thế bằng LIST endpoint do không có GET_ALL
+      const response = await apiClient.get(API_ENDPOINTS.NOTIFICATIONS.LIST);
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -25,8 +27,8 @@ const notificationService = {
   // Get notifications by user ID
   async getNotificationsByUser(userId) {
     try {
-      const url = API_ENDPOINTS.NOTIFICATION.GET_BY_USER.replace(':userId', userId);
-      const response = await apiClient.get(url);
+      // API này không tồn tại, sử dụng LIST với query params
+      const response = await apiClient.get(`${API_ENDPOINTS.NOTIFICATIONS.LIST}?userId=${userId}`);
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -36,8 +38,8 @@ const notificationService = {
   // Get notification by ID
   async getNotificationById(notificationId) {
     try {
-      const url = API_ENDPOINTS.NOTIFICATION.GET_BY_ID.replace(':id', notificationId);
-      const response = await apiClient.get(url);
+      // API này không tồn tại, sử dụng LIST với filter
+      const response = await apiClient.get(`${API_ENDPOINTS.NOTIFICATIONS.LIST}?id=${notificationId}`);
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -47,7 +49,7 @@ const notificationService = {
   // Mark notification as read
   async markAsRead(notificationId) {
     try {
-      const url = API_ENDPOINTS.NOTIFICATION.MARK_READ.replace(':id', notificationId);
+      const url = API_ENDPOINTS.NOTIFICATIONS.MARK_READ.replace(':id', notificationId);
       const response = await apiClient.patch(url);
       return response.data;
     } catch (error) {
@@ -58,7 +60,7 @@ const notificationService = {
   // Mark all notifications as read
   async markAllAsRead() {
     try {
-      const response = await apiClient.patch(API_ENDPOINTS.NOTIFICATION.MARK_ALL_READ);
+      const response = await apiClient.patch(API_ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ);
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -68,7 +70,7 @@ const notificationService = {
   // Delete notification
   async deleteNotification(notificationId) {
     try {
-      const url = API_ENDPOINTS.NOTIFICATION.DELETE.replace(':id', notificationId);
+      const url = API_ENDPOINTS.NOTIFICATIONS.DELETE.replace(':id', notificationId);
       const response = await apiClient.delete(url);
       return response.data;
     } catch (error) {
@@ -79,8 +81,10 @@ const notificationService = {
   // Delete all notifications for current user
   async deleteAllMyNotifications() {
     try {
-      const response = await apiClient.delete(API_ENDPOINTS.NOTIFICATION.DELETE_ALL_MY);
-      return response.data;
+      // API không tồn tại, tạm thời comment out hoặc dùng workaround
+      // const response = await apiClient.delete(API_ENDPOINTS.NOTIFICATIONS.DELETE_ALL_MY);
+      console.warn('deleteAllMyNotifications API không có sẵn - cần triển khai backend');
+      return { success: false, message: 'Chức năng chưa được triển khai' };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -89,8 +93,10 @@ const notificationService = {
   // Create custom notification (for admin users)
   async createCustomNotification(notificationData) {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.NOTIFICATION.CREATE_CUSTOM, notificationData);
-      return response.data;
+      // API không tồn tại, tạm thời comment out
+      // const response = await apiClient.post(API_ENDPOINTS.NOTIFICATIONS.CREATE_CUSTOM, notificationData);
+      console.warn('createCustomNotification API không có sẵn - cần triển khai backend');
+      return { success: false, message: 'Chức năng chưa được triển khai' };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -99,8 +105,10 @@ const notificationService = {
   // Send system announcement (for admin users)
   async sendSystemAnnouncement(announcementData) {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.NOTIFICATION.SEND_ANNOUNCEMENT, announcementData);
-      return response.data;
+      // API không tồn tại, tạm thời comment out
+      // const response = await apiClient.post(API_ENDPOINTS.NOTIFICATIONS.SEND_ANNOUNCEMENT, announcementData);
+      console.warn('sendSystemAnnouncement API không có sẵn - cần triển khai backend');
+      return { success: false, message: 'Chức năng chưa được triển khai' };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -109,8 +117,10 @@ const notificationService = {
   // Get notification statistics
   async getNotificationStats() {
     try {
-      const response = await apiClient.get(API_ENDPOINTS.NOTIFICATION.GET_STATS);
-      return response.data;
+      // API không tồn tại, tạm thời comment out
+      // const response = await apiClient.get(API_ENDPOINTS.NOTIFICATIONS.GET_STATS);
+      console.warn('getNotificationStats API không có sẵn - cần triển khai backend');
+      return { success: false, message: 'Chức năng chưa được triển khai' };
     } catch (error) {
       throw handleApiError(error);
     }
@@ -119,9 +129,9 @@ const notificationService = {
   // Search notifications
   async searchNotifications(searchParams) {
     try {
-      const response = await apiClient.get(API_ENDPOINTS.NOTIFICATION.SEARCH, {
-        params: searchParams
-      });
+      // API không tồn tại, sử dụng LIST với query params
+      const queryString = new URLSearchParams(searchParams).toString();
+      const response = await apiClient.get(`${API_ENDPOINTS.NOTIFICATIONS.LIST}?${queryString}`);
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -131,7 +141,7 @@ const notificationService = {
   // Get unread count
   async getUnreadCount() {
     try {
-      const response = await apiClient.get(API_ENDPOINTS.NOTIFICATION.GET_UNREAD_COUNT);
+      const response = await apiClient.get(API_ENDPOINTS.NOTIFICATIONS.GET_UNREAD_COUNT);
       return response.data;
     } catch (error) {
       throw handleApiError(error);
@@ -150,7 +160,6 @@ const notificationService = {
       { value: 'CHANGE_PURPOSE_REQUEST_CREATED', label: 'Yêu cầu đổi mục đích', color: 'geekblue' },
       { value: 'REISSUE_REQUEST_CREATED', label: 'Yêu cầu cấp lại GCN', color: 'lime' },
       { value: 'TRANSACTION_PROCESSED', label: 'Giao dịch đã xử lý', color: 'blue' },
-      { value: 'TRANSACTION_FORWARDED', label: 'Giao dịch đã chuyển tiếp', color: 'cyan' },
       { value: 'TRANSACTION_APPROVED', label: 'Giao dịch được phê duyệt', color: 'green' },
       { value: 'TRANSACTION_REJECTED', label: 'Giao dịch bị từ chối', color: 'red' },
       { value: 'DOCUMENT_CREATED', label: 'Tài liệu đã tạo', color: 'blue' },
@@ -199,7 +208,6 @@ const notificationService = {
       'CHANGE_PURPOSE_REQUEST_CREATED': 'geekblue',
       'REISSUE_REQUEST_CREATED': 'lime',
       'TRANSACTION_PROCESSED': 'blue',
-      'TRANSACTION_FORWARDED': 'cyan',
       'TRANSACTION_APPROVED': 'green',
       'TRANSACTION_REJECTED': 'red',
       'DOCUMENT_CREATED': 'blue',
@@ -239,7 +247,6 @@ const notificationService = {
       'CHANGE_PURPOSE_REQUEST_CREATED': 'Yêu cầu đổi mục đích',
       'REISSUE_REQUEST_CREATED': 'Yêu cầu cấp lại GCN',
       'TRANSACTION_PROCESSED': 'Giao dịch đã xử lý',
-      'TRANSACTION_FORWARDED': 'Giao dịch đã chuyển tiếp',
       'TRANSACTION_APPROVED': 'Giao dịch được phê duyệt',
       'TRANSACTION_REJECTED': 'Giao dịch bị từ chối',
       'DOCUMENT_CREATED': 'Tài liệu đã tạo',

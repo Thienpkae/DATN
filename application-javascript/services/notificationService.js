@@ -123,12 +123,6 @@ class NotificationService {
                     priority: 'HIGH'
                 };
 
-            case 'TRANSACTION_FORWARDED':
-                return {
-                    title: '📤 Giao dịch đã chuyển tiếp',
-                    message: `Giao dịch ${transactionId} của bạn đã được chuyển tiếp để phê duyệt.`,
-                    priority: 'MEDIUM'
-                };
 
             case 'TRANSACTION_APPROVED':
                 return {
@@ -307,12 +301,6 @@ class NotificationService {
         });
     }
 
-    async notifyTransactionForwarded(userId, transactionId) {
-        await this.createNotification('TRANSACTION_FORWARDED', userId, {
-            transactionId,
-            userId
-        });
-    }
 
     async notifyTransactionApproved(userId, transactionId, transactionData = null) {
         await this.createNotification('TRANSACTION_APPROVED', userId, {

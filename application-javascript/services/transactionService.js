@@ -52,7 +52,7 @@ const transactionService = {
             res.json({
                 success: true,
                 message: actionMessage[decision],
-                data: JSON.parse(transactionResult.toString())
+                data: transactionResult ? JSON.parse(transactionResult.toString()) : { success: true }
             });
         } catch (error) {
             console.error('Error processing transaction:', error);
@@ -90,13 +90,14 @@ const transactionService = {
                     'QueryTransactionsByOwner',
                     userID
                 );
-                const allTransactions = JSON.parse(allTransactionsResult.toString());
-                
-                // Tìm transaction vừa tạo (có timestamp gần nhất và type TRANSFER)
-                createdTransaction = allTransactions
-                    .filter(tx => tx.type === 'TRANSFER' && tx.landParcelId === landParcelId && tx.toOwnerId === toOwnerId)
-                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+                if (allTransactionsResult) {
+                    const allTransactions = JSON.parse(allTransactionsResult.toString());
                     
+                    // Tìm transaction vừa tạo (có timestamp gần nhất và type TRANSFER)
+                    createdTransaction = allTransactions
+                        .filter(tx => tx.type === 'TRANSFER' && tx.landParcelId === landParcelId && tx.toOwnerId === toOwnerId)
+                        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+                }
             } catch (queryError) {
                 console.warn('Could not find created transaction:', queryError.message);
             }
@@ -106,10 +107,17 @@ const transactionService = {
             // Get the final transaction data
             let transactionResult = null;
             if (actualTxID) {
-                transactionResult = await contract.evaluateTransaction(
-                    'QueryTransactionByID',
-                    actualTxID
-                );
+                try {
+                    const result = await contract.evaluateTransaction(
+                        'QueryTransactionByID',
+                        actualTxID
+                    );
+                    if (result) {
+                        transactionResult = result;
+                    }
+                } catch (queryError) {
+                    console.warn('Could not get transaction details:', queryError.message);
+                }
             }
 
             // Send notifications to both parties
@@ -189,21 +197,28 @@ const transactionService = {
         }
     },
 
-    // Create split request
+    // Create split request - theo luồng chaincode mới
     async createSplitRequest(req, res) {
         try {
-            const { landParcelID, newParcels, documentIds, reason } = req.body;
+            const { landParcelID, documentIds, reason } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
+            // Validate input
+            if (!landParcelID) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Mã thửa đất là bắt buộc'
+                });
+            }
+
             const { contract } = await connectToNetwork(org, userID);
 
-            const newParcelsStr = JSON.stringify(newParcels);
+            // Theo chaincode mới: CreateSplitRequest(landParcelID, documentIdsStr, reason)
             const documentIdsStr = documentIds && Array.isArray(documentIds) ? JSON.stringify(documentIds) : "[]";
             await contract.submitTransaction(
                 'CreateSplitRequest',
                 landParcelID,
-                newParcelsStr,
                 documentIdsStr,
                 reason || ''
             );
@@ -215,12 +230,13 @@ const transactionService = {
                     'QueryTransactionsByOwner',
                     userID
                 );
-                const allTransactions = JSON.parse(allTransactionsResult.toString());
-                
-                createdTransaction = allTransactions
-                    .filter(tx => tx.type === 'SPLIT' && tx.landParcelId === landParcelID)
-                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+                if (allTransactionsResult) {
+                    const allTransactions = JSON.parse(allTransactionsResult.toString());
                     
+                    createdTransaction = allTransactions
+                        .filter(tx => tx.type === 'SPLIT' && tx.landParcelId === landParcelID)
+                        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+                }
             } catch (queryError) {
                 console.warn('Could not find created transaction:', queryError.message);
             }
@@ -230,16 +246,22 @@ const transactionService = {
             // Get the final transaction data
             let transactionResult = null;
             if (actualTxID) {
-                transactionResult = await contract.evaluateTransaction(
-                    'QueryTransactionByID',
-                    actualTxID,
-                    userID
-                );
+                try {
+                    const result = await contract.evaluateTransaction(
+                        'QueryTransactionByID',
+                        actualTxID
+                    );
+                    if (result) {
+                        transactionResult = result;
+                    }
+                } catch (queryError) {
+                    console.warn('Could not get transaction details:', queryError.message);
+                }
             }
 
             res.json({
                 success: true,
-                message: `Yêu cầu tách thửa đã được tạo thành công${documentIds?.length > 0 ? ` với ${documentIds.length} tài liệu đính kèm` : ''}`,
+                message: `Yêu cầu tách thửa đã được tạo thành công${documentIds?.length > 0 ? ` với ${documentIds.length} tài liệu đính kèm` : ''}. Thửa đất sẽ được tách khi phê duyệt.`,
                 data: transactionResult ? JSON.parse(transactionResult.toString()) : { success: true, txID: actualTxID }
             });
         } catch (error) {
@@ -252,22 +274,29 @@ const transactionService = {
         }
     },
 
-    // Create merge request
+    // Create merge request - theo luồng chaincode mới
     async createMergeRequest(req, res) {
         try {
-            const { parcelIDs, newParcel, documentIds, reason } = req.body;
+            const { parcelIDs, documentIds, reason } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
+            // Validate input
+            if (!parcelIDs || !Array.isArray(parcelIDs) || parcelIDs.length < 2) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cần ít nhất 2 thửa đất để thực hiện gộp thửa'
+                });
+            }
+
             const { contract } = await connectToNetwork(org, userID);
 
+            // Theo chaincode mới: CreateMergeRequest(parcelIDsStr, documentIdsStr, reason)
             const parcelIDsStr = JSON.stringify(parcelIDs);
-            const newParcelStr = JSON.stringify(newParcel);
             const documentIdsStr = documentIds && Array.isArray(documentIds) ? JSON.stringify(documentIds) : "[]";
             await contract.submitTransaction(
                 'CreateMergeRequest',
                 parcelIDsStr,
-                newParcelStr,
                 documentIdsStr,
                 reason || ''
             );
@@ -279,12 +308,13 @@ const transactionService = {
                     'QueryTransactionsByOwner',
                     userID
                 );
-                const allTransactions = JSON.parse(allTransactionsResult.toString());
-                
-                createdTransaction = allTransactions
-                    .filter(tx => tx.type === 'MERGE' && tx.landParcelId === newParcel.id)
-                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+                if (allTransactionsResult) {
+                    const allTransactions = JSON.parse(allTransactionsResult.toString());
                     
+                    createdTransaction = allTransactions
+                        .filter(tx => tx.type === 'MERGE' && JSON.stringify(tx.parcelIds) === parcelIDsStr)
+                        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+                }
             } catch (queryError) {
                 console.warn('Could not find created transaction:', queryError.message);
             }
@@ -294,16 +324,22 @@ const transactionService = {
             // Get the final transaction data
             let transactionResult = null;
             if (actualTxID) {
-                transactionResult = await contract.evaluateTransaction(
-                    'QueryTransactionByID',
-                    actualTxID,
-                    userID
-                );
+                try {
+                    const result = await contract.evaluateTransaction(
+                        'QueryTransactionByID',
+                        actualTxID
+                    );
+                    if (result) {
+                        transactionResult = result;
+                    }
+                } catch (queryError) {
+                    console.warn('Could not get transaction details:', queryError.message);
+                }
             }
 
             res.json({
                 success: true,
-                message: `Yêu cầu hợp thửa đã được tạo thành công${documentIds?.length > 0 ? ` với ${documentIds.length} tài liệu đính kèm` : ''}`,
+                message: `Yêu cầu hợp thửa ${parcelIDs.length} thửa đất đã được tạo thành công${documentIds?.length > 0 ? ` với ${documentIds.length} tài liệu đính kèm` : ''}. Thửa đất sẽ được gộp khi phê duyệt.`,
                 data: transactionResult ? JSON.parse(transactionResult.toString()) : { success: true, txID: actualTxID }
             });
         } catch (error) {
@@ -341,12 +377,13 @@ const transactionService = {
                     'QueryTransactionsByOwner',
                     userID
                 );
-                const allTransactions = JSON.parse(allTransactionsResult.toString());
-                
-                createdTransaction = allTransactions
-                    .filter(tx => tx.type === 'CHANGE_PURPOSE' && tx.landParcelId === landParcelID)
-                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+                if (allTransactionsResult) {
+                    const allTransactions = JSON.parse(allTransactionsResult.toString());
                     
+                    createdTransaction = allTransactions
+                        .filter(tx => tx.type === 'CHANGE_PURPOSE' && tx.landParcelId === landParcelID)
+                        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+                }
             } catch (queryError) {
                 console.warn('Could not find created transaction:', queryError.message);
             }
@@ -356,10 +393,17 @@ const transactionService = {
             // Get the created transaction to return as response data
             let transactionResult = null;
             if (actualTxID) {
-                transactionResult = await contract.evaluateTransaction(
-                    'QueryTransactionByID',
-                    actualTxID
-                );
+                try {
+                    const result = await contract.evaluateTransaction(
+                        'QueryTransactionByID',
+                        actualTxID
+                    );
+                    if (result) {
+                        transactionResult = result;
+                    }
+                } catch (queryError) {
+                    console.warn('Could not get transaction details:', queryError.message);
+                }
             }
 
             res.json({
@@ -401,12 +445,13 @@ const transactionService = {
                     'QueryTransactionsByOwner',
                     userID
                 );
-                const allTransactions = JSON.parse(allTransactionsResult.toString());
-                
-                createdTransaction = allTransactions
-                    .filter(tx => tx.type === 'REISSUE' && tx.landParcelId === landParcelID)
-                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+                if (allTransactionsResult) {
+                    const allTransactions = JSON.parse(allTransactionsResult.toString());
                     
+                    createdTransaction = allTransactions
+                        .filter(tx => tx.type === 'REISSUE' && tx.landParcelId === landParcelID)
+                        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+                }
             } catch (queryError) {
                 console.warn('Could not find created transaction:', queryError.message);
             }
@@ -416,10 +461,17 @@ const transactionService = {
             // Get the created transaction to return as response data
             let transactionResult = null;
             if (actualTxID) {
-                transactionResult = await contract.evaluateTransaction(
-                    'QueryTransactionByID',
-                    actualTxID
-                );
+                try {
+                    const result = await contract.evaluateTransaction(
+                        'QueryTransactionByID',
+                        actualTxID
+                    );
+                    if (result) {
+                        transactionResult = result;
+                    }
+                } catch (queryError) {
+                    console.warn('Could not get transaction details:', queryError.message);
+                }
             }
 
             res.json({
@@ -437,40 +489,6 @@ const transactionService = {
         }
     },
 
-    // Forward transaction
-    async forwardTransaction(req, res) {
-        try {
-            const { txID } = req.params;
-            const userID = req.user.cccd;
-            const org = req.user.org;
-
-            const { contract } = await connectToNetwork(org, userID);
-
-            await contract.submitTransaction(
-                'ForwardTransaction',
-                txID
-            );
-
-            // Get the updated transaction to return as response data
-            const transactionResult = await contract.evaluateTransaction(
-                'QueryTransactionByID',
-                txID
-            );
-
-            res.json({
-                success: true,
-                message: 'Giao dịch đã được chuyển tiếp thành công',
-                data: JSON.parse(transactionResult.toString())
-            });
-        } catch (error) {
-            console.error('Error forwarding transaction:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Lỗi khi chuyển tiếp giao dịch',
-                error: error.message
-            });
-        }
-    },
 
     // Approve transfer transaction
     async approveTransferTransaction(req, res) {
@@ -542,29 +560,95 @@ const transactionService = {
         }
     },
 
+    // Phê duyệt tách thửa với thông tin thửa đất mới
     async approveSplitTransaction(req, res) {
         try {
             const { txID } = req.params;
+            const { landID, newParcels } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
+            // Validate input
+            if (!landID) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Mã thửa đất gốc là bắt buộc'
+                });
+            }
+
+            if (!newParcels || !Array.isArray(newParcels) || newParcels.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Danh sách thửa đất mới là bắt buộc'
+                });
+            }
+
             const { contract } = await connectToNetwork(org, userID);
 
+            // Lấy thông tin giao dịch để biết chủ sở hữu gốc
+            const originalTransactionResult = await contract.evaluateTransaction(
+                'QueryTransactionByID',
+                txID
+            );
+            const transaction = JSON.parse(originalTransactionResult.toString());
+            
+            // Lấy thông tin thửa đất gốc để kế thừa các thông tin cần thiết
+            const originalLandResult = await contract.evaluateTransaction(
+                'QueryLandByID',
+                landID
+            );
+            const originalLand = JSON.parse(originalLandResult.toString());
+            
+            // Tách biệt thửa cập nhật (trùng ID gốc) và thửa tạo mới
+            const updateParcels = [];
+            const createParcels = [];
+            
+            newParcels.forEach(parcel => {
+                const enrichedParcel = {
+                    ...parcel,
+                    OwnerID: transaction.fromOwnerId || transaction.FromOwnerID,
+                    Location: originalLand.location,
+                    LandUsePurpose: originalLand.landUsePurpose,
+                    LegalStatus: ""
+                };
+                
+                if (parcel.id === landID) {
+                    // Thửa này sẽ được cập nhật (trùng ID gốc)
+                    updateParcels.push(enrichedParcel);
+                } else {
+                    // Thửa này sẽ được tạo mới
+                    createParcels.push(enrichedParcel);
+                }
+            });
+            
+            // Sắp xếp lại: thửa cập nhật trước, thửa tạo mới sau
+            const newParcelsWithOwner = [...updateParcels, ...createParcels];
+            
+            console.log('📋 Transaction info:', transaction);
+            console.log('🏠 Original land info:', originalLand);
+            console.log('🎯 Land ID from request:', landID);
+            console.log('📦 New parcels from request:', newParcels);
+            console.log('🏠 New parcels with owner:', newParcelsWithOwner);
+
+            // Theo chaincode: ApproveSplitTransaction(txID, landID, newParcelsStr)
+            const newParcelsStr = JSON.stringify(newParcelsWithOwner);
             await contract.submitTransaction(
                 'ApproveSplitTransaction',
-                txID
+                txID,
+                landID,
+                newParcelsStr
             );
 
             // Get the updated transaction to return as response data
-            const transactionResult = await contract.evaluateTransaction(
+            const updatedTransactionResult = await contract.evaluateTransaction(
                 'QueryTransactionByID',
                 txID
             );
 
             res.json({
                 success: true,
-                message: 'Giao dịch tách thửa đã được phê duyệt thành công',
-                data: JSON.parse(transactionResult.toString())
+                message: `Giao dịch tách thửa đã được phê duyệt thành công. Đã tạo/cập nhật ${newParcels.length} thửa đất mới.`,
+                data: JSON.parse(updatedTransactionResult.toString())
             });
         } catch (error) {
             console.error('Error approving split transaction:', error);
@@ -576,17 +660,47 @@ const transactionService = {
         }
     },
 
+    // Phê duyệt gộp thửa với thông tin thửa đất gộp
     async approveMergeTransaction(req, res) {
         try {
             const { txID } = req.params;
+            const { landIds, selectedLandID, newParcel } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
+            // Validate input
+            if (!landIds || !Array.isArray(landIds) || landIds.length < 2) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cần ít nhất 2 thửa đất để gộp'
+                });
+            }
+
+            if (!selectedLandID) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Mã thửa đất được chọn làm thửa chính là bắt buộc'
+                });
+            }
+
+            if (!newParcel) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Thông tin thửa đất sau gộp là bắt buộc'
+                });
+            }
+
             const { contract } = await connectToNetwork(org, userID);
 
+            // Theo chaincode: ApproveMergeTransaction(txID, landIdsStr, selectedLandID, newParcelStr)
+            const landIdsStr = JSON.stringify(landIds);
+            const newParcelStr = JSON.stringify(newParcel);
             await contract.submitTransaction(
                 'ApproveMergeTransaction',
-                txID
+                txID,
+                landIdsStr,
+                selectedLandID,
+                newParcelStr
             );
 
             // Get the updated transaction to return as response data
@@ -597,14 +711,14 @@ const transactionService = {
 
             res.json({
                 success: true,
-                message: 'Giao dịch hợp thửa đã được phê duyệt thành công',
+                message: `Giao dịch gộp thửa đã được phê duyệt thành công. Đã gộp ${landIds.length} thửa đất thành thửa ${selectedLandID}.`,
                 data: JSON.parse(transactionResult.toString())
             });
         } catch (error) {
             console.error('Error approving merge transaction:', error);
             res.status(500).json({
                 success: false,
-                message: 'Lỗi khi phê duyệt giao dịch hợp thửa',
+                message: 'Lỗi khi phê duyệt giao dịch gộp thửa',
                 error: error.message
             });
         }
@@ -738,11 +852,18 @@ const transactionService = {
                 txID
             );
 
-            const transaction = JSON.parse(result.toString());
-            res.json({
-                success: true,
-                data: transaction
-            });
+            if (result) {
+                const transaction = JSON.parse(result.toString());
+                res.json({
+                    success: true,
+                    data: transaction
+                });
+            } else {
+                res.status(404).json({
+                    success: false,
+                    message: 'Giao dịch không tồn tại'
+                });
+            }
         } catch (error) {
             console.error('Error getting transaction:', error);
             res.status(500).json({

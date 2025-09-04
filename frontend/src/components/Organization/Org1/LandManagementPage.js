@@ -6,7 +6,8 @@ import authService from '../../../services/auth';
 import documentService from '../../../services/documentService';
 import ipfsService from '../../../services/ipfs';
 
-import { DocumentLinker, DocumentViewer } from '../../Common';
+import DocumentDetailModal from '../../Common/DocumentDetailModal';
+import OnlineDocumentViewer from '../../Common/OnlineDocumentViewer';
 import { LAND_USE_PURPOSES, LEGAL_STATUSES } from '../../../services/index';
 
 const { Option } = Select;
@@ -48,10 +49,13 @@ const LandManagementPage = () => {
   };
   
   // Document linking states
-  const [documentLinkerOpen, setDocumentLinkerOpen] = useState(false);
-  const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
+  const [documentDetailOpen, setDocumentDetailOpen] = useState(false);
+  const [onlineViewerOpen, setOnlineViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [linkedDocuments, setLinkedDocuments] = useState([]);
+  const [availableDocuments, setAvailableDocuments] = useState([]);
+  const [selectedDocumentsForLinking, setSelectedDocumentsForLinking] = useState([]);
+  const [linkingDocuments, setLinkingDocuments] = useState(false);
   const [uploadingCertificate, setUploadingCertificate] = useState(false);
   const [certificateFile, setCertificateFile] = useState(null);
   const [certificateFileList, setCertificateFileList] = useState([]);
@@ -114,7 +118,7 @@ const LandManagementPage = () => {
     }
   };
 
-  const openDetail = async (record) => {
+  const openDetail = React.useCallback(async (record) => {
     try {
       setSelected(record);
       setDetailOpen(true);
@@ -127,11 +131,14 @@ const LandManagementPage = () => {
       } else {
         setLinkedDocuments([]);
       }
+      
+      // Load available documents for linking
+      await loadAvailableDocuments();
     } catch (e) {
       setHistory([]);
       setLinkedDocuments([]);
     }
-  };
+  }, []);
 
   const onCreate = async () => {
     try {
@@ -271,19 +278,39 @@ const LandManagementPage = () => {
     }
   };
 
-  const openDocumentLinker = () => {
-    setDocumentLinkerOpen(true);
-  };
-
-  const openDocumentViewer = (document) => {
+  const openDocumentViewer = async (document) => {
     setSelectedDocument(document);
-    setDocumentViewerOpen(true);
+    setDocumentDetailOpen(true);
   };
 
-  const handleDocumentLinkSuccess = () => {
-    // Reload land details to get updated document list
-    if (selected) {
-      openDetail(selected);
+  
+  const loadAvailableDocuments = async () => {
+    try {
+      const docs = await documentService.getAllDocumentsWithMetadata();
+      setAvailableDocuments(docs);
+    } catch (e) {
+      console.error('Error loading available documents:', e);
+      setAvailableDocuments([]);
+    }
+  };
+  
+  const handleLinkSelectedDocuments = async () => {
+    if (!selectedDocumentsForLinking.length) {
+      message.warning('Vui lòng chọn ít nhất một tài liệu');
+      return;
+    }
+    
+    try {
+      setLinkingDocuments(true);
+      await documentService.linkDocumentToLand(selectedDocumentsForLinking, selected.id);
+      message.success('Liên kết tài liệu thành công');
+      setSelectedDocumentsForLinking([]);
+      // Refresh land detail to show updated linked documents
+      await openDetail(selected);
+    } catch (e) {
+      message.error(e.message || 'Liên kết thất bại');
+    } finally {
+      setLinkingDocuments(false);
     }
   };
 
@@ -308,11 +335,11 @@ const LandManagementPage = () => {
         <Space>
           <Tooltip title="Xem chi tiết">
             <Button icon={<EyeOutlined />} onClick={() => openDetail(record)} />
-        </Tooltip>
+          </Tooltip>
           <Tooltip title="Cấp giấy chứng nhận">
-          <Button
+            <Button
               icon={<FileDoneOutlined />} 
-                          onClick={() => {
+              onClick={() => {
                 // Tự động điền trạng thái pháp lý theo mục đích sử dụng đất
                 const legalStatus = getLegalStatusByLandUse(record.landUsePurpose);
                 issueForm.setFieldsValue({ 
@@ -341,7 +368,7 @@ const LandManagementPage = () => {
         </Space>
       )
     }
-  ]), [issueForm, editForm]);
+  ]), [issueForm, editForm, openDetail]);
 
   return (
     <div>
@@ -709,52 +736,94 @@ const LandManagementPage = () => {
                   label: "Tài liệu liên quan",
                   children: (
                     <div>
-                <div style={{ marginBottom: 16 }}>
-                  <Button
-                    type="primary"
-                    icon={<LinkOutlined />}
-                          onClick={openDocumentLinker}
-                  >
-                    Liên kết tài liệu
-                  </Button>
-                </div>
-                <List
-                  header={<div><strong>Danh sách tài liệu ({linkedDocuments.length})</strong></div>}
-                  bordered
-                  dataSource={linkedDocuments}
-                  renderItem={(docId, index) => (
-                    <List.Item
-                      actions={[
-                        <Button
-                          size="small"
-                          icon={<EyeOutlined />}
-                          onClick={async () => {
-                            try {
-                              // Load document details
-                              const doc = await documentService.getDocument(docId);
-                              if (doc) {
-                                openDocumentViewer(doc);
-                              } else {
-                                message.info('Không thể tìm thấy thông tin tài liệu');
-                              }
-                            } catch (error) {
-                              message.error('Lỗi khi tải thông tin tài liệu: ' + error.message);
-                            }
-                          }}
-                        >
-                          Xem
-                        </Button>
-                      ]}
-                    >
-                      <List.Item.Meta
-                        avatar={<FileTextOutlined />}
-                        title={`Tài liệu ${index + 1}`}
-                        description={`ID: ${docId}`}
+                      {/* Liên kết tài liệu mới */}
+                      <div style={{ marginBottom: 24, padding: '16px', background: '#f9f9f9', borderRadius: '8px' }}>
+                        <div style={{ marginBottom: 16 }}>
+                          <Text strong style={{ fontSize: 16 }}>Liên kết tài liệu mới</Text>
+                        </div>
+                        <Space direction="vertical" style={{ width: '100%' }}>
+                          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+                            <div style={{ flex: 1 }}>
+                              <Text strong style={{ marginBottom: 8, display: 'block' }}>Chọn tài liệu:</Text>
+                              <Select
+                                mode="multiple"
+                                placeholder="Chọn tài liệu để liên kết"
+                                value={selectedDocumentsForLinking}
+                                onChange={setSelectedDocumentsForLinking}
+                                style={{ width: '100%' }}
+                                filterOption={(input, option) =>
+                                  option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                                }
+                                showSearch
+                              >
+                                {availableDocuments
+                                  .filter(doc => !linkedDocuments.includes(doc.docID))
+                                  .map(doc => (
+                                    <Option key={doc.docID} value={doc.docID}>
+                                      {doc.title || doc.docID} ({documentService.getDocumentTypeName(doc.docType || doc.Type)})
+                                    </Option>
+                                  ))
+                                }
+                              </Select>
+                            </div>
+                            <Button
+                              type="primary"
+                              icon={<LinkOutlined />}
+                              onClick={handleLinkSelectedDocuments}
+                              loading={linkingDocuments}
+                              disabled={!selectedDocumentsForLinking.length}
+                            >
+                              Liên kết
+                            </Button>
+                          </div>
+                          {selectedDocumentsForLinking.length > 0 && (
+                            <div style={{ marginTop: 8 }}>
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                Đã chọn {selectedDocumentsForLinking.length} tài liệu
+                              </Text>
+                            </div>
+                          )}
+                        </Space>
+                      </div>
+                      
+                      {/* Danh sách tài liệu đã liên kết */}
+                      <List
+                        header={<div><strong>Danh sách tài liệu đã liên kết ({linkedDocuments.length})</strong></div>}
+                        bordered
+                        dataSource={linkedDocuments}
+                        renderItem={(docId, index) => (
+                          <List.Item
+                            actions={[
+                              <Button
+                                size="small"
+                                icon={<EyeOutlined />}
+                                onClick={async () => {
+                                  try {
+                                    // Load document details
+                                    const doc = await documentService.getDocument(docId);
+                                    if (doc) {
+                                      openDocumentViewer(doc);
+                                    } else {
+                                      message.info('Không thể tìm thấy thông tin tài liệu');
+                                    }
+                                  } catch (error) {
+                                    message.error('Lỗi khi tải thông tin tài liệu: ' + error.message);
+                                  }
+                                }}
+                              >
+                                Xem
+                              </Button>
+                            ]}
+                          >
+                            <List.Item.Meta
+                              avatar={<FileTextOutlined />}
+                              title={`Tài liệu ${index + 1}`}
+                              description={`ID: ${docId}`}
+                            />
+                          </List.Item>
+                        )}
+                        locale={{ emptyText: 'Chưa có tài liệu nào được liên kết' }}
                       />
-                    </List.Item>
-                  )}
-                  locale={{ emptyText: 'Chưa có tài liệu nào được liên kết' }}
-                />
                     </div>
                   )
                 },
@@ -805,6 +874,11 @@ const LandManagementPage = () => {
 
                             {item.land && (
                             <>
+                              <div style={{ marginBottom: 12 }}>
+                                <Text strong>Chủ sử dụng đất: </Text>
+                                <Text type="secondary">{item.land.ownerId || 'Chưa bổ sung'}</Text>
+                              </div>
+                              
                               <div style={{ marginBottom: 12 }}>
                                 <Text strong>Diện tích: </Text>
                                 <Text type="secondary">{item.land.area || 'Chưa bổ sung'} m²</Text>
@@ -886,21 +960,20 @@ const LandManagementPage = () => {
           )}
         </Drawer>
 
-        {/* Document Linker Modal */}
-        <DocumentLinker
-          open={documentLinkerOpen}
-          onCancel={() => setDocumentLinkerOpen(false)}
-          onSuccess={handleDocumentLinkSuccess}
-          targetType="land"
-          targetID={selected?.id}
-          linkedDocuments={linkedDocuments}
-        />
 
-        {/* Document Viewer Modal */}
-        <DocumentViewer
-          visible={documentViewerOpen}
-          onCancel={() => setDocumentViewerOpen(false)}
-          documentData={selectedDocument}
+        {/* Document Detail Modal */}
+        <DocumentDetailModal
+          visible={documentDetailOpen}
+          onClose={() => setDocumentDetailOpen(false)}
+          document={selectedDocument}
+          userRole="Org1"
+        />
+        
+        {/* Online Document Viewer */}
+        <OnlineDocumentViewer
+          visible={onlineViewerOpen}
+          onCancel={() => setOnlineViewerOpen(false)}
+          document={selectedDocument}
         />
       </Card>
     </div>

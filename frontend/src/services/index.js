@@ -4,7 +4,7 @@ export { default as authService } from './auth';
 export { default as landService } from './landService';
 export { default as documentService } from './documentService';
 export { default as transactionService } from './transactionService';
-export { default as notificationService } from './notification';
+export { default as notificationService } from './notificationService';
 
 // Export service types for TypeScript-like usage
 export const SERVICE_TYPES = {
@@ -94,11 +94,20 @@ export const TRANSACTION_TYPES = {
 export const TRANSACTION_STATUSES = {
   PENDING: 'PENDING',
   CONFIRMED: 'CONFIRMED',
-  FORWARDED: 'FORWARDED',
   VERIFIED: 'VERIFIED',
   SUPPLEMENT_REQUESTED: 'SUPPLEMENT_REQUESTED',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED'
+};
+
+// Export transaction status display names in Vietnamese
+export const TRANSACTION_STATUS_NAMES = {
+  PENDING: 'Chờ xử lý',
+  CONFIRMED: 'Đã xác nhận',
+  VERIFIED: 'Đã thẩm định',
+  SUPPLEMENT_REQUESTED: 'Yêu cầu bổ sung',
+  APPROVED: 'Đã phê duyệt',
+  REJECTED: 'Bị từ chối'
 };
 
 // Export document types - EXACTLY match chaincode
@@ -310,7 +319,7 @@ export const ORGANIZATION_PERMISSIONS = {
       'transaction_approve', 'transaction_reject',
       'document_view_all', 'system_config_view', 'system_config_update'
     ],
-    canProcess: ['FORWARDED'], // Can approve/reject transactions
+    canProcess: ['VERIFIED'], // Can approve/reject transactions
     canView: ['all'] // Can view all data
   },
   ORG2: {

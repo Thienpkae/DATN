@@ -486,7 +486,7 @@ const documentService = {
   getDocumentStatuses() {
     return [
       'PENDING',       // Chờ xử lý
-      'VERIFIED',      // Đã xác thực
+      'VERIFIED',      // Đã thẩm định
       'REJECTED',      // Bị từ chối
       'EXPIRED',       // Hết hạn
       'ARCHIVED'       // Đã lưu trữ

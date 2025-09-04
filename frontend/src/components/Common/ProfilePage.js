@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Form, Input, Button, Space, Typography, App, Tabs, Alert } from 'antd';
-import { UserOutlined, LockOutlined, SafetyOutlined, PhoneOutlined } from '@ant-design/icons';
+import { Card, Form, Input, Button, Space, Typography, App, Tabs, Alert, Row, Col, Divider } from 'antd';
+import { UserOutlined, LockOutlined, SafetyOutlined, PhoneOutlined, EditOutlined, CloseOutlined, SaveOutlined, UndoOutlined } from '@ant-design/icons';
 import userService from '../../services/userService';
 import authService from '../../services/auth';
 import { normalizeVietnameseName } from '../../utils/text';
@@ -18,6 +18,8 @@ const ProfilePage = () => {
   const [activeTab, setActiveTab] = useState('1');
   const [showOtpForm, setShowOtpForm] = useState(false);
   const [pendingPhone, setPendingPhone] = useState('');
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [originalProfileData, setOriginalProfileData] = useState({});
   const { message } = App.useApp();
 
   useEffect(() => {
@@ -26,11 +28,14 @@ const ProfilePage = () => {
         // 1) Start from local auth user (same as Admin flow)
         const current = authService.getCurrentUser();
         if (current) {
-          profileForm.setFieldsValue({
+          const profileData = {
             cccd: current.cccd || current.userId,
             fullName: normalizeVietnameseName(current.name),
             phone: current.phone ? String(current.phone) : ''
-          });
+          };
+          
+          profileForm.setFieldsValue(profileData);
+          setOriginalProfileData(profileData);
 
           // Backfill phone from JWT if still missing
           const currentPhone = current.phone ? String(current.phone) : '';
@@ -40,7 +45,9 @@ const ProfilePage = () => {
               if (token) {
                 const payload = JSON.parse(atob(token.split('.')[1]));
                 if (payload?.phone) {
-                  profileForm.setFieldsValue({ phone: String(payload.phone) });
+                  const updatedData = { ...profileData, phone: String(payload.phone) };
+                  profileForm.setFieldsValue(updatedData);
+                  setOriginalProfileData(updatedData);
                   const cached = authService.getCurrentUser() || {};
                   localStorage.setItem('user', JSON.stringify({ ...cached, phone: String(payload.phone) }));
                 }
@@ -54,11 +61,13 @@ const ProfilePage = () => {
           if (targetCccd) {
             const me = await userService.getSelfByCccd(targetCccd);
             if (me) {
-              profileForm.setFieldsValue({
+              const updatedData = {
                 cccd: me.cccd,
                 fullName: normalizeVietnameseName(me.fullName || current?.name || ''),
                 phone: me.phone ? String(me.phone) : profileForm.getFieldValue('phone') || ''
-              });
+              };
+              profileForm.setFieldsValue(updatedData);
+              setOriginalProfileData(updatedData);
               if (me.phone) {
                 localStorage.setItem('user', JSON.stringify({ ...current, phone: String(me.phone) }));
               }
@@ -73,69 +82,7 @@ const ProfilePage = () => {
     load();
   }, [profileForm]);
 
-  const onSubmitProfile = async () => {
-    try {
-      const values = await profileForm.validateFields();
-      setLoading(true);
-      const payload = { fullName: values.fullName, phone: values.phone };
-      let updated;
-      try {
-        updated = await userService.updateProfile(payload);
-      } catch (err) {
-        // If profile API not available (404), try admin update-by-cccd for own account
-        if (err?.response?.status === 404) {
-          const current = authService.getCurrentUser();
-          if (current?.role === 'admin' && (current?.cccd || current?.userId)) {
-            const cccd = current.cccd || current.userId;
-            updated = await userService.updateByCccd(cccd, {
-              fullName: values.fullName,
-              phone: values.phone
-            });
-          } else {
-            throw err;
-          }
-        } else {
-          throw err;
-        }
-      }
-      
-      // Debug log để check response
-      console.log('Update profile response:', updated);
-      
-      // Check if phone verification is required
-      if (updated?.phoneChanged || updated?.requiresVerification) {
-        console.log('Phone changed detected, showing OTP form');
-        setPendingPhone(values.phone);
-        setShowOtpForm(true);
-        message.warning('Số điện thoại đã được cập nhật. Vui lòng xác thực OTP để hoàn tất thay đổi.');
-        // Automatically send OTP
-        try {
-          await userService.requestPhoneVerification();
-          message.success('OTP đã được gửi đến số điện thoại mới');
-        } catch (otpError) {
-          console.error('Auto OTP send failed:', otpError);
-          message.error('Không thể gửi OTP. Vui lòng thử lại.');
-        }
-        return;
-      }
-      
-      message.success('Cập nhật hồ sơ thành công');
-      // persist name to localStorage for header display
-      const current = authService.getCurrentUser();
-      if (current) {
-        const merged = { ...current, name: updated?.user?.fullName || values.fullName, phone: values.phone };
-        localStorage.setItem('user', JSON.stringify(merged));
-      }
-      // Navigate back after a short delay so the toast can be seen
-      setTimeout(() => {
-        goBack();
-      }, 800);
-    } catch (error) {
-      message.error(error?.response?.data?.error || error.message || 'Cập nhật hồ sơ thất bại');
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   const onSubmitPassword = async () => {
     try {
@@ -210,6 +157,80 @@ const ProfilePage = () => {
     }
   };
 
+  const handleEditProfile = () => {
+    setIsEditingProfile(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingProfile(false);
+    profileForm.setFieldsValue(originalProfileData);
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      const values = await profileForm.validateFields();
+      setLoading(true);
+      const payload = { fullName: values.fullName, phone: values.phone };
+      let updated;
+      try {
+        updated = await userService.updateProfile(payload);
+      } catch (err) {
+        // If profile API not available (404), try admin update-by-cccd for own account
+        if (err?.response?.status === 404) {
+          const current = authService.getCurrentUser();
+          if (current?.role === 'admin' && (current?.cccd || current?.userId)) {
+            const cccd = current.cccd || current.userId;
+            updated = await userService.updateByCccd(cccd, {
+              fullName: values.fullName,
+              phone: values.phone
+            });
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
+      }
+      
+      // Debug log để check response
+      console.log('Update profile response:', updated);
+      
+      // Check if phone verification is required
+      if (updated?.phoneChanged || updated?.requiresVerification) {
+        console.log('Phone changed detected, showing OTP form');
+        setPendingPhone(values.phone);
+        setShowOtpForm(true);
+        message.warning('Số điện thoại đã được cập nhật. Vui lòng xác thực OTP để hoàn tất thay đổi.');
+        // Automatically send OTP
+        try {
+          await userService.requestPhoneVerification();
+          message.success('OTP đã được gửi đến số điện thoại mới');
+        } catch (otpError) {
+          console.error('Auto OTP send failed:', otpError);
+          message.error('Không thể gửi OTP. Vui lòng thử lại.');
+        }
+        return;
+      }
+      
+      message.success('Cập nhật hồ sơ thành công');
+      // persist name to localStorage for header display
+      const current = authService.getCurrentUser();
+      if (current) {
+        const merged = { ...current, name: updated?.user?.fullName || values.fullName, phone: values.phone };
+        localStorage.setItem('user', JSON.stringify(merged));
+      }
+      
+      // Update original data and exit edit mode
+      setOriginalProfileData(values);
+      setIsEditingProfile(false);
+      
+    } catch (error) {
+      message.error(error?.response?.data?.error || error.message || 'Cập nhật hồ sơ thất bại');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const goBack = () => {
     const u = authService.getCurrentUser();
     if (u && u.role === 'admin') {
@@ -244,37 +265,113 @@ const ProfilePage = () => {
                   <Space direction="vertical" size="large" style={{ width: '100%' }}>
                     {!showOtpForm ? (
                       <>
-                        <Form form={profileForm} layout="vertical" disabled={loading}>
-                          <Form.Item label="CCCD" name="cccd">
-                            <Input disabled style={{ backgroundColor: '#f5f5f5' }} />
-                          </Form.Item>
-                          <Form.Item 
-                            label="Họ và tên" 
-                            name="fullName" 
-                            rules={[
-                              { required: true, message: 'Vui lòng nhập họ tên' },
-                              { min: 2, message: 'Họ tên phải có ít nhất 2 ký tự' }
-                            ]}
-                          >
-                            <Input placeholder="Nhập họ tên đầy đủ" />
-                          </Form.Item>
-                          <Form.Item 
-                            label="Số điện thoại" 
-                            name="phone" 
-                            rules={[
-                              { required: true, message: 'Vui lòng nhập số điện thoại' },
-                              { pattern: /^(0[3|5|7|8|9])+([0-9]{8})$/, message: 'Số điện thoại không hợp lệ' }
-                            ]}
-                          >
-                            <Input placeholder="Nhập số điện thoại (VD: 0901234567)" maxLength={10} />
-                          </Form.Item>
+                        {/* Header with Edit Button */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <Title level={4} style={{ margin: 0 }}>Thông tin cá nhân</Title>
+                            <Text type="secondary">Xem và cập nhật thông tin cá nhân của bạn</Text>
+                          </div>
+                          {!isEditingProfile && (
+                            <Button 
+                              type="primary" 
+                              icon={<EditOutlined />}
+                              onClick={handleEditProfile}
+                            >
+                              Sửa
+                            </Button>
+                          )}
+                        </div>
+
+                        <Divider style={{ margin: '16px 0' }} />
+
+                        <Form form={profileForm} layout="vertical" disabled={!isEditingProfile || loading}>
+                          <Row gutter={16}>
+                            <Col span={24}>
+                              <Form.Item label="CCCD" name="cccd">
+                                <Input 
+                                  disabled 
+                                  style={{ backgroundColor: '#f5f5f5' }}
+                                  prefix={<UserOutlined style={{ color: '#bfbfbf' }} />}
+                                />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                          
+                          <Row gutter={16}>
+                            <Col span={24}>
+                              <Form.Item 
+                                label="Họ và tên" 
+                                name="fullName" 
+                                rules={[
+                                  { required: true, message: 'Vui lòng nhập họ tên' },
+                                  { min: 2, message: 'Họ tên phải có ít nhất 2 ký tự' }
+                                ]}
+                              >
+                                <Input 
+                                  placeholder="Nhập họ tên đầy đủ"
+                                  prefix={<UserOutlined style={{ color: isEditingProfile ? '#1890ff' : '#bfbfbf' }} />}
+                                  style={{ 
+                                    backgroundColor: isEditingProfile ? '#fff' : '#f5f5f5',
+                                    borderColor: isEditingProfile ? '#d9d9d9' : '#f0f0f0'
+                                  }}
+                                />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                          
+                          <Row gutter={16}>
+                            <Col span={24}>
+                              <Form.Item 
+                                label="Số điện thoại" 
+                                name="phone" 
+                                rules={[
+                                  { required: true, message: 'Vui lòng nhập số điện thoại' },
+                                  { pattern: /^(0[3|5|7|8|9])+([0-9]{8})$/, message: 'Số điện thoại không hợp lệ' }
+                                ]}
+                              >
+                                <Input 
+                                  placeholder="Nhập số điện thoại (VD: 0901234567)" 
+                                  maxLength={10}
+                                  prefix={<PhoneOutlined style={{ color: isEditingProfile ? '#1890ff' : '#bfbfbf' }} />}
+                                  style={{ 
+                                    backgroundColor: isEditingProfile ? '#fff' : '#f5f5f5',
+                                    borderColor: isEditingProfile ? '#d9d9d9' : '#f0f0f0'
+                                  }}
+                                />
+                              </Form.Item>
+                            </Col>
+                          </Row>
                         </Form>
 
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                          <Button onClick={goBack}>Hủy</Button>
-                          <Button type="primary" onClick={onSubmitProfile} loading={loading}>
-                            Lưu thay đổi
+                        {/* Action Buttons */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Button 
+                            icon={<CloseOutlined />}
+                            onClick={goBack}
+                            style={{ borderColor: '#d9d9d9' }}
+                          >
+                            Hủy
                           </Button>
+                          
+                          {isEditingProfile && (
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <Button 
+                                icon={<UndoOutlined />}
+                                onClick={handleCancelEdit}
+                                disabled={loading}
+                              >
+                                Hủy chỉnh sửa
+                              </Button>
+                              <Button 
+                                type="primary" 
+                                icon={<SaveOutlined />}
+                                onClick={handleSaveProfile} 
+                                loading={loading}
+                              >
+                                Lưu thay đổi
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </>
                     ) : (
@@ -313,27 +410,31 @@ const ProfilePage = () => {
                           </Form.Item>
                         </Form>
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Button 
+                            icon={<PhoneOutlined />}
                             onClick={sendOtp} 
                             loading={sendingOtp}
-                            icon={<PhoneOutlined />}
                           >
                             Gửi lại OTP
                           </Button>
+                          
                           <div style={{ display: 'flex', gap: 8 }}>
-                            <Button onClick={() => {
-                              setShowOtpForm(false);
-                              setPendingPhone('');
-                              otpForm.resetFields();
-                            }}>
+                            <Button 
+                              icon={<UndoOutlined />}
+                              onClick={() => {
+                                setShowOtpForm(false);
+                                setPendingPhone('');
+                                otpForm.resetFields();
+                              }}
+                            >
                               Quay lại
                             </Button>
                             <Button 
                               type="primary" 
+                              icon={<SafetyOutlined />}
                               onClick={verifyOtp} 
                               loading={otpLoading}
-                              icon={<SafetyOutlined />}
                             >
                               Xác thực OTP
                             </Button>
@@ -355,10 +456,11 @@ const ProfilePage = () => {
                 children: (
                   <Space direction="vertical" size="large" style={{ width: '100%' }}>
                     <div>
-                      <Text strong>Đổi mật khẩu</Text>
-                      <br />
+                      <Title level={4} style={{ margin: 0 }}>Đổi mật khẩu</Title>
                       <Text type="secondary">Để bảo vệ tài khoản, vui lòng chọn mật khẩu mạnh và không chia sẻ với ai</Text>
                     </div>
+
+                    <Divider style={{ margin: '16px 0' }} />
 
                     <Form form={passwordForm} layout="vertical" disabled={passwordLoading}>
                       <Form.Item
@@ -417,11 +519,32 @@ const ProfilePage = () => {
                       </Form.Item>
                     </Form>
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                      <Button onClick={() => passwordForm.resetFields()}>Đặt lại</Button>
-                      <Button type="primary" onClick={onSubmitPassword} loading={passwordLoading}>
-                        Đổi mật khẩu
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Button 
+                        icon={<CloseOutlined />}
+                        onClick={goBack}
+                        style={{ borderColor: '#d9d9d9' }}
+                      >
+                        Hủy
                       </Button>
+                      
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <Button 
+                          icon={<UndoOutlined />}
+                          onClick={() => passwordForm.resetFields()}
+                          disabled={passwordLoading}
+                        >
+                          Đặt lại
+                        </Button>
+                        <Button 
+                          type="primary" 
+                          icon={<SaveOutlined />}
+                          onClick={onSubmitPassword} 
+                          loading={passwordLoading}
+                        >
+                          Đổi mật khẩu
+                        </Button>
+                      </div>
                     </div>
                   </Space>
                 )

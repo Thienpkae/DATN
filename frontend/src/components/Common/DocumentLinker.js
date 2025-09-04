@@ -7,13 +7,15 @@ import ipfsService from '../../services/ipfs';
 const { Option } = Select;
 
 const DocumentLinker = ({ 
-  visible, 
+  open, 
+  visible, // Support both 'open' and 'visible' props for backward compatibility
   onCancel, 
   onSuccess, 
   targetType, // 'land' hoặc 'transaction'
   targetID, 
   linkedDocuments = [] 
 }) => {
+  const modalVisible = open !== undefined ? open : visible;
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [documents, setDocuments] = useState([]);
@@ -43,10 +45,10 @@ const DocumentLinker = ({
   }, [linkedDocuments]);
 
   useEffect(() => {
-    if (visible && linkedDocuments.length > 0) {
+    if (modalVisible && linkedDocuments.length > 0) {
       loadLinkedDocuments();
     }
-  }, [visible, linkedDocuments, loadLinkedDocuments]);
+  }, [modalVisible, linkedDocuments, loadLinkedDocuments]);
 
   const searchDocuments = async () => {
     try {
@@ -70,15 +72,12 @@ const DocumentLinker = ({
     try {
       setLoading(true);
       if (targetType === 'land') {
-        await documentService.linkDocumentToLand({
-          docID,
-          landParcelId: targetID
-        });
+        // API expects: linkDocumentToLand(docIDs, landParcelID)
+        // docIDs can be array or single value
+        await documentService.linkDocumentToLand([docID], targetID);
       } else {
-        await documentService.linkDocumentToTransaction({
-          docID,
-          transactionId: targetID
-        });
+        // API expects: linkDocumentToTransaction(docIDs, txID) 
+        await documentService.linkDocumentToTransaction([docID], targetID);
       }
       message.success('Liên kết tài liệu thành công');
       onSuccess();
@@ -92,7 +91,11 @@ const DocumentLinker = ({
   const handleUnlinkDocument = async (docID) => {
     try {
       setLoading(true);
-      // Gọi API để bỏ liên kết (cần implement trong backend)
+      if (targetType === 'land') {
+        await documentService.unlinkDocumentFromLand(docID, targetID);
+      } else {
+        await documentService.unlinkDocumentFromTransaction(docID, targetID);
+      }
       message.success('Bỏ liên kết tài liệu thành công');
       onSuccess();
     } catch (e) {
@@ -131,7 +134,7 @@ const DocumentLinker = ({
   return (
     <Modal
       title={`Liên kết tài liệu với ${targetType === 'land' ? 'thửa đất' : 'giao dịch'} ${targetID}`}
-      open={visible}
+      open={modalVisible}
       onCancel={onCancel}
       footer={null}
       width={800}

@@ -32,7 +32,7 @@ import {
   TransactionOutlined,
   HomeOutlined
 } from '@ant-design/icons';
-import notificationService from '../../services/notification';
+import notificationService from '../../services/notificationService';
 import { useAuth } from '../../hooks/useAuth';
 
 const { Title, Text } = Typography;
@@ -68,11 +68,12 @@ const NotificationsPage = () => {
   const fetchNotifications = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await notificationService.getUserNotifications({
-        limit: pagination.pageSize,
-        status: filters.status,
-        page: pagination.current
-      });
+        const response = await notificationService.getMyNotifications({
+          page: pagination.current,
+          limit: pagination.pageSize,
+          status: filters.status,
+          ...filters
+        });
       
       if (response.success) {
         setNotifications(response.data.notifications || []);
@@ -92,7 +93,7 @@ const NotificationsPage = () => {
   const fetchStats = useCallback(async () => {
     try {
       const unreadCount = await notificationService.getUnreadCount();
-      const allNotifications = await notificationService.getUserNotifications({ limit: 1000 });
+      const allNotifications = await notificationService.getMyNotifications({ limit: 1000 });
       
       if (allNotifications.success) {
         const allNotifs = allNotifications.data.notifications || [];
@@ -158,7 +159,7 @@ const NotificationsPage = () => {
 
   const handleArchiveNotification = async (notificationId) => {
     try {
-      await notificationService.archiveNotification(notificationId);
+      await notificationService.deleteNotification(notificationId);
       
       // Remove from local state
       setNotifications(prev => 
@@ -166,11 +167,11 @@ const NotificationsPage = () => {
       );
       
       fetchStats(); // Refresh stats
-      message.success('Đã lưu trữ thông báo');
+      message.success('Đã xóa thông báo');
       
     } catch (error) {
-      console.error('Error archiving notification:', error);
-      message.error('Không thể lưu trữ thông báo');
+      console.error('Error deleting notification:', error);
+      message.error('Không thể xóa thông báo');
     }
   };
 
@@ -460,9 +461,9 @@ const NotificationsPage = () => {
                         </Button>
                       </Tooltip>
                     ),
-                    <Tooltip title="Lưu trữ">
+                    <Tooltip title="Xóa">
                       <Popconfirm
-                        title="Bạn có chắc muốn lưu trữ thông báo này?"
+                        title="Bạn có chắc muốn xóa thông báo này?"
                         onConfirm={() => handleArchiveNotification(notification._id)}
                         okText="Có"
                         cancelText="Không"
@@ -473,7 +474,7 @@ const NotificationsPage = () => {
                           icon={<DeleteOutlined />}
                           danger
                         >
-                          Lưu trữ
+                          Xóa
                         </Button>
                       </Popconfirm>
                     </Tooltip>

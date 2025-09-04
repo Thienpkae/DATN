@@ -243,9 +243,23 @@ func (s *LandRegistryChaincode) GetDocument(ctx contractapi.TransactionContextIn
 		if err != nil {
 			return nil, err
 		}
-		if doc.UploadedBy != userID {
-			return nil, fmt.Errorf("người dùng %s không có quyền truy cập tài liệu %s", userID, docID)
+		
+		// Allow access if user uploaded the document
+		if doc.UploadedBy == userID {
+			return &doc, nil
 		}
+		
+		// Allow access if document is part of a transaction where user is involved
+		if s.canUserAccessTransactionDocument(ctx, userID, docID) {
+			return &doc, nil
+		}
+		
+		// Allow access if document is linked to a land parcel owned by the user
+		if s.canUserAccessLandDocument(ctx, userID, docID) {
+			return &doc, nil
+		}
+		
+		return nil, fmt.Errorf("người dùng %s không có quyền truy cập tài liệu %s", userID, docID)
 	}
 
 	return &doc, nil
@@ -1053,4 +1067,57 @@ func (s *LandRegistryChaincode) getQueryResultForDocuments(ctx contractapi.Trans
 	}
 
 	return documents, nil
+}
+
+// canUserAccessTransactionDocument - Kiểm tra xem người dùng có thể truy cập tài liệu của giao dịch không
+func (s *LandRegistryChaincode) canUserAccessTransactionDocument(ctx contractapi.TransactionContextInterface, userID, docID string) bool {
+	// Tạo query tìm kiếm các giao dịch chứa document này và user tham gia
+	queryString := fmt.Sprintf(`{
+		"selector": {
+			"$and": [
+				{"txId": {"$exists": true}},
+				{"type": {"$exists": true, "$ne": "LOG"}},
+				{"documentIds": {"$elemMatch": {"$eq": "%s"}}},
+				{"$or": [
+					{"fromOwnerId": "%s"},
+					{"toOwnerId": "%s"}
+				]}
+			]
+		}
+	}`, docID, userID, userID)
+	
+	resultsIterator, err := ctx.GetStub().GetQueryResult(queryString)
+	if err != nil {
+		log.Printf("Lỗi khi truy vấn giao dịch chứa tài liệu %s: %v", docID, err)
+		return false
+	}
+	defer resultsIterator.Close()
+	
+	// Nếu tìm thấy ít nhất một giao dịch, cho phép truy cập
+	return resultsIterator.HasNext()
+}
+
+// canUserAccessLandDocument - Kiểm tra xem người dùng có sở hữu thửa đất nào liên kết với tài liệu hay không
+func (s *LandRegistryChaincode) canUserAccessLandDocument(ctx contractapi.TransactionContextInterface, userID, docID string) bool {
+	// Tạo query tìm kiếm các thửa đất chứa document này và thuộc sở hữu của user
+	queryString := fmt.Sprintf(`{
+		"selector": {
+			"$and": [
+				{"id": {"$exists": true}},
+				{"landUsePurpose": {"$exists": true}},
+				{"documentIds": {"$elemMatch": {"$eq": "%s"}}},
+				{"ownerId": "%s"}
+			]
+		}
+	}`, docID, userID)
+	
+	resultsIterator, err := ctx.GetStub().GetQueryResult(queryString)
+	if err != nil {
+		log.Printf("Lỗi khi truy vấn thửa đất chứa tài liệu %s: %v", docID, err)
+		return false
+	}
+	defer resultsIterator.Close()
+	
+	// Nếu tìm thấy ít nhất một thửa đất, cho phép truy cập
+	return resultsIterator.HasNext()
 }

@@ -3,8 +3,7 @@ import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, R
 import { EditOutlined, SearchOutlined, ReloadOutlined, DeleteOutlined, DownloadOutlined, UploadOutlined, FileTextOutlined, CloudUploadOutlined } from '@ant-design/icons';
 import documentService from '../../../services/documentService';
 import ipfsService from '../../../services/ipfs';
-import landService from '../../../services/landService';
-import landTypeMatchService from '../../../services/landTypeMatchService';
+import documentAnalysisService from '../../../services/documentAnalysisService';
 import OnlineDocumentViewer from '../../Common/OnlineDocumentViewer';
 import { useAuth } from '../../../hooks/useAuth';
 import DocumentDetailModal from '../../Common/DocumentDetailModal'; // Import the component
@@ -157,126 +156,19 @@ const DocumentManagementPage = () => {
   const onAnalyze = async (docID) => {
     try {
       setLoading(true);
-      const result = await documentService.analyzeDocument(docID);
-      if (result.success && result.data && result.data.analysis) {
-        const analysisData = result.data.analysis;
-        setAnalysis(analysisData);
-        await performBlockchainComparison(analysisData);
-        message.success('Phân tích và so sánh tài liệu hoàn tất');
-      } else {
-        throw new Error('Dữ liệu phân tích không hợp lệ');
-      }
+      const result = await documentAnalysisService.performCompleteAnalysis(docID);
+      setAnalysis(result.analysis);
+      setBlockchainData(result.blockchainData);
+      setComparisonResult(result.comparisonResult);
     } catch (e) {
-      message.error(e.message || 'Phân tích thất bại');
+      console.error('Analysis error:', e);
+      // Error message is already shown by the shared service
     } finally {
       setLoading(false);
     }
   };
 
-  const performBlockchainComparison = async (analysisData) => {
-    if (!analysisData || !analysisData.extractedInfo) {
-      throw new Error('Dữ liệu phân tích không hợp lệ');
-    }
-    try {
-      console.log('Starting blockchain comparison...');
-      const landID = analysisData.extractedInfo.landParcelID;
-      console.log('Querying land with ID:', landID);
-      if (!landID) {
-        throw new Error('Không tìm thấy LandID trong tài liệu');
-      }
-      const landInfo = await landService.getLandParcel(landID);
-      console.log('Land info from blockchain:', landInfo);
-      if (!landInfo) {
-        throw new Error(`Không tìm thấy thông tin thửa đất ${landID} trên blockchain`);
-      }
-      const blockchainDataObj = {
-        landID,
-        landType: landInfo?.landUsePurpose || landInfo?.purpose || 'Không tìm thấy',
-        legalStatus: landInfo?.legalStatus || 'Không tìm thấy',
-        area: landInfo?.area || landInfo?.landArea || 'Không tìm thấy',
-        location: landInfo?.location || landInfo?.address || 'Không tìm thấy',
-        cccd: landInfo?.ownerID || landInfo?.ownerId || 'Không tìm thấy',
-      };
-      console.log('Blockchain data object:', blockchainDataObj);
-      setBlockchainData(blockchainDataObj);
-      const result = calculateMatch(analysisData.extractedInfo, blockchainDataObj);
-      console.log('Match result:', result);
-      setComparisonResult(result);
-    } catch (e) {
-      console.error('Error in performBlockchainComparison:', e);
-      throw e;
-    }
-  };
 
-  const calculateMatch = (extracted, blockchain) => {
-    const fields = [
-      { name: 'LandID', extracted: extracted.landParcelID, blockchain: blockchain.landID, weight: 4, type: 'exact' },
-      { name: 'Loại đất', extracted: extracted.landType, blockchain: blockchain.landType, weight: 3, type: 'landType' },
-      { name: 'Diện tích', extracted: extracted.landArea, blockchain: blockchain.area, weight: 2, type: 'number' },
-      { name: 'Địa chỉ', extracted: extracted.landLocation, blockchain: blockchain.location, weight: 2, type: 'location' },
-      { name: 'CCCD', extracted: extracted.cccd, blockchain: blockchain.cccd, weight: 3, type: 'exact' },
-    ];
-    let totalScore = 0;
-    let maxScore = 0;
-    let matchedFields = 0;
-    const details = [];
-    fields.forEach((field) => {
-      maxScore += field.weight;
-      if (!field.extracted || !field.blockchain) {
-        details.push(`⚠️ ${field.name}: Thiếu thông tin`);
-        return;
-      }
-      let isMatch = false;
-      switch (field.type) {
-        case 'exact':
-          isMatch = field.extracted.toString().toLowerCase() === field.blockchain.toString().toLowerCase();
-          break;
-        case 'landType':
-          isMatch = landTypeMatchService.isMatch(field.blockchain, field.extracted);
-          break;
-        case 'number':
-          const extractedNum = parseFloat(field.extracted);
-          const blockchainNum = parseFloat(field.blockchain);
-          if (!isNaN(extractedNum) && !isNaN(blockchainNum)) {
-            const diff = Math.abs(extractedNum - blockchainNum);
-            const tolerance = Math.max(extractedNum, blockchainNum) * 0.05;
-            isMatch = diff <= tolerance;
-          }
-          break;
-        case 'location':
-          const extractedLoc = field.extracted.toString().toLowerCase();
-          const blockchainLoc = field.blockchain.toString().toLowerCase();
-          isMatch =
-            extractedLoc.includes(blockchainLoc) ||
-            blockchainLoc.includes(extractedLoc) ||
-            extractedLoc === blockchainLoc;
-          break;
-        default:
-          isMatch = field.extracted.toString().toLowerCase() === field.blockchain.toString().toLowerCase();
-      }
-      if (isMatch) {
-        totalScore += field.weight;
-        matchedFields++;
-        details.push(`✅ ${field.name}: Khớp (${field.extracted})`);
-      } else {
-        details.push(`❌ ${field.name}: Không khớp (Tài liệu: ${field.extracted}, Blockchain: ${field.blockchain})`);
-      }
-    });
-    const matchPercentage = Math.round((totalScore / maxScore) * 100);
-    let recommendation = 'review';
-    if (matchPercentage >= 80) {
-      recommendation = 'verify';
-    } else if (matchPercentage <= 30) {
-      recommendation = 'reject';
-    }
-    return {
-      matchPercentage,
-      matchedFields,
-      totalFields: fields.length,
-      recommendation,
-      details,
-    };
-  };
 
   const loadDocumentHistory = useCallback(async (docID) => {
     try {
@@ -374,9 +266,9 @@ const DocumentManagementPage = () => {
         dataIndex: 'status',
         key: 'status',
         render: (v) => {
-          if (v === 'VERIFIED') return <Tag color='green'>Đã xác thực</Tag>;
-          if (v === 'REJECTED') return <Tag color='red'>Không hợp lệ</Tag>;
-          return <Tag color='orange'>Chờ xác thực</Tag>;
+        if (v === 'VERIFIED') return <Tag color="green">Đã thẩm định</Tag>;
+        if (v === 'REJECTED') return <Tag color="red">Không hợp lệ</Tag>;
+        return <Tag color="orange">Chờ xác thực</Tag>;
         },
       },
       { title: 'Loại file', dataIndex: 'fileType', key: 'fileType', render: (v) => <Tag color='blue'>{documentService.getDisplayFileType(v)}</Tag> },
@@ -455,7 +347,7 @@ const DocumentManagementPage = () => {
             value={filters.verified}
             onChange={(v) => setFilters({ ...filters, verified: v })}
           >
-            <Option value={true}>Đã xác thực</Option>
+            <Option value={true}>Đã thẩm định</Option>
             <Option value={false}>Chờ xác thực</Option>
           </Select>
           <Button icon={<SearchOutlined />} onClick={onSearch}>

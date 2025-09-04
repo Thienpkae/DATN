@@ -18,11 +18,12 @@ const transactionService = {
     }
   },
 
-  // Create split request
+  // Create split request - theo luồng chaincode mới
   async createSplitRequest(splitData) {
     try {
       const response = await apiClient.post(API_ENDPOINTS.TRANSACTION.SPLIT, {
-        ...splitData,
+        landParcelID: splitData.landParcelID,
+        documentIds: splitData.documentIds || [],
         reason: splitData.reason || ''
       });
       return response.data;
@@ -31,11 +32,12 @@ const transactionService = {
     }
   },
 
-  // Create merge request
+  // Create merge request - theo luồng chaincode mới
   async createMergeRequest(mergeData) {
     try {
       const response = await apiClient.post(API_ENDPOINTS.TRANSACTION.MERGE, {
-        ...mergeData,
+        parcelIDs: mergeData.parcelIDs,
+        documentIds: mergeData.documentIds || [],
         reason: mergeData.reason || ''
       });
       return response.data;
@@ -91,16 +93,6 @@ const transactionService = {
     }
   },
 
-  // Forward transaction (Org2)
-  async forwardTransaction(txID) {
-    try {
-      const url = API_ENDPOINTS.TRANSACTION.FORWARD.replace(':txID', txID);
-      const response = await apiClient.post(url);
-      return response.data;
-    } catch (error) {
-      throw handleApiError(error);
-    }
-  },
 
   // Approve transfer transaction (Org1)
   async approveTransferTransaction(txID) {
@@ -113,22 +105,29 @@ const transactionService = {
     }
   },
 
-  // Approve split transaction (Org1)
-  async approveSplitTransaction(txID) {
+  // Approve split transaction (Org1) - với thông tin thửa đất mới
+  async approveSplitTransaction(txID, landID, newParcels) {
     try {
       const url = API_ENDPOINTS.TRANSACTION.APPROVE_SPLIT.replace(':txID', txID);
-      const response = await apiClient.post(url);
+      const response = await apiClient.post(url, {
+        landID: landID,
+        newParcels: newParcels
+      });
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Lỗi khi phê duyệt giao dịch tách thửa');
     }
   },
 
-  // Approve merge transaction (Org1)
-  async approveMergeTransaction(txID) {
+  // Approve merge transaction (Org1) - với thông tin thửa đất gộp
+  async approveMergeTransaction(txID, landIds, selectedLandID, newParcel) {
     try {
       const url = API_ENDPOINTS.TRANSACTION.APPROVE_MERGE.replace(':txID', txID);
-      const response = await apiClient.post(url);
+      const response = await apiClient.post(url, {
+        landIds: landIds,
+        selectedLandID: selectedLandID,
+        newParcel: newParcel
+      });
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Lỗi khi phê duyệt giao dịch gộp thửa');
@@ -249,7 +248,8 @@ const transactionService = {
   validateTransactionData(transactionData, type) {
     const errors = [];
 
-    if (!transactionData.landParcelID || transactionData.landParcelID.trim() === '') {
+    // Chỉ yêu cầu landParcelID cho các loại giao dịch khác MERGE
+    if (type !== 'MERGE' && (!transactionData.landParcelID || transactionData.landParcelID.trim() === '')) {
       errors.push('Mã thửa đất là bắt buộc');
     }
 
@@ -260,17 +260,14 @@ const transactionService = {
         }
         break;
       case 'SPLIT':
-        if (!transactionData.newParcels || !Array.isArray(transactionData.newParcels) || transactionData.newParcels.length === 0) {
-          errors.push('Danh sách thửa đất mới là bắt buộc');
-        }
+        // Theo luồng chaincode mới: chỉ cần landParcelID, documentIds, reason
+        // Không cần validate newParcels ở bước tạo yêu cầu
         break;
       case 'MERGE':
         if (!transactionData.parcelIDs || !Array.isArray(transactionData.parcelIDs) || transactionData.parcelIDs.length < 2) {
           errors.push('Cần ít nhất 2 thửa đất để gộp');
         }
-        if (!transactionData.newParcel) {
-          errors.push('Thông tin thửa đất mới là bắt buộc');
-        }
+        // Theo luồng chaincode mới: không cần validate newParcel ở bước tạo yêu cầu
         break;
       case 'CHANGE_PURPOSE':
         if (!transactionData.newPurpose || transactionData.newPurpose.trim() === '') {
@@ -304,7 +301,6 @@ const transactionService = {
     const statusTexts = {
       'PENDING': 'Chờ xử lý',
       'VERIFIED': 'Đã thẩm định',
-      'FORWARDED': 'Đã chuyển tiếp',
       'APPROVED': 'Đã phê duyệt',
       'REJECTED': 'Bị từ chối',
       'CONFIRMED': 'Đã xác nhận',

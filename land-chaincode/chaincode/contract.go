@@ -541,7 +541,7 @@ func (s *LandRegistryChaincode) RejectDocument(ctx contractapi.TransactionContex
 
 	// Từ chối tài liệu
 	SetDocumentRejected(doc, userID, txTime)
-	
+
 	// Lưu thông tin từ chối vào Description với format chuẩn để dễ nhận biết
 	rejectionInfo := fmt.Sprintf(" [REJECTED: %s | By: %s | At: %s]", reason, userID, txTime.Format("2006-01-02 15:04:05"))
 	doc.Description = doc.Description + rejectionInfo
@@ -768,7 +768,7 @@ func (s *LandRegistryChaincode) LinkDocumentToTransaction(ctx contractapi.Transa
 // ========================================
 
 // CreateSplitRequest - Tạo yêu cầu tách thửa (auto-generate txID)
-func (s *LandRegistryChaincode) CreateSplitRequest(ctx contractapi.TransactionContextInterface, landParcelID, newParcelsStr, documentIdsStr, reason string) error {
+func (s *LandRegistryChaincode) CreateSplitRequest(ctx contractapi.TransactionContextInterface, landParcelID, documentIdsStr, reason string) error {
 	if err := CheckOrganization(ctx, []string{"Org3MSP"}); err != nil {
 		return err
 	}
@@ -776,35 +776,16 @@ func (s *LandRegistryChaincode) CreateSplitRequest(ctx contractapi.TransactionCo
 	if err != nil {
 		return err
 	}
-	var newParcels []Land
-	if err := json.Unmarshal([]byte(newParcelsStr), &newParcels); err != nil {
-		return fmt.Errorf("lỗi khi giải mã danh sách thửa đất mới: %v", err)
-	}
 	if err := VerifyLandOwnership(ctx, landParcelID, callerID); err != nil {
 		return err
 	}
 	if err := VerifyLandLegalStatus(ctx, landParcelID, []string{"Đang tranh chấp", "Đang thế chấp"}); err != nil {
 		return err
 	}
-	existingLand, err := s.QueryLandByID(ctx, landParcelID)
-	if err != nil {
-		return fmt.Errorf("lỗi khi truy vấn thửa đất %s: %v", landParcelID, err)
-	}
-	var totalArea float64
-	for _, newLand := range newParcels {
-		if err := ValidateLand(ctx, newLand, false); err != nil {
-			return fmt.Errorf("thửa đất mới %s không hợp lệ: %v", newLand.ID, err)
-		}
-		totalArea += newLand.Area
-	}
-	if totalArea > existingLand.Area {
-		return fmt.Errorf("tổng diện tích các thửa mới (%f m²) vượt quá diện tích thửa gốc (%f m²)", totalArea, existingLand.Area)
-	}
 	txTime, err := GetTxTimestampAsTime(ctx)
 	if err != nil {
 		return fmt.Errorf("lỗi khi lấy timestamp: %v", err)
 	}
-
 	// Parse document IDs if provided
 	var documentIDs []string
 	if documentIdsStr != "" {
@@ -812,27 +793,24 @@ func (s *LandRegistryChaincode) CreateSplitRequest(ctx contractapi.TransactionCo
 			return fmt.Errorf("lỗi khi giải mã danh sách document IDs: %v", err)
 		}
 	}
-
 	// Tự động tạo txID với timestamp
 	txID := fmt.Sprintf("TACH_THUA_%d_%s_%s", txTime.Unix(), callerID, landParcelID)
-
 	// Tạo Details với lý do
-	details := fmt.Sprintf("Tách thửa đất %s thành %d thửa", landParcelID, len(newParcels))
+	details := fmt.Sprintf("Tách thửa đất %s", landParcelID)
 	if reason != "" {
 		details = fmt.Sprintf("%s. Lý do: %s", details, reason)
 	}
-
 	tx := Transaction{
 		TxID:         txID,
 		Type:         "SPLIT",
 		LandParcelID: landParcelID,
-		ParcelIDs:    []string{}, // Khởi tạo empty slice thay vì nil
+		ParcelIDs:    []string{}, // Để trống, sẽ cập nhật khi approve
 		FromOwnerID:  callerID,
 		ToOwnerID:    callerID,
 		Status:       "PENDING",
 		Details:      details,
-		UserID:       callerID, // Tự động điền người thực hiện
-		DocumentIDs:  documentIDs, // Sử dụng documentIDs được parse
+		UserID:       callerID,
+		DocumentIDs:  documentIDs,
 		CreatedAt:    txTime,
 		UpdatedAt:    txTime,
 	}
@@ -843,22 +821,11 @@ func (s *LandRegistryChaincode) CreateSplitRequest(ctx contractapi.TransactionCo
 	if err := ctx.GetStub().PutState(txID, txJSON); err != nil {
 		return fmt.Errorf("lỗi khi lưu giao dịch: %v", err)
 	}
-	for _, newLand := range newParcels {
-		newLand.CreatedAt = txTime
-		newLand.UpdatedAt = txTime
-		newLandJSON, err := json.Marshal(newLand)
-		if err != nil {
-			return fmt.Errorf("lỗi khi mã hóa thửa đất mới: %v", err)
-		}
-		if err := ctx.GetStub().PutState(newLand.ID, newLandJSON); err != nil {
-			return fmt.Errorf("lỗi khi lưu thửa đất mới %s: %v", newLand.ID, err)
-		}
-	}
 	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "CREATE_SPLIT_REQUEST", callerID, fmt.Sprintf("Tạo yêu cầu tách thửa %s", txID))
 }
 
 // CreateMergeRequest - Tạo yêu cầu hợp thửa (auto-generate txID)
-func (s *LandRegistryChaincode) CreateMergeRequest(ctx contractapi.TransactionContextInterface, parcelIDsStr, newParcelStr, documentIdsStr, reason string) error {
+func (s *LandRegistryChaincode) CreateMergeRequest(ctx contractapi.TransactionContextInterface, parcelIDsStr, documentIdsStr, reason string) error {
 	if err := CheckOrganization(ctx, []string{"Org3MSP"}); err != nil {
 		return err
 	}
@@ -870,12 +837,9 @@ func (s *LandRegistryChaincode) CreateMergeRequest(ctx contractapi.TransactionCo
 	if err := json.Unmarshal([]byte(parcelIDsStr), &parcelIDs); err != nil {
 		return fmt.Errorf("lỗi khi giải mã danh sách parcelIDs: %v", err)
 	}
-	var newLand Land
-	if err := json.Unmarshal([]byte(newParcelStr), &newLand); err != nil {
-		return fmt.Errorf("lỗi khi giải mã thửa đất mới: %v", err)
-	}
 	var totalArea float64
 	for _, parcelID := range parcelIDs {
+		parcelID = strings.TrimSpace(parcelID)
 		if err := VerifyLandOwnership(ctx, parcelID, callerID); err != nil {
 			return err
 		}
@@ -888,17 +852,10 @@ func (s *LandRegistryChaincode) CreateMergeRequest(ctx contractapi.TransactionCo
 		}
 		totalArea += land.Area
 	}
-	if err := ValidateLand(ctx, newLand, false); err != nil {
-		return fmt.Errorf("thửa đất mới %s không hợp lệ: %v", newLand.ID, err)
-	}
-	if newLand.Area != totalArea {
-		return fmt.Errorf("diện tích thửa đất mới (%f m²) không khớp với tổng diện tích các thửa đất gốc (%f m²)", newLand.Area, totalArea)
-	}
 	txTime, err := GetTxTimestampAsTime(ctx)
 	if err != nil {
 		return fmt.Errorf("lỗi khi lấy timestamp: %v", err)
 	}
-
 	// Parse document IDs if provided
 	var documentIDs []string
 	if documentIdsStr != "" {
@@ -906,27 +863,24 @@ func (s *LandRegistryChaincode) CreateMergeRequest(ctx contractapi.TransactionCo
 			return fmt.Errorf("lỗi khi giải mã danh sách document IDs: %v", err)
 		}
 	}
-
 	// Tự động tạo txID với timestamp
 	txID := fmt.Sprintf("HOP_THUA_%d_%s_%v", txTime.Unix(), callerID, parcelIDs)
-
 	// Tạo Details với lý do
-	details := fmt.Sprintf("Hợp nhất các thửa đất %v thành %s", parcelIDs, newLand.ID)
+	details := fmt.Sprintf("Hợp nhất các thửa đất %v", parcelIDs)
 	if reason != "" {
 		details = fmt.Sprintf("%s. Lý do: %s", details, reason)
 	}
-
 	tx := Transaction{
 		TxID:         txID,
 		Type:         "MERGE",
-		LandParcelID: newLand.ID,
+		LandParcelID: "", // Để trống, sẽ set khi approve
 		ParcelIDs:    parcelIDs,
 		FromOwnerID:  callerID,
 		ToOwnerID:    callerID,
 		Status:       "PENDING",
 		Details:      details,
-		UserID:       callerID, // Tự động điền người thực hiện
-		DocumentIDs:  documentIDs, // Sử dụng documentIDs được parse
+		UserID:       callerID,
+		DocumentIDs:  documentIDs,
 		CreatedAt:    txTime,
 		UpdatedAt:    txTime,
 	}
@@ -936,15 +890,6 @@ func (s *LandRegistryChaincode) CreateMergeRequest(ctx contractapi.TransactionCo
 	}
 	if err := ctx.GetStub().PutState(txID, txJSON); err != nil {
 		return fmt.Errorf("lỗi khi lưu giao dịch: %v", err)
-	}
-	newLand.CreatedAt = txTime
-	newLand.UpdatedAt = txTime
-	newLandJSON, err := json.Marshal(newLand)
-	if err != nil {
-		return fmt.Errorf("lỗi khi mã hóa thửa đất mới: %v", err)
-	}
-	if err := ctx.GetStub().PutState(newLand.ID, newLandJSON); err != nil {
-		return fmt.Errorf("lỗi khi lưu thửa đất mới %s: %v", newLand.ID, err)
 	}
 	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "CREATE_MERGE_REQUEST", callerID, fmt.Sprintf("Tạo yêu cầu hợp thửa %s", txID))
 }
@@ -995,7 +940,7 @@ func (s *LandRegistryChaincode) CreateTransferRequest(ctx contractapi.Transactio
 		ToOwnerID:    toOwnerID,
 		Status:       "PENDING",
 		Details:      details,
-		UserID:       callerID, // Tự động điền người thực hiện
+		UserID:       callerID,    // Tự động điền người thực hiện
 		DocumentIDs:  documentIDs, // Sử dụng documentIDs được parse
 		CreatedAt:    txTime,
 		UpdatedAt:    txTime,
@@ -1059,7 +1004,7 @@ func (s *LandRegistryChaincode) CreateChangePurposeRequest(ctx contractapi.Trans
 		ToOwnerID:    callerID,
 		Status:       "PENDING",
 		Details:      details,
-		UserID:       callerID, // Tự động điền người thực hiện
+		UserID:       callerID,    // Tự động điền người thực hiện
 		DocumentIDs:  documentIDs, // Sử dụng documentIDs được parse
 		CreatedAt:    txTime,
 		UpdatedAt:    txTime,
@@ -1120,7 +1065,7 @@ func (s *LandRegistryChaincode) CreateReissueRequest(ctx contractapi.Transaction
 		ToOwnerID:    callerID,
 		Status:       "PENDING",
 		Details:      details,
-		UserID:       callerID, // Tự động điền người thực hiện
+		UserID:       callerID,    // Tự động điền người thực hiện
 		DocumentIDs:  documentIDs, // Sử dụng documentIDs được parse
 		CreatedAt:    txTime,
 		UpdatedAt:    txTime,
@@ -1154,13 +1099,13 @@ func (s *LandRegistryChaincode) ConfirmTransfer(ctx contractapi.TransactionConte
 	if tx.ToOwnerID != userID {
 		return fmt.Errorf("người dùng %s không phải là người nhận chuyển nhượng", userID)
 	}
-	if tx.Status != "APPROVED" {
-		return fmt.Errorf("giao dịch %s không ở trạng thái APPROVED để xác nhận", txID)
+	if tx.Status != "PENDING" {
+		return fmt.Errorf("giao dịch %s không ở trạng thái PENDING để xác nhận", txID)
 	}
 
 	// Parse isAccepted
 	isAccepted := isAcceptedStr == "true"
-	
+
 	txTime, err := GetTxTimestampAsTime(ctx)
 	if err != nil {
 		return fmt.Errorf("lỗi khi lấy timestamp: %v", err)
@@ -1180,7 +1125,7 @@ func (s *LandRegistryChaincode) ConfirmTransfer(ctx contractapi.TransactionConte
 		}
 		actionLog = "CONFIRM_TRANSFER_REJECTED"
 	}
-	
+
 	tx.UpdatedAt = txTime
 	txJSON, err := json.Marshal(tx)
 	if err != nil {
@@ -1189,7 +1134,7 @@ func (s *LandRegistryChaincode) ConfirmTransfer(ctx contractapi.TransactionConte
 	if err := ctx.GetStub().PutState(txID, txJSON); err != nil {
 		return fmt.Errorf("lỗi khi cập nhật giao dịch: %v", err)
 	}
-	
+
 	actionText := "chấp nhận"
 	if !isAccepted {
 		actionText = "từ chối"
@@ -1227,11 +1172,11 @@ func (s *LandRegistryChaincode) ProcessTransaction(ctx contractapi.TransactionCo
 		}
 	}
 
-	// Kiểm tra và xác minh tài liệu trước khi quyết định
-	var verifiedDocs, rejectedDocs []string
+	// Kiểm tra trạng thái tài liệu hiện tại (không tự động xác minh)
+	var verifiedDocs, pendingDocs, rejectedDocs []string
 	var docErrors []string
 
-	// Xử lý xác minh từng tài liệu đính kèm
+	// Kiểm tra trạng thái từng tài liệu đính kèm
 	for _, docID := range tx.DocumentIDs {
 		doc, err := s.GetDocument(ctx, docID)
 		if err != nil {
@@ -1239,17 +1184,16 @@ func (s *LandRegistryChaincode) ProcessTransaction(ctx contractapi.TransactionCo
 			continue
 		}
 
-		// Tự động xác minh tài liệu (giả định logic xác minh)
+		// Chỉ kiểm tra trạng thái, không tự động xác minh
 		if doc.Type != "" && doc.IPFSHash != "" {
-			if !IsDocumentVerified(doc) {
-				// Tự động xác minh tài liệu hợp lệ
-				txTime, _ := GetTxTimestampAsTime(ctx)
-				SetDocumentVerified(doc, userID, txTime)
-
-				docJSON, _ := json.Marshal(doc)
-				ctx.GetStub().PutState(docID, docJSON)
+			if IsDocumentVerified(doc) {
+				verifiedDocs = append(verifiedDocs, doc.Title)
+			} else if doc.Status == "REJECTED" {
+				rejectedDocs = append(rejectedDocs, doc.Title)
+			} else {
+				// Document đang PENDING - chưa được Org2 xác thực
+				pendingDocs = append(pendingDocs, doc.Title)
 			}
-			verifiedDocs = append(verifiedDocs, doc.Title)
 		} else {
 			rejectedDocs = append(rejectedDocs, doc.Title)
 		}
@@ -1258,33 +1202,44 @@ func (s *LandRegistryChaincode) ProcessTransaction(ctx contractapi.TransactionCo
 	// Xử lý theo 3 trạng thái quyết định
 	txTime, err := GetTxTimestampAsTime(ctx)
 	if err != nil {
-		return fmt.Errorf("lỗi khi lấy timestamp: %v", err)
+		return fmt.Errorf("lỗ6i khi lấy timestamp: %v", err)
 	}
 
 	var logAction, statusDetails string
 
 	switch decision {
 	case "APPROVE":
-		// Xác nhận đạt yêu cầu và chuyển tiếp
+		// Xác nhận đạt yêu cầu và chuyển sang trạng thái VERIFIED để Org1 xử lý
 		if len(rejectedDocs) > 0 {
 			return fmt.Errorf("không thể phê duyệt vì có tài liệu không hợp lệ: %v", rejectedDocs)
 		}
+		// Chuyển sang VERIFIED thay vì FORWARDED - loại bỏ bước chuyển tiếp thủ công
 		tx.Status = "VERIFIED"
-		statusDetails = fmt.Sprintf("Hồ sơ đạt yêu cầu. Đã xác minh %d tài liệu: %v", len(verifiedDocs), verifiedDocs)
-		if reason != "" {
-			statusDetails += fmt.Sprintf(". Ghi chú: %s", reason)
+		statusDetails = fmt.Sprintf("Hồ sơ đạt yêu cầu.")
+		if len(verifiedDocs) > 0 {
+			statusDetails += fmt.Sprintf(" Tài liệu đã xác thực: %v.", verifiedDocs)
 		}
-		logAction = "Xác nhận đạt yêu cầu và chuyển tiếp"
+		if len(pendingDocs) > 0 {
+			statusDetails += fmt.Sprintf(" Tài liệu chưa xác thực: %v.", pendingDocs)
+		}
+		statusDetails += " Sẵn sàng cho Sở TN&MT xử lý."
+		if reason != "" {
+			statusDetails += fmt.Sprintf(" Ghi chú: %s", reason)
+		}
+		logAction = "Xác nhận đạt yêu cầu và chuyển sang trạng thái VERIFIED"
 
 	case "SUPPLEMENT":
 		// Yêu cầu bổ sung
 		tx.Status = "SUPPLEMENT_REQUESTED"
 		statusDetails = fmt.Sprintf("Yêu cầu bổ sung tài liệu.")
 		if len(verifiedDocs) > 0 {
-			statusDetails += fmt.Sprintf(" Đã xác minh %d tài liệu: %v.", len(verifiedDocs), verifiedDocs)
+			statusDetails += fmt.Sprintf(" Tài liệu đã xác thực: %v.", verifiedDocs)
+		}
+		if len(pendingDocs) > 0 {
+			statusDetails += fmt.Sprintf(" Tài liệu chưa xác thực: %v.", pendingDocs)
 		}
 		if len(rejectedDocs) > 0 {
-			statusDetails += fmt.Sprintf(" Tài liệu cần bổ sung/sửa: %v.", rejectedDocs)
+			statusDetails += fmt.Sprintf(" Tài liệu không hợp lệ: %v.", rejectedDocs)
 		}
 		if reason != "" {
 			statusDetails += fmt.Sprintf(" Lý do: %s", reason)
@@ -1329,43 +1284,6 @@ func (s *LandRegistryChaincode) ProcessTransaction(ctx contractapi.TransactionCo
 	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "PROCESS_TRANSACTION_DOSSIER", userID, logDetails)
 }
 
-// ForwardTransaction - Chuyển tiếp giao dịch đã được xác nhận lên Sở TN&MT (Org2)
-func (s *LandRegistryChaincode) ForwardTransaction(ctx contractapi.TransactionContextInterface, txID string) error {
-	if err := CheckOrganization(ctx, []string{"Org2MSP"}); err != nil {
-		return err
-	}
-	userID, err := GetCallerID(ctx)
-	if err != nil {
-		return err
-	}
-	tx, err := GetTransaction(ctx, txID)
-	if err != nil {
-		return err
-	}
-	// Chỉ cho phép chuyển tiếp giao dịch đã được xác nhận (VERIFIED)
-	if tx.Status != "VERIFIED" {
-		return fmt.Errorf("chỉ có thể chuyển tiếp giao dịch đã được xác nhận đạt yêu cầu (trạng thái VERIFIED)")
-	}
-	
-	tx.Status = "FORWARDED"
-	tx.Details = fmt.Sprintf("%s; Đã chuyển tiếp hồ sơ lên Sở TN&MT để phê duyệt", tx.Details)
-	
-	txTime, err := GetTxTimestampAsTime(ctx)
-	if err != nil {
-		return fmt.Errorf("lỗi khi lấy timestamp: %v", err)
-	}
-	tx.UpdatedAt = txTime
-	
-	txJSON, err := json.Marshal(tx)
-	if err != nil {
-		return fmt.Errorf("lỗi khi mã hóa giao dịch: %v", err)
-	}
-	if err := ctx.GetStub().PutState(txID, txJSON); err != nil {
-		return fmt.Errorf("lỗi khi cập nhật giao dịch: %v", err)
-	}
-	
-	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "FORWARD_TRANSACTION", userID, fmt.Sprintf("Chuyển tiếp giao dịch %s lên Sở TN&MT", txID))
-}
 
 // ========================================
 // TRANSACTION APPROVAL FUNCTIONS (ORG1)
@@ -1384,8 +1302,8 @@ func (s *LandRegistryChaincode) ApproveTransferTransaction(ctx contractapi.Trans
 	if err != nil {
 		return err
 	}
-	if tx.Status != "FORWARDED" {
-		return fmt.Errorf("giao dịch %s không ở trạng thái FORWARDED", txID)
+	if tx.Status != "VERIFIED" {
+		return fmt.Errorf("giao dịch %s không ở trạng thái VERIFIED", txID)
 	}
 	if tx.Type != "TRANSFER" {
 		return fmt.Errorf("giao dịch %s không phải là chuyển nhượng", txID)
@@ -1406,7 +1324,7 @@ func (s *LandRegistryChaincode) ApproveTransferTransaction(ctx contractapi.Trans
 
 	// Vô hiệu hóa giấy chứng nhận cũ (do chủ sử dụng thay đổi)
 	if land.CertificateID != "" {
-		land.CertificateID = "" // Xóa giấy chứng nhận cũ
+		land.CertificateID = ""      // Xóa giấy chứng nhận cũ
 		land.IssueDate = time.Time{} // Reset ngày cấp
 		land.LegalInfo = "Giấy chứng nhận đã vô hiệu do chuyển nhượng quyền sử dụng đất"
 	}
@@ -1437,6 +1355,8 @@ func (s *LandRegistryChaincode) ApproveTransferTransaction(ctx contractapi.Trans
 	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "APPROVE_TRANSFER", userID, fmt.Sprintf("Phê duyệt chuyển nhượng %s", txID))
 }
 
+
+
 // ApproveReissueTransaction - Phê duyệt giao dịch cấp đổi giấy chứng nhận với IPFS hash mới
 func (s *LandRegistryChaincode) ApproveReissueTransaction(ctx contractapi.TransactionContextInterface, txID string, newCertificateID string) error {
 	if err := CheckOrganization(ctx, []string{"Org1MSP"}); err != nil {
@@ -1450,8 +1370,8 @@ func (s *LandRegistryChaincode) ApproveReissueTransaction(ctx contractapi.Transa
 	if err != nil {
 		return err
 	}
-	if tx.Status != "FORWARDED" {
-		return fmt.Errorf("giao dịch %s không ở trạng thái FORWARDED", txID)
+	if tx.Status != "VERIFIED" {
+		return fmt.Errorf("giao dịch %s không ở trạng thái VERIFIED", txID)
 	}
 	if tx.Type != "REISSUE" {
 		return fmt.Errorf("giao dịch %s không phải là cấp đổi giấy chứng nhận", txID)
@@ -1503,8 +1423,8 @@ func (s *LandRegistryChaincode) ApproveReissueTransaction(ctx contractapi.Transa
 	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "APPROVE_REISSUE", userID, fmt.Sprintf("Phê duyệt cấp đổi GCN cho thửa đất %s với IPFS hash: %s", tx.LandParcelID, newCertificateID))
 }
 
-// ApproveSplitTransaction - Phê duyệt giao dịch tách thửa và tạo các thửa đất mới
-func (s *LandRegistryChaincode) ApproveSplitTransaction(ctx contractapi.TransactionContextInterface, txID string) error {
+// ApproveSplitTransaction approves a split transaction, updating the original land first if its ID matches, then creating new parcels, invalidating all certificates
+func (s *LandRegistryChaincode) ApproveSplitTransaction(ctx contractapi.TransactionContextInterface, txID, landID, newParcelsStr string) error {
 	if err := CheckOrganization(ctx, []string{"Org1MSP"}); err != nil {
 		return err
 	}
@@ -1516,56 +1436,94 @@ func (s *LandRegistryChaincode) ApproveSplitTransaction(ctx contractapi.Transact
 	if err != nil {
 		return err
 	}
-	if tx.Status != "FORWARDED" {
-		return fmt.Errorf("giao dịch %s không ở trạng thái FORWARDED", txID)
+	if tx.Status != "VERIFIED" {
+		return fmt.Errorf("giao dịch %s không ở trạng thái VERIFIED", txID)
 	}
 	if tx.Type != "SPLIT" {
 		return fmt.Errorf("giao dịch %s không phải là tách thửa", txID)
 	}
-
-	// Lấy thông tin thửa đất gốc để kiểm tra
-	originalLand, err := s.QueryLandByID(ctx, tx.LandParcelID)
+	originalLand, err := s.QueryLandByID(ctx, landID)
 	if err != nil {
-		return fmt.Errorf("lỗi khi truy vấn thửa đất %s: %v", tx.LandParcelID, err)
+		return fmt.Errorf("lỗi khi truy vấn thửa đất gốc %s: %v", landID, err)
 	}
-
-	// Kiểm tra quyền sở hữu
 	if originalLand.OwnerID != tx.FromOwnerID {
-		return fmt.Errorf("người dùng %s không sở hữu thửa đất %s", tx.FromOwnerID, tx.LandParcelID)
+		return fmt.Errorf("người dùng %s không sở hữu thửa đất %s", tx.FromOwnerID, landID)
 	}
-
-	// Tạo các thửa đất mới từ thông tin trong transaction
-	// Các thửa đất mới đã được tạo trong CreateSplitRequest
-	// Ở đây chỉ cần xóa thửa đất gốc và cập nhật trạng thái
-
+	var newParcels []Land
+	if err := json.Unmarshal([]byte(newParcelsStr), &newParcels); err != nil {
+		return fmt.Errorf("lỗi khi giải mã danh sách thửa đất mới: %v", err)
+	}
+	if len(newParcels) == 0 {
+		return fmt.Errorf("danh sách thửa đất mới trống")
+	}
 	txTime, err := GetTxTimestampAsTime(ctx)
 	if err != nil {
 		return fmt.Errorf("lỗi khi lấy timestamp: %v", err)
 	}
-
-	// Vô hiệu hóa thửa đất gốc (giữ lại để lưu trữ lịch sử, không xóa)
-	if originalLand.CertificateID != "" {
-		originalLand.CertificateID = "" // Vô hiệu hóa giấy chứng nhận cũ
-		originalLand.IssueDate = time.Time{} // Reset ngày cấp
+	var totalArea float64
+	var newLandIDs []string
+	var updatedOriginal bool
+	// Step 1: Validate and process all parcels
+	for _, newLand := range newParcels {
+		// Determine if this is an update (ID matches original) or create new
+		isUpdate := newLand.ID == landID
+		
+		// Validate with appropriate flag
+		if err := ValidateLand(ctx, newLand, isUpdate); err != nil {
+			return fmt.Errorf("thửa đất mới %s không hợp lệ: %v", newLand.ID, err)
+		}
+		
+		totalArea += newLand.Area
+		newLand.CreatedAt = txTime
+		newLand.UpdatedAt = txTime
+		newLand.OwnerID = tx.FromOwnerID // Inherit owner
+		// Kế thừa mục đích sử dụng và vị trí từ thửa đất gốc
+		newLand.LandUsePurpose = originalLand.LandUsePurpose
+		newLand.Location = originalLand.Location
+		// Invalidate certificate for all parcels
+		newLand.CertificateID = ""
+		newLand.IssueDate = time.Time{}
+		newLand.LegalInfo = "Giấy chứng nhận sẽ được cấp mới sau tách thửa"
+		newLand.LegalStatus = ""
+		
+		if isUpdate {
+			// Update original land
+			updatedOriginal = true
+			newLand.DocumentIDs = originalLand.DocumentIDs // Keep existing documents
+		}
+		
+		// Save the land parcel
+		landJSON, err := json.Marshal(newLand)
+		if err != nil {
+			return fmt.Errorf("lỗi khi mã hóa thửa đất %s: %v", newLand.ID, err)
+		}
+		if err := ctx.GetStub().PutState(newLand.ID, landJSON); err != nil {
+			return fmt.Errorf("lỗi khi lưu thửa đất %s: %v", newLand.ID, err)
+		}
+		newLandIDs = append(newLandIDs, newLand.ID)
+	}
+	if totalArea > originalLand.Area {
+		return fmt.Errorf("tổng diện tích các thửa mới (%f m²) vượt quá diện tích thửa gốc (%f m²)", totalArea, originalLand.Area)
+	}
+	// Step 3: Invalidate original land if not updated
+	if !updatedOriginal {
+		originalLand.CertificateID = ""
+		originalLand.IssueDate = time.Time{}
 		originalLand.LegalInfo = "Giấy chứng nhận đã vô hiệu do tách thửa đất"
+		originalLand.LegalStatus = ""
+		originalLand.UpdatedAt = txTime
+		updatedLandJSON, err := json.Marshal(originalLand)
+		if err != nil {
+			return fmt.Errorf("lỗi khi mã hóa thửa đất gốc %s: %v", landID, err)
+		}
+		if err := ctx.GetStub().PutState(landID, updatedLandJSON); err != nil {
+			return fmt.Errorf("lỗi khi cập nhật thửa đất gốc %s: %v", landID, err)
+		}
 	}
-	
-	// Đánh dấu thửa đất cũ là không còn hoạt động (để lưu trữ lịch sử)
-	originalLand.LegalStatus = ""
-	originalLand.UpdatedAt = txTime
-	
-	// Cập nhật thửa đất gốc (giữ lại, không xóa)
-	updatedLandJSON, err := json.Marshal(originalLand)
-	if err != nil {
-		return fmt.Errorf("lỗi khi mã hóa thửa đất cũ: %v", err)
-	}
-	if err := ctx.GetStub().PutState(tx.LandParcelID, updatedLandJSON); err != nil {
-		return fmt.Errorf("lỗi khi cập nhật thửa đất gốc %s: %v", tx.LandParcelID, err)
-	}
-
-	// Cập nhật trạng thái giao dịch
+	// Update transaction
+	tx.ParcelIDs = newLandIDs
 	tx.Status = "APPROVED"
-	tx.Details = fmt.Sprintf("%s; Đã phê duyệt tách thửa và tạo %d thửa đất mới", tx.Details, len(tx.ParcelIDs))
+	tx.Details = fmt.Sprintf("%s; Đã phê duyệt tách thửa và tạo/cập nhật %d thửa đất mới, tất cả GCN đã vô hiệu hóa", tx.Details, len(newLandIDs))
 	tx.UpdatedAt = txTime
 	txJSON, err := json.Marshal(tx)
 	if err != nil {
@@ -1574,12 +1532,15 @@ func (s *LandRegistryChaincode) ApproveSplitTransaction(ctx contractapi.Transact
 	if err := ctx.GetStub().PutState(txID, txJSON); err != nil {
 		return fmt.Errorf("lỗi khi cập nhật giao dịch: %v", err)
 	}
-
-	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "APPROVE_SPLIT", userID, fmt.Sprintf("Phê duyệt tách thửa %s thành %d thửa mới", txID, len(tx.ParcelIDs)))
+	// Emit event for off-chain apps
+	if err := ctx.GetStub().SetEvent("SPLIT_APPROVED", txJSON); err != nil {
+		return fmt.Errorf("lỗi khi emit event: %v", err)
+	}
+	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "APPROVE_SPLIT", userID, fmt.Sprintf("Phê duyệt tách thửa %s thành %d thửa mới, tất cả GCN đã vô hiệu hóa", txID, len(newLandIDs)))
 }
 
-// ApproveMergeTransaction - Phê duyệt giao dịch hợp thửa và tạo thửa đất mới
-func (s *LandRegistryChaincode) ApproveMergeTransaction(ctx contractapi.TransactionContextInterface, txID string) error {
+// ApproveMergeTransaction approves a merge transaction, updating the selected original land and invalidating all certificates
+func (s *LandRegistryChaincode) ApproveMergeTransaction(ctx contractapi.TransactionContextInterface, txID, landIdsStr, selectedLandID, newParcelStr string) error {
 	if err := CheckOrganization(ctx, []string{"Org1MSP"}); err != nil {
 		return err
 	}
@@ -1591,15 +1552,38 @@ func (s *LandRegistryChaincode) ApproveMergeTransaction(ctx contractapi.Transact
 	if err != nil {
 		return err
 	}
-	if tx.Status != "FORWARDED" {
-		return fmt.Errorf("giao dịch %s không ở trạng thái FORWARDED", txID)
+	if tx.Status != "VERIFIED" {
+		return fmt.Errorf("giao dịch %s không ở trạng thái VERIFIED", txID)
 	}
 	if tx.Type != "MERGE" {
 		return fmt.Errorf("giao dịch %s không phải là hợp thửa", txID)
 	}
-
-	// Kiểm tra quyền sở hữu tất cả các thửa đất
-	for _, parcelID := range tx.ParcelIDs {
+	var landIds []string
+	if err := json.Unmarshal([]byte(landIdsStr), &landIds); err != nil {
+		return fmt.Errorf("lỗi khi giải mã danh sách landIds: %v", err)
+	}
+	// Chỉ lấy thông tin area từ newParcelStr
+	var newParcelData struct {
+		ID   string  `json:"id"`
+		Area float64 `json:"area"`
+	}
+	if err := json.Unmarshal([]byte(newParcelStr), &newParcelData); err != nil {
+		return fmt.Errorf("lỗi khi giải mã thông tin thửa đất mới: %v", err)
+	}
+	// Verify selectedLandID is in landIds
+	isValidSelected := false
+	for _, id := range landIds {
+		if id == selectedLandID {
+			isValidSelected = true
+			break
+		}
+	}
+	if !isValidSelected {
+		return fmt.Errorf("selectedLandID %s không nằm trong danh sách landIds %v", selectedLandID, landIds)
+	}
+	var totalArea float64
+	var baseLocation string
+	for i, parcelID := range landIds {
 		parcelID = strings.TrimSpace(parcelID)
 		land, err := s.QueryLandByID(ctx, parcelID)
 		if err != nil {
@@ -1608,50 +1592,69 @@ func (s *LandRegistryChaincode) ApproveMergeTransaction(ctx contractapi.Transact
 		if land.OwnerID != tx.FromOwnerID {
 			return fmt.Errorf("người dùng %s không sở hữu thửa đất %s", tx.FromOwnerID, parcelID)
 		}
+		totalArea += land.Area
+		if i == 0 {
+			baseLocation = land.Location
+		} else if land.Location != baseLocation {
+			return fmt.Errorf("thửa đất %s không cùng vị trí với các thửa khác", parcelID)
+		}
 	}
-
+	// Không validate toàn bộ struct, chỉ kiểm tra area
+	if newParcelData.Area <= 0 {
+		return fmt.Errorf("diện tích thừa đất mới phải lớn hơn 0")
+	}
+	if newParcelData.Area != totalArea {
+		return fmt.Errorf("diện tích thừa đất mới (%f m²) không khớp với tổng diện tích các thừa đất gốc (%f m²)", newParcelData.Area, totalArea)
+	}
 	txTime, err := GetTxTimestampAsTime(ctx)
 	if err != nil {
 		return fmt.Errorf("lỗi khi lấy timestamp: %v", err)
 	}
-
-	// Vô hiệu hóa các thửa đất gốc (giữ lại để lưu trữ lịch sử, không xóa)
-	for _, parcelID := range tx.ParcelIDs {
-		parcelID = strings.TrimSpace(parcelID)
-		
-		// Lấy thông tin thửa đất để vô hiệu hóa
+	// Step 1: Lấy thông tin thừa đất chính hiện tại và chỉ cập nhật area
+	existingLand, err := s.QueryLandByID(ctx, selectedLandID)
+	if err != nil {
+		return fmt.Errorf("lỗi khi truy vấn thừa đất gốc %s: %v", selectedLandID, err)
+	}
+	// Chỉ cập nhật area và vô hiệu hóa GCN, giữ nguyên các thông tin khác
+	existingLand.Area = newParcelData.Area
+	existingLand.UpdatedAt = txTime
+	existingLand.CertificateID = "" // Invalidate certificate
+	existingLand.IssueDate = time.Time{}
+	existingLand.LegalInfo = "Giấy chứng nhận sẽ được cấp mới sau hợp thừa"
+	existingLand.LegalStatus = ""
+	landJSON, err := json.Marshal(existingLand)
+	if err != nil {
+		return fmt.Errorf("lỗi khi mã hóa thửa đất gốc %s: %v", selectedLandID, err)
+	}
+	if err := ctx.GetStub().PutState(selectedLandID, landJSON); err != nil {
+		return fmt.Errorf("lỗi khi cập nhật thửa đất gốc %s: %v", selectedLandID, err)
+	}
+	// Step 2: Invalidate other original lands
+	for _, parcelID := range landIds {
+		if parcelID == selectedLandID {
+			continue // Skip the updated land
+		}
 		originalLand, err := s.QueryLandByID(ctx, parcelID)
 		if err != nil {
 			return fmt.Errorf("lỗi khi truy vấn thửa đất %s: %v", parcelID, err)
 		}
-		
-		// Vô hiệu hóa giấy chứng nhận
-		if originalLand.CertificateID != "" {
-			originalLand.CertificateID = "" // Vô hiệu hóa giấy chứng nhận cũ
-			originalLand.IssueDate = time.Time{} // Reset ngày cấp
-			originalLand.LegalInfo = "Giấy chứng nhận đã vô hiệu do hợp thửa đất"
-		}
-		
-		// Đánh dấu thửa đất cũ là không còn hoạt động (để lưu trữ lịch sử)
+		originalLand.CertificateID = ""
+		originalLand.IssueDate = time.Time{}
+		originalLand.LegalInfo = "Giấy chứng nhận đã vô hiệu do hợp thửa đất"
 		originalLand.LegalStatus = ""
 		originalLand.UpdatedAt = txTime
-		
-		// Cập nhật thửa đất gốc (giữ lại, không xóa)
 		updatedLandJSON, err := json.Marshal(originalLand)
 		if err != nil {
 			return fmt.Errorf("lỗi khi mã hóa thửa đất cũ %s: %v", parcelID, err)
 		}
 		if err := ctx.GetStub().PutState(parcelID, updatedLandJSON); err != nil {
-			return fmt.Errorf("lỗi khi cập nhật thửa đất gốc %s: %v", parcelID, err)
+			return fmt.Errorf("lỗi khi cập nhật thửa đất cũ %s: %v", parcelID, err)
 		}
 	}
-
-	// Thửa đất mới đã được tạo trong CreateMergeRequest
-	// Ở đây chỉ cần cập nhật trạng thái giao dịch
-
-	// Cập nhật trạng thái giao dịch
+	// Update transaction
+	tx.LandParcelID = selectedLandID
 	tx.Status = "APPROVED"
-	tx.Details = fmt.Sprintf("%s; Đã phê duyệt hợp thửa và tạo thửa đất mới", tx.Details)
+	tx.Details = fmt.Sprintf("%s; Đã phê duyệt hợp thửa và cập nhật thửa đất %s, tất cả GCN đã vô hiệu hóa", tx.Details, selectedLandID)
 	tx.UpdatedAt = txTime
 	txJSON, err := json.Marshal(tx)
 	if err != nil {
@@ -1660,8 +1663,11 @@ func (s *LandRegistryChaincode) ApproveMergeTransaction(ctx contractapi.Transact
 	if err := ctx.GetStub().PutState(txID, txJSON); err != nil {
 		return fmt.Errorf("lỗi khi cập nhật giao dịch: %v", err)
 	}
-
-	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "APPROVE_MERGE", userID, fmt.Sprintf("Phê duyệt hợp thửa %s thành thửa mới", txID))
+	// Emit event for off-chain apps
+	if err := ctx.GetStub().SetEvent("MERGE_APPROVED", txJSON); err != nil {
+		return fmt.Errorf("lỗi khi emit event: %v", err)
+	}
+	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "APPROVE_MERGE", userID, fmt.Sprintf("Phê duyệt hợp thửa %s thành thửa %s, tất cả GCN đã vô hiệu hóa", txID, selectedLandID))
 }
 
 // ApproveChangePurposeTransaction - Phê duyệt giao dịch thay đổi mục đích sử dụng
@@ -1677,8 +1683,8 @@ func (s *LandRegistryChaincode) ApproveChangePurposeTransaction(ctx contractapi.
 	if err != nil {
 		return err
 	}
-	if tx.Status != "FORWARDED" {
-		return fmt.Errorf("giao dịch %s không ở trạng thái FORWARDED", txID)
+	if tx.Status != "VERIFIED" {
+		return fmt.Errorf("giao dịch %s không ở trạng thái VERIFIED", txID)
 	}
 	if tx.Type != "CHANGE_PURPOSE" {
 		return fmt.Errorf("giao dịch %s không phải là thay đổi mục đích sử dụng", txID)
@@ -1707,7 +1713,7 @@ func (s *LandRegistryChaincode) ApproveChangePurposeTransaction(ctx contractapi.
 
 	// Vô hiệu hóa giấy chứng nhận cũ (do thông tin thay đổi)
 	if land.CertificateID != "" {
-		land.CertificateID = "" // Xóa giấy chứng nhận cũ
+		land.CertificateID = ""      // Xóa giấy chứng nhận cũ
 		land.IssueDate = time.Time{} // Reset ngày cấp
 		land.LegalInfo = "Giấy chứng nhận đã vô hiệu do thay đổi mục đích sử dụng đất"
 	}
@@ -1751,8 +1757,8 @@ func (s *LandRegistryChaincode) RejectTransaction(ctx contractapi.TransactionCon
 	if err != nil {
 		return err
 	}
-	if tx.Status != "FORWARDED" {
-		return fmt.Errorf("giao dịch %s không ở trạng thái FORWARDED", txID)
+	if tx.Status != "VERIFIED" {
+		return fmt.Errorf("giao dịch %s không ở trạng thái VERIFIED", txID)
 	}
 	tx.Status = "REJECTED"
 	tx.Details = fmt.Sprintf("%s; Lý do từ chối: %s", tx.Details, reason)
@@ -1770,5 +1776,3 @@ func (s *LandRegistryChaincode) RejectTransaction(ctx contractapi.TransactionCon
 	}
 	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "REJECT_TRANSACTION", userID, fmt.Sprintf("Từ chối giao dịch %s: %s", txID, reason))
 }
-
-

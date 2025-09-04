@@ -1,5 +1,5 @@
 
-Dependencies: Set up Hyperledger Fabric environment: [Hyperledger Fabric Official Docs](https://hyperledger-fabric.readthedocs.io/en/latest/getting_started.html) and MongoDB
+Dependencies: Set up Hyperledger Fabric environment: [Hyperledger Fabric Official Docs](https://hyperledger-fabric.readthedocs.io/en/latest/getting_started.html) jq, Node and MongoDB
 
 
 How to run project
@@ -20,12 +20,12 @@ cd ..
 ./network.sh deployCC -ccn land-cc -ccp ../land-chaincode/ -ccl go -cci "Init"
 ```
 
-<h3> Deploy Backend </h3>
+<h3> Deploy Backend in 2th terminal </h3>
 
-Enroll Admin for 3 Org
+Enroll Admin for 3 Org 
 
 ```shell
-cd ../application-javascript
+cd application-javascript
 
 cd enroll
 
@@ -55,7 +55,7 @@ Test Postman: [API](https://www.postman.com/research-administrator-81537314/work
 <h3> Deploy Frontend </h3>
 
 ```shell
-cd ../frontend
+cd frontend
 
 npm i
 

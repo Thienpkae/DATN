@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Radio, Skeleton } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined, CheckCircleOutlined, ForwardOutlined, HistoryOutlined, ExclamationCircleOutlined, CloseCircleOutlined, FileTextOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, CheckCircleOutlined, HistoryOutlined, ExclamationCircleOutlined, CloseCircleOutlined, FileTextOutlined } from '@ant-design/icons';
 import transactionService from '../../../services/transactionService';
 import documentService from '../../../services/documentService';
+import documentAnalysisService from '../../../services/documentAnalysisService';
 import DocumentDetailModal from '../../Common/DocumentDetailModal';
 
 const { Option } = Select;
@@ -20,10 +21,8 @@ const TransactionManagementPage = () => {
   const [filters, setFilters] = useState(defaultFilters);
   const [detailOpen, setDetailOpen] = useState(false);
   const [processOpen, setProcessOpen] = useState(false);
-  const [forwardOpen, setForwardOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [forwardForm] = Form.useForm();
   const [processForm] = Form.useForm();
 
   // States cho document detail modal
@@ -31,6 +30,12 @@ const TransactionManagementPage = () => {
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [documentDetailOpen, setDocumentDetailOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  
+  // States cho document analysis
+  const [analysis, setAnalysis] = useState(null);
+  const [blockchainData, setBlockchainData] = useState(null);
+  const [comparisonResult, setComparisonResult] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
   
   // States cho transaction history
   const [transactionHistory, setTransactionHistory] = useState([]);
@@ -72,7 +77,7 @@ const TransactionManagementPage = () => {
       await transactionService.processTransaction(selected.txId, values.decision, values.reason);
       
       const successMessages = {
-        'APPROVE': 'Giao dịch đã được xác nhận đạt yêu cầu',
+        'APPROVE': 'Giao dịch đã được xác nhận đạt yêu cầu và tự động chuyển tiếp lên Sở TN&MT',
         'SUPPLEMENT': 'Đã yêu cầu bổ sung tài liệu cho giao dịch', 
         'REJECT': 'Giao dịch đã bị từ chối'
       };
@@ -88,20 +93,6 @@ const TransactionManagementPage = () => {
     }
   };
 
-  const onForward = async () => {
-    try {
-      await forwardForm.validateFields();
-      setLoading(true);
-      await transactionService.forwardTransaction(selected.txID);
-      message.success('Chuyển tiếp giao dịch thành công');
-      setForwardOpen(false);
-      loadList();
-    } catch (e) {
-      message.error(e.message || 'Chuyển tiếp thất bại');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const onViewHistory = async (record) => {
     try {
@@ -153,17 +144,36 @@ const TransactionManagementPage = () => {
   };
 
   const onViewDocumentDetail = async (document) => {
+    // Reset analysis states khi mở document mới
+    setAnalysis(null);
+    setBlockchainData(null);
+    setComparisonResult(null);
+    
     // Mở modal xem chi tiết tài liệu trong cùng trang
     setSelectedDocument(document);
     setDocumentDetailOpen(true);
     console.log('🔗 Mở modal xem chi tiết tài liệu:', document.docID);
+  };
+  
+  const onAnalyzeDocument = async (docID) => {
+    try {
+      setAnalyzing(true);
+      const result = await documentAnalysisService.performCompleteAnalysis(docID);
+      setAnalysis(result.analysis);
+      setBlockchainData(result.blockchainData);
+      setComparisonResult(result.comparisonResult);
+    } catch (e) {
+      console.error('Analysis error:', e);
+      // Error message is already shown by the shared service
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const getStatusTag = (status) => {
     const statusColors = {
       'PENDING': 'orange',
       'VERIFIED': 'blue',
-      'FORWARDED': 'cyan',
       'APPROVED': 'green',
       'REJECTED': 'red',
       'CONFIRMED': 'green',
@@ -177,12 +187,14 @@ const TransactionManagementPage = () => {
   };
 
   const canProcess = (transaction) => {
+    // TRANSFER transactions can be processed when CONFIRMED (after recipient acceptance)
+    if (transaction.type === 'TRANSFER') {
+      return transaction.status === 'CONFIRMED';
+    }
+    // Other transaction types can be processed when PENDING
     return transaction.status === 'PENDING';
   };
 
-  const canForward = (transaction) => {
-    return transaction.status === 'VERIFIED';
-  };
 
   const getDocumentStatusColor = (doc) => {
     if (doc.status === 'VERIFIED') return 'green';
@@ -191,7 +203,7 @@ const TransactionManagementPage = () => {
   };
 
   const getDocumentStatusText = (doc) => {
-    if (doc.status === 'VERIFIED') return 'Đã xác thực';
+    if (doc.status === 'VERIFIED') return 'Đã thẩm định';
     if (doc.status === 'REJECTED') return 'Không hợp lệ';
     return 'Chờ xác thực';
   };
@@ -227,20 +239,6 @@ const TransactionManagementPage = () => {
               </Button>
             </Tooltip>
           )}
-          {canForward(record) && (
-            <Tooltip title="Chuyển tiếp">
-              <Button 
-                type="default" 
-                icon={<ForwardOutlined />} 
-                onClick={() => {
-                  setSelected(record);
-                  setForwardOpen(true);
-                }}
-              >
-                Chuyển tiếp
-              </Button>
-            </Tooltip>
-          )}
         </Space>
       )
     }
@@ -268,7 +266,6 @@ const TransactionManagementPage = () => {
           <Select placeholder="Trạng thái" allowClear style={{ width: 150 }} value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })}>
             <Option value="PENDING">Chờ xử lý</Option>
             <Option value="VERIFIED">Đã thẩm định</Option>
-            <Option value="FORWARDED">Đã chuyển tiếp</Option>
             <Option value="APPROVED">Đã phê duyệt</Option>
             <Option value="REJECTED">Bị từ chối</Option>
             <Option value="CONFIRMED">Đã xác nhận</Option>
@@ -324,9 +321,9 @@ const TransactionManagementPage = () => {
                 <Space direction="vertical">
                   <Radio value="APPROVE">
                     <CheckCircleOutlined style={{ color: '#52c41a' }} /> 
-                    <strong> Xác nhận đạt yêu cầu và chuyển tiếp</strong>
+                    <strong> Xác nhận đạt yêu cầu</strong>
                     <div style={{ fontSize: '12px', color: '#666', marginLeft: 20 }}>
-                      Hồ sơ đầy đủ và hợp lệ, chuyển tiếp lên Sở TN&MT
+                      Hồ sơ đầy đủ và hợp lệ, tự động chuyển tiếp lên Sở TN&MT
                     </div>
                   </Radio>
                   <Radio value="SUPPLEMENT">
@@ -382,31 +379,13 @@ const TransactionManagementPage = () => {
         </div>
       </Modal>
 
-      {/* Forward Transaction */}
-      <Modal title="Chuyển tiếp giao dịch" open={forwardOpen} onOk={onForward} onCancel={() => setForwardOpen(false)} confirmLoading={loading} width={640}>
-        <Form layout="vertical" form={forwardForm}>
-          <div style={{ marginBottom: 16 }}>
-            <strong>Thông tin giao dịch:</strong>
-            <div style={{ marginTop: 8, padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
-              <div><strong>Mã giao dịch:</strong> {selected?.txID}</div>
-              <div><strong>Loại:</strong> {selected ? transactionService.getTransactionTypeText(selected.type) : ''}</div>
-              <div><strong>Thửa đất:</strong> {selected?.landParcelId}</div>
-              <div><strong>Người gửi:</strong> {selected?.fromOwnerId}</div>
-              {selected?.toOwnerId && <div><strong>Người nhận:</strong> {selected.toOwnerId}</div>}
-            </div>
-          </div>
-          <div style={{ color: '#666', fontSize: '14px' }}>
-            Bạn có chắc chắn muốn chuyển tiếp giao dịch này lên cấp trên (Sở TN&MT) để phê duyệt? Hành động này sẽ chuyển trạng thái giao dịch từ "Đã thẩm định" sang "Đã chuyển tiếp".
-          </div>
-        </Form>
-      </Modal>
 
       {/* Detail + History */}
       <Drawer title="Chi tiết giao dịch" width={800} open={detailOpen} onClose={() => setDetailOpen(false)}>
         {selected && (
           <div>
             <Row gutter={16}>
-              <Col span={12}><strong>Mã giao dịch:</strong> {selected.txID}</Col>
+              <Col span={12}><strong>Mã giao dịch:</strong> {selected.txId || selected.txID}</Col>
               <Col span={12}><strong>Loại:</strong> {getTypeTag(selected.type)}</Col>
             </Row>
             <Row gutter={16} style={{ marginTop: 12 }}>
@@ -675,7 +654,13 @@ const TransactionManagementPage = () => {
       <DocumentDetailModal
         document={selectedDocument}
         visible={documentDetailOpen}
-        onClose={() => setDocumentDetailOpen(false)}
+        onClose={() => {
+          setDocumentDetailOpen(false);
+          // Reset analysis states khi đóng modal
+          setAnalysis(null);
+          setBlockchainData(null);
+          setComparisonResult(null);
+        }}
         onVerify={async (docID, notes) => {
           try {
             await documentService.verifyDocument(docID, notes);
@@ -704,6 +689,11 @@ const TransactionManagementPage = () => {
           // Preview được xử lý tự động trong DocumentDetailModal
         }}
         userRole="Org2"
+        onAnalyze={onAnalyzeDocument}
+        analysis={analysis}
+        blockchainData={blockchainData}
+        comparisonResult={comparisonResult}
+        analyzing={analyzing}
       />
     </Card>
   );

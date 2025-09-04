@@ -19,6 +19,7 @@ const LandManagementPage = () => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [history, setHistory] = useState([]);
+  const [detailDefaultTab, setDetailDefaultTab] = useState("1");
 
   function sortLandIds(lands) {
     return [...lands].sort((a, b) => {
@@ -75,16 +76,23 @@ const LandManagementPage = () => {
     }
   };
 
-  const openDetail = async (record) => {
+  const openDetail = React.useCallback(async (record, defaultTab = "1") => {
     try {
       setSelected(record);
       setDetailOpen(true);
       const res = await landService.getLandParcelHistory(record.id || record.ID || record.landId);
       setHistory(Array.isArray(res) ? res : (res?.data ?? []));
+      
+      // Set default tab if specified
+      if (defaultTab !== "1") {
+        setDetailDefaultTab(defaultTab);
+      } else {
+        setDetailDefaultTab("1");
+      }
     } catch (e) {
       setHistory([]);
     }
-  };
+  }, []);
 
   const columns = useMemo(() => ([
     { title: 'Mã thửa đất', dataIndex: 'id', key: 'id', render: v => <code>{v}</code> },
@@ -108,10 +116,13 @@ const LandManagementPage = () => {
           <Tooltip title="Xem chi tiết">
             <Button icon={<EyeOutlined />} onClick={() => openDetail(record)} />
           </Tooltip>
+          <Tooltip title="Xem lịch sử">
+            <Button icon={<HistoryOutlined />} onClick={() => openDetail(record, "3")} />
+          </Tooltip>
         </Space>
       )
     }
-  ]), []);
+  ]), [openDetail]);
 
   return (
     <div>
@@ -164,7 +175,8 @@ const LandManagementPage = () => {
         <Drawer title={`Chi tiết thửa đất: ${selected?.id}`} width={800} open={detailOpen} onClose={() => setDetailOpen(false)}>
           {selected && (
             <Tabs
-              defaultActiveKey="1"
+              key={selected.id + detailDefaultTab}
+              defaultActiveKey={detailDefaultTab}
               items={[
                 {
                   key: "1",
@@ -307,6 +319,11 @@ const LandManagementPage = () => {
                                 </div>
                                 {item.land && (
                                   <>
+                                    <div style={{ marginBottom: 12 }}>
+                                      <Text strong>Chủ sử dụng đất: </Text>
+                                      <Text type="secondary">{item.land.ownerId || 'Chưa bổ sung'}</Text>
+                                    </div>
+                                    
                                     <div style={{ marginBottom: 12 }}>
                                       <Text strong>Diện tích: </Text>
                                       <Text type="secondary">{item.land.area || 'Chưa bổ sung'} m²</Text>

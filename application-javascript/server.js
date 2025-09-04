@@ -112,7 +112,6 @@ app.post('/api/transactions/split', authenticateJWT, checkOrg(['Org3']), transac
 app.post('/api/transactions/merge', authenticateJWT, checkOrg(['Org3']), transactionService.createMergeRequest);
 app.post('/api/transactions/change-purpose', authenticateJWT, checkOrg(['Org3']), transactionService.createChangePurposeRequest);
 app.post('/api/transactions/reissue', authenticateJWT, checkOrg(['Org3']), transactionService.createReissueRequest);
-app.post('/api/transactions/:txID/forward', authenticateJWT, checkOrg(['Org2']), transactionService.forwardTransaction);
 app.post('/api/transactions/:txID/approve/transfer', authenticateJWT, checkOrg(['Org1']), transactionService.approveTransferTransaction);
 app.post('/api/transactions/:txID/approve/split', authenticateJWT, checkOrg(['Org1']), transactionService.approveSplitTransaction);
 app.post('/api/transactions/:txID/approve/merge', authenticateJWT, checkOrg(['Org1']), transactionService.approveMergeTransaction);

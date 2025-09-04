@@ -182,7 +182,7 @@ const Login = ({ onLogin }) => {
             {/* Security Notice */}
             <Alert
               message="Truy cập an toàn"
-              description="Dữ liệu của bạn được bảo vệ bởi công nghệ blockchain và bảo mật cấp doanh nghiệp."
+              description="Dữ liệu của bạn được bảo vệ bởi công nghệ blockchain."
               type="info"
               showIcon
               icon={<SafetyOutlined />}
@@ -302,9 +302,6 @@ const Login = ({ onLogin }) => {
 
               <div style={{ textAlign: 'center' }}>
                 <Space direction="vertical" size="small">
-                  <Text type="secondary" style={{ fontSize: '14px' }}>
-                    Chưa có tài khoản?
-                  </Text>
                   <Link 
                     to="/register" 
                     style={{ 

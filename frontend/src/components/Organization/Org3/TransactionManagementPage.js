@@ -1,6 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Alert, Typography, Divider } from 'antd';
-import { PlusOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, HistoryOutlined, FileTextOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Drawer, Row, Col, Tooltip, Alert, Typography, Divider, Steps, Collapse } from 'antd';
+import '../../../styles/transaction-management.css';
+import { 
+  PlusOutlined, 
+  SearchOutlined, 
+  ReloadOutlined, 
+  EyeOutlined, 
+  HistoryOutlined, 
+  FileTextOutlined, 
+  CheckCircleOutlined,
+  SwapOutlined,
+  ScissorOutlined,
+  MergeCellsOutlined,
+  EditOutlined,
+  FileProtectOutlined,
+  ArrowRightOutlined,
+  
+} from '@ant-design/icons';
 import transactionService from '../../../services/transactionService';
 import authService from '../../../services/auth';
 import documentService from '../../../services/documentService';
@@ -39,6 +55,14 @@ const getDocumentTypeFromTitle = (documentTitle) => {
   if (title.includes('bản vẽ') ||
       title.includes('mảnh trích')) {
     return 'MAP';
+  }
+  
+  // Bản kê khai nộp thuế -> Tax Document
+  if (title.includes('bản kê khai') || 
+      title.includes('kê khai') ||
+      title.includes('nộp thuế') ||
+      title.includes('thuế')) {
+    return 'TAX_DOCUMENT';
   }
   
   // Các loại khác không cần check
@@ -87,6 +111,9 @@ const TransactionManagementPage = () => {
   // States for land management
   const [userLands, setUserLands] = useState([]);
   const [landLoading, setLandLoading] = useState(false);
+  
+  // States for merge land selection
+  const [mergeParcelIds, setMergeParcelIds] = useState(['', '']); // Bắt đầu với 2 field
 
   // Document detail modal states
   const [documentDetailOpen, setDocumentDetailOpen] = useState(false);
@@ -96,6 +123,8 @@ const TransactionManagementPage = () => {
   
   // State for transaction type selection
   const [selectedTransactionType, setSelectedTransactionType] = useState(null);
+  // Step state: 0 = chọn loại, 1 = nhập thông tin và upload tài liệu, 2 = hoàn tất
+  const [currentStep, setCurrentStep] = useState(0);
 
   const loadUserDocuments = async () => {
     try {
@@ -161,8 +190,21 @@ const TransactionManagementPage = () => {
     if (createOpen) {
       loadUserDocuments();
       loadUserLands();
+      // Khi mở modal, nếu chưa chọn loại thì về bước 0
+      setCurrentStep(selectedTransactionType ? 1 : 0);
     }
-  }, [createOpen]);
+  }, [createOpen, selectedTransactionType]);
+
+  // Debug form state
+  useEffect(() => {
+    if (createOpen && currentStep > 0) {
+      const formValues = form.getFieldsValue();
+      console.log('📝 Current form values:', formValues);
+      console.log('🎯 Selected transaction type:', selectedTransactionType);
+      console.log('📄 Selected documents:', selectedDocuments);
+    }
+  }, [createOpen, currentStep, form, selectedTransactionType, selectedDocuments]);
+
 
   const onSearch = async () => {
     try {
@@ -185,30 +227,47 @@ const TransactionManagementPage = () => {
         return;
       }
 
-      const values = await form.validateFields();
+      // Validate form trước khi tạo - nhưng bỏ qua landParcelID cho MERGE
+      console.log('🔍 Debug validation - selectedTransactionType:', selectedTransactionType);
+      
+      let values;
+      try {
+        if (selectedTransactionType === 'MERGE') {
+          console.log('✅ MERGE: Chỉ validate reason field');
+          // Với MERGE, chỉ validate reason, không cần landParcelID
+          values = await form.validateFields(['reason']);
+        } else {
+          console.log('📝 OTHER: Validate tất cả fields');
+          // Với các loại khác, validate đầy đủ
+          values = await form.validateFields();
+        }
+        console.log('✅ Validation success, values:', values);
+      } catch (errorInfo) {
+        console.error('❌ Validation failed:', errorInfo);
+        const errorFields = errorInfo.errorFields || [];
+        const errorMessages = errorFields.map(field => field.errors.join(', ')).join('; ');
+        message.error(`Vui lòng kiểm tra lại thông tin: ${errorMessages}`);
+        return;
+      }
+      
+      // Xử lý parcelIDs cho MERGE từ dynamic fields
+      if (selectedTransactionType === 'MERGE') {
+        const validParcelIds = mergeParcelIds.filter(id => id.trim() !== '');
+        if (validParcelIds.length < 2) {
+          message.error('Cần chọn ít nhất 2 thửa đất để gộp');
+          return;
+        }
+        values.parcelIDs = validParcelIds;
+      }
       
       // Thêm transaction type vào values
       values.type = selectedTransactionType;
       
-      // Validation cho JSON fields
-      if (selectedTransactionType === 'SPLIT' && values.newParcels) {
-        try {
-          JSON.parse(values.newParcels);
-        } catch (e) {
-          message.error('Thông tin thửa đất mới không đúng định dạng JSON');
-          return;
-        }
-      }
-      
-      if (selectedTransactionType === 'MERGE' && values.newParcel) {
-        try {
-          JSON.parse(values.newParcel);
-        } catch (e) {
-          message.error('Thông tin thửa đất mới không đúng định dạng JSON');
-          return;
-        }
-      }
+      // Không cần validation JSON fields cho tạo yêu cầu - chỉ cần ở bước phê duyệt
 
+      console.log('📝 Final values before document validation:', values);
+      console.log('🎯 mergeParcelIds state:', mergeParcelIds);
+      
       // Validation loại tài liệu đính kèm
       const requiredDocs = REQUIRED_DOCUMENTS[selectedTransactionType] || [];
       const documentValidationErrors = [];
@@ -227,7 +286,8 @@ const TransactionManagementPage = () => {
                   'CERTIFICATE': 'Giấy chứng nhận',
                   'CONTRACT': 'Hợp đồng', 
                   'FORM': 'Đơn đăng ký',
-                  'MAP': 'Bản đồ'
+                  'MAP': 'Bản đồ',
+                  'TAX_DOCUMENT': 'Tài liệu thuế'
                 };
                 documentValidationErrors.push(
                   `Tài liệu "${selectedDoc.title}" (loại ${selectedDoc.type}) không phù hợp với yêu cầu "${requiredDocName}". Cần loại: ${typeMapping[expectedType] || expectedType}`
@@ -250,8 +310,11 @@ const TransactionManagementPage = () => {
         return;
       }
 
+      console.log('📝 Values before service validation:', values);
       const validation = transactionService.validateTransactionData(values, selectedTransactionType);
+      console.log('📝 Service validation result:', validation);
       if (!validation.isValid) {
+        console.error('❌ Service validation errors:', validation.errors);
         message.warning(validation.errors.join('\n'));
         return;
       }
@@ -259,11 +322,15 @@ const TransactionManagementPage = () => {
       
       // Chuẩn bị data chung với documentIds và reason
       const baseData = {
-        landParcelID: values.landParcelID,
         fromOwnerID: user.userId, // Tự động lấy từ user hiện tại
         documentIds: Object.values(selectedDocuments),  // Chuyển object thành array
         reason: values.reason || ''  // Thêm lý do tạo yêu cầu
       };
+      
+      // Chỉ thêm landParcelID cho các loại giao dịch cần (không bao gồm MERGE)
+      if (selectedTransactionType !== 'MERGE') {
+        baseData.landParcelID = values.landParcelID;
+      }
       
       switch (selectedTransactionType) {
         case 'TRANSFER':
@@ -275,16 +342,16 @@ const TransactionManagementPage = () => {
         case 'SPLIT':
           await transactionService.createSplitRequest({
             ...baseData,
-            ownerID: user.userId, // Tự động lấy từ user hiện tại
-            newParcelsStr: values.newParcels
+            // Theo chaincode mới: chỉ cần landParcelID, documentIds, reason
+            // newParcels sẽ được xử lý ở bước phê duyệt
           });
           break;
         case 'MERGE':
           await transactionService.createMergeRequest({
             ...baseData,
-            ownerID: user.userId, // Tự động lấy từ user hiện tại
-            parcelIDs: values.parcelIDs.split(',').map(id => id.trim()),
-            newParcelStr: values.newParcel
+            // Theo chaincode mới: chỉ cần parcelIDs, documentIds, reason
+            parcelIDs: values.parcelIDs // Đã được xử lý ở trên thành array
+            // Chi tiết cách gộp sẽ được xử lý ở bước phê duyệt dựa trên tài liệu đính kèm
           });
           break;
         case 'CHANGE_PURPOSE':
@@ -309,6 +376,7 @@ const TransactionManagementPage = () => {
       form.resetFields();
       setSelectedDocuments({});  // Reset danh sách tài liệu đã chọn
       setSelectedTransactionType(null);  // Reset loại giao dịch đã chọn
+      setMergeParcelIds(['', '']); // Reset merge parcel fields
       loadMyTransactions();
     } catch (e) {
       message.error(e.message || 'Tạo yêu cầu thất bại');
@@ -345,11 +413,60 @@ const TransactionManagementPage = () => {
   // Link supplement documents to transaction - UC-18
   const onLinkSupplementDocuments = async () => {
     try {
-      const values = await linkDocumentForm.validateFields();
+      console.log('🔔 Bắt đầu liên kết tài liệu bổ sung');
+      console.log('📝 Selected transaction:', selected);
+      console.log('📁 User documents:', userDocuments);
+      
+      // Kiểm tra tài liệu khả dụng
+      const existingDocIds = selected?.documentIds || [];
+      const availableDocs = userDocuments.filter(doc => !existingDocIds.includes(doc.docID));
+      console.log('📊 Available documents for supplement:', availableDocs);
+      console.log('🔗 Existing document IDs:', existingDocIds);
+      
+      if (availableDocs.length === 0) {
+        message.warning('Không có tài liệu mới nào để bổ sung. Tất cả tài liệu của bạn đã được liên kết với giao dịch này.');
+        return;
+      }
+      
+      let values;
+      try {
+        values = await linkDocumentForm.validateFields();
+        console.log('📝 Form values:', values);
+      } catch (validationError) {
+        console.error('❌ Validation error:', validationError);
+        console.log('📄 Validation error details:');
+        console.log('  - values:', validationError.values);
+        console.log('  - errorFields:', validationError.errorFields);
+        console.log('  - outOfDate:', validationError.outOfDate);
+        
+        if (validationError.errorFields && validationError.errorFields.length > 0) {
+          const errorMessages = validationError.errorFields.map(field => {
+            const fieldName = field.name.join('.');
+            const errors = field.errors.join(', ');
+            console.log(`  - Field "${fieldName}": ${errors}`);
+            return `${fieldName}: ${errors}`;
+          }).join('; ');
+          message.error(`Vui lòng kiểm tra lại: ${errorMessages}`);
+        } else {
+          message.warning('Vui lòng chọn ít nhất một tài liệu để bổ sung');
+        }
+        return;
+      }
+      
       if (!values.selectedDocuments || values.selectedDocuments.length === 0) {
         message.warning('Vui lòng chọn ít nhất một tài liệu để bổ sung');
         return;
       }
+
+      if (!selected || !selected.txId) {
+        message.error('Không xác định được giao dịch');
+        return;
+      }
+
+      console.log('🔗 Gọi request liên kết:', {
+        docIDs: values.selectedDocuments,
+        txID: selected.txId
+      });
 
       setLoading(true);
       await documentService.linkDocumentToTransaction(values.selectedDocuments, selected.txId);
@@ -359,7 +476,18 @@ const TransactionManagementPage = () => {
       linkDocumentForm.resetFields();
       loadMyTransactions();
     } catch (e) {
-      message.error(e.message || 'Liên kết tài liệu bổ sung thất bại');
+      console.error('❌ Lỗi khi liên kết tài liệu:', e);
+      // Xử lý các loại lỗi khác nhau
+      if (e.response) {
+        // Lỗi từ API backend
+        message.error(e.response.data?.message || e.message || 'Lỗi từ server khi liên kết tài liệu');
+      } else if (e.message) {
+        // Lỗi có message
+        message.error(e.message);
+      } else {
+        // Lỗi không xác định
+        message.error('Liên kết tài liệu bổ sung thất bại');
+      }
     } finally {
       setLoading(false);
     }
@@ -421,7 +549,6 @@ const TransactionManagementPage = () => {
     const statusColors = {
       'PENDING': 'orange',
       'VERIFIED': 'blue',
-      'FORWARDED': 'cyan',
       'APPROVED': 'green',
       'REJECTED': 'red',
       'CONFIRMED': 'green',
@@ -441,7 +568,7 @@ const TransactionManagementPage = () => {
   };
 
   const getDocumentStatusText = (doc) => {
-    if (doc.status === 'VERIFIED') return 'Đã xác thực';
+    if (doc.status === 'VERIFIED') return 'Đã thẩm định';
     if (doc.status === 'REJECTED') return 'Không hợp lệ';
     return 'Chờ xác thực';
   };
@@ -523,8 +650,10 @@ const TransactionManagementPage = () => {
               <Button 
                 type="default" 
                 icon={<FileTextOutlined />} 
-                onClick={() => {
+                onClick={async () => {
                   setSelected(record);
+                  // Load danh sách tài liệu của user trước khi mở modal
+                  await loadUserDocuments();
                   setLinkDocumentOpen(true);
                 }}
                 style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: 'white' }}
@@ -544,17 +673,24 @@ const TransactionManagementPage = () => {
     const requiredDocs = REQUIRED_DOCUMENTS[selectedType] || [];
     
     return (
-      <div>
-        <div style={{ marginBottom: 16 }}>
+      <div style={{ maxHeight: 'none', overflow: 'visible' }}>
+        <Alert
+          message="📋 Yêu cầu tài liệu"
+          description={`Loại giao dịch này yêu cầu ${requiredDocs.length} tài liệu. Vui lòng đính kèm đầy đủ các tài liệu sau:`}
+          type="info"
+          showIcon
+          style={{ marginBottom: '20px' }}
+        />
+        
+        <div style={{ marginBottom: 16, maxHeight: 'none', overflow: 'visible' }}>
           {requiredDocs.map((docType, index) => (
-            <div key={index} style={{ 
-              marginBottom: 16,
-              padding: '16px',
-              background: '#fff',
-              borderRadius: '8px',
-              border: '1px solid #e8e8e8',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-            }}>
+            <Card
+              key={`doc-${index}-${docType}`}
+              size="small"
+              className="document-requirement-card"
+              style={{ marginBottom: 16 }}
+              styles={{ body: { padding: '16px' } }}
+            >
               <div style={{ marginBottom: 12 }}>
                 <div style={{ 
                   fontWeight: 'bold', 
@@ -571,7 +707,8 @@ const TransactionManagementPage = () => {
                       'CERTIFICATE': 'Giấy chứng nhận',
                       'CONTRACT': 'Hợp đồng', 
                       'FORM': 'Đơn đăng ký',
-                      'MAP': 'Bản đồ'
+                      'MAP': 'Bản đồ',
+                      'TAX_DOCUMENT': 'Tài liệu thuế'
                     };
                     return (
                       <div style={{ 
@@ -671,224 +808,487 @@ const TransactionManagementPage = () => {
                   </div>
                 )}
               </div>
-            </div>
+            </Card>
           ))}
         </div>
-
-
       </div>
     );
   };
 
   const renderTransactionTypeSelection = () => {
+    const transactionTypes = [
+      {
+        key: 'TRANSFER',
+        title: 'Chuyển nhượng quyền sử dụng đất',
+        description: 'Chuyển quyền sử dụng đất từ người này sang người khác',
+        icon: <SwapOutlined style={{ fontSize: '24px', color: '#1890ff' }} />,
+        color: '#1890ff',
+        bgColor: '#e6f7ff'
+      },
+      {
+        key: 'SPLIT',
+        title: 'Tách thửa đất',
+        description: 'Chia một thửa đất thành nhiều thửa đất nhỏ hơn',
+        icon: <ScissorOutlined style={{ fontSize: '24px', color: '#52c41a' }} />,
+        color: '#52c41a',
+        bgColor: '#f6ffed'
+      },
+      {
+        key: 'MERGE',
+        title: 'Hợp thửa đất',
+        description: 'Gộp nhiều thửa đất thành một thửa đất lớn hơn',
+        icon: <MergeCellsOutlined style={{ fontSize: '24px', color: '#722ed1' }} />,
+        color: '#722ed1',
+        bgColor: '#f9f0ff'
+      },
+      {
+        key: 'CHANGE_PURPOSE',
+        title: 'Thay đổi mục đích sử dụng đất',
+        description: 'Thay đổi mục đích sử dụng của thửa đất',
+        icon: <EditOutlined style={{ fontSize: '24px', color: '#fa8c16' }} />,
+        color: '#fa8c16',
+        bgColor: '#fff7e6'
+      },
+      {
+        key: 'REISSUE',
+        title: 'Cấp lại giấy chứng nhận',
+        description: 'Cấp lại giấy chứng nhận quyền sử dụng đất',
+        icon: <FileProtectOutlined style={{ fontSize: '24px', color: '#eb2f96' }} />,
+        color: '#eb2f96',
+        bgColor: '#fff0f6'
+      }
+    ];
+
     return (
-      <div style={{ textAlign: 'center', padding: '40px 0' }}>
-        <h3 style={{ marginBottom: '24px' }}>Chọn loại giao dịch biến động đất đai</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
-          <Button 
-            size="large" 
-            style={{ width: '300px', textAlign: 'left' }}
-            onClick={() => setSelectedTransactionType('TRANSFER')}
-          >
-            Chuyển nhượng quyền sử dụng đất
-          </Button>
-          <Button 
-            size="large" 
-            style={{ width: '300px', textAlign: 'left' }}
-            onClick={() => setSelectedTransactionType('SPLIT')}
-          >
-            Tách thửa đất
-          </Button>
-          <Button 
-            size="large" 
-            style={{ width: '300px', textAlign: 'left' }}
-            onClick={() => setSelectedTransactionType('MERGE')}
-          >
-            Hợp thửa đất
-          </Button>
-          <Button 
-            size="large" 
-            style={{ width: '300px', textAlign: 'left' }}
-            onClick={() => setSelectedTransactionType('CHANGE_PURPOSE')}
-          >
-            Thay đổi mục đích sử dụng đất
-          </Button>
-          <Button 
-            size="large" 
-            style={{ width: '300px', textAlign: 'left' }}
-            onClick={() => setSelectedTransactionType('REISSUE')}
-          >
-            Cấp lại giấy chứng nhận
-          </Button>
+      <div style={{ padding: '20px 0' }}>
+        {/* Header */}
+        <div className="gradient-header" style={{ textAlign: 'center' }}>
+          <h2 style={{ 
+            margin: 0, 
+            fontSize: '24px', 
+            fontWeight: 600,
+            marginBottom: '8px'
+          }}>
+            🏠 Tạo Giao Dịch Biến Động Đất Đai
+          </h2>
+          <p style={{ 
+            margin: '0 auto', 
+            fontSize: '14px', 
+            opacity: 0.9,
+            maxWidth: '500px'
+          }}>
+            Chọn loại giao dịch bạn muốn thực hiện. Hệ thống sẽ hướng dẫn bạn qua các bước tiếp theo.
+          </p>
+        </div>
+
+        {/* Transaction Type Cards */}
+        <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+          {transactionTypes.map((type) => (
+            <Col xs={24} sm={12} lg={8} key={type.key}>
+              <Card
+                hoverable
+                className="transaction-type-card"
+                style={{
+                  height: '100%',
+                  cursor: 'pointer',
+                  borderRadius: '12px',
+                  overflow: 'hidden'
+                }}
+                styles={{
+                  body: {
+                    padding: '24px',
+                    textAlign: 'center',
+                    background: type.bgColor,
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }
+                }}
+                onClick={() => setSelectedTransactionType(type.key)}
+              >
+                <div>
+                  <div style={{ marginBottom: '16px' }}>
+                    {type.icon}
+                  </div>
+                  <h3 style={{ 
+                    margin: '0 0 8px 0', 
+                    fontSize: '16px', 
+                    fontWeight: 600,
+                    color: type.color
+                  }}>
+                    {type.title}
+                  </h3>
+                  <p style={{ 
+                    margin: 0, 
+                    fontSize: '13px', 
+                    color: '#666',
+                    lineHeight: '1.4'
+                  }}>
+                    {type.description}
+                  </p>
+                </div>
+                <div style={{ 
+                  marginTop: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: type.color,
+                  fontSize: '12px',
+                  fontWeight: 500
+                }}>
+                  <ArrowRightOutlined style={{ marginRight: '4px' }} />
+                  Chọn loại này
+                </div>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+
+        {/* Footer */}
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '16px',
+          background: '#f8f9fa',
+          borderRadius: '8px',
+          border: '1px solid #e9ecef'
+        }}>
+          <Text type="secondary" style={{ fontSize: '13px' }}>
+            💡 Mỗi loại giao dịch có yêu cầu tài liệu khác nhau. Hãy chuẩn bị sẵn các tài liệu cần thiết.
+          </Text>
         </div>
       </div>
     );
   };
 
   const renderCreateForm = () => {
-    if (!selectedTransactionType) {
+    // Bước 0: Chọn loại giao dịch
+    if (currentStep === 0 || !selectedTransactionType) {
       return renderTransactionTypeSelection();
     }
 
+    // Bước 1 và 2: Hiển thị theo từng phần
     return (
-      <Form layout="vertical" form={form}>
-        {/* Header với loại giao dịch đã chọn */}
-        <div style={{ 
-          marginBottom: '24px', 
-          padding: '16px', 
-          background: '#f0f9ff', 
-          borderRadius: '8px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <span style={{ fontSize: '16px', fontWeight: 500 }}>
-            Loại giao dịch: <Tag color="blue">{getTransactionTypeText(selectedTransactionType)}</Tag>
-          </span>
-          <Button 
-            size="small" 
-            onClick={() => {
-              setSelectedTransactionType(null);
-              setSelectedDocuments({});
-              form.resetFields();
-            }}
-          >
-            Chọn lại
-          </Button>
-        </div>
-        
-        {/* Layout 2 cột: Thông tin giao dịch | Tài liệu đính kèm */}
-        <Row gutter={24}>
-          {/* Cột trái: Thông tin giao dịch */}
-          <Col span={12}>
-            <div style={{ 
-              padding: '20px', 
-              background: '#fafafa', 
-              borderRadius: '8px',
-              border: '1px solid #e8e8e8',
-              height: '100%',
-              minHeight: '500px'
-            }}>
-              <h4 style={{ marginBottom: '20px', color: '#1890ff', borderBottom: '2px solid #1890ff', paddingBottom: '8px' }}>
-                📝 Thông tin giao dịch
-              </h4>
-              
-            <Form.Item name="landParcelID" label="Mã thửa đất" rules={[{ required: true, message: 'Bắt buộc' }]}>
-              <Select 
-                placeholder="Chọn thửa đất" 
-                showSearch={false}
-                loading={landLoading}
-                notFoundContent={landLoading ? 'Đang tải...' : 'Không có thửa đất nào'}
-                optionLabelProp="value"
-              >
-                {userLands.map((land) => (
-                  <Option key={land.id} value={land.id}>
-                    <div style={{ padding: '4px 0' }}>
-                      <div style={{ fontWeight: 'bold', color: '#1890ff' }}>
-                        {land.id}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#666' }}>
-                        Diện tích: {land.area}m² | Mục đích: {LAND_USE_PURPOSES[land.landUsePurpose] || land.landUsePurpose || 'Chưa có'}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#666' }}>
-                        Pháp lý: {land.legalStatus && land.legalStatus.trim() !== '' ? land.legalStatus : 'Chưa có'} | Địa chỉ: {land.location || 'Chưa có'}
-                      </div>
-                    </div>
-                  </Option>
-                ))}
-              </Select>
-              {userLands.length === 0 && !landLoading && (
-                <div style={{ marginTop: 8, color: '#ff4d4f', fontSize: '12px' }}>
-                  ⚠️ Bạn chưa có thửa đất nào. Vui lòng liên hệ cơ quan quản lý đất đai.
-                </div>
-              )}
-            </Form.Item>
-
-        {/* CCCD chủ sở hữu sẽ tự động lấy từ user hiện tại */}
-        <Form.Item label="CCCD chủ sở hữu">
-          <Input 
-            value={authService.getCurrentUser()?.userId || 'N/A'} 
-            disabled 
-            style={{ backgroundColor: '#f5f5f5' }}
+      <div>
+        {/* Progress Steps */}
+        <div style={{ marginBottom: '32px' }}>
+          <Steps
+            current={currentStep}
+            items={[
+              { title: 'Chọn loại giao dịch' },
+              { title: 'Nhập thông tin và tài liệu' },
+              { title: 'Hoàn tất' }
+            ]}
           />
-        </Form.Item>
+        </div>
 
-        {/* Conditional fields dựa trên loại giao dịch đã chọn */}
-        {selectedTransactionType === 'TRANSFER' && (
-          <Form.Item name="toOwnerID" label="CCCD người nhận chuyển nhượng" rules={[{ required: true, message: 'Bắt buộc' }]}>
-            <Input placeholder="Nhập số CCCD người nhận" />
-          </Form.Item>
-        )}
+        {/* Header với loại giao dịch đã chọn */}
+        <Card
+          style={{ marginBottom: '24px', background: 'white', border: '1px solid #f0f0f0' }}
+          styles={{ body: { padding: '20px' } }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, marginBottom: '4px' }}>🎯 Loại giao dịch đã chọn</h3>
+              <p style={{ margin: 0, opacity: 0.9, fontSize: '14px' }}>{getTransactionTypeText(selectedTransactionType)}</p>
+            </div>
+            <Button 
+              onClick={() => {
+                setSelectedTransactionType(null);
+                setSelectedDocuments({});
+                form.resetFields();
+                setCurrentStep(0);
+              }}
+            >
+              Chọn lại
+            </Button>
+          </div>
+        </Card>
 
-        {selectedTransactionType === 'CHANGE_PURPOSE' && (
-          <Form.Item name="newPurpose" label="Mục đích sử dụng mới" rules={[{ required: true, message: 'Bắt buộc' }]}>
-            <Select placeholder="Chọn mục đích sử dụng">
-              {Object.entries(LAND_USE_PURPOSES).map(([code, name]) => (
-                <Option key={code} value={code}>{code} - {name}</Option>
-              ))}
-            </Select>
-          </Form.Item>
-        )}
+        {currentStep === 1 && (
+          <Form layout="vertical" form={form}>
+            <Collapse
+              defaultActiveKey={['info', 'documents']}
+              ghost
+              style={{ background: 'transparent' }}
+              items={[
+                {
+                  key: 'info',
+                  label: (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '16px' }}>📝</span>
+                      <span style={{ fontSize: '16px', fontWeight: 600 }}>Thông tin giao dịch</span>
+                    </div>
+                  ),
+                  children: (
+                    <div style={{ padding: '0 24px 16px 24px' }}>
+                      {/* CCCD chủ sở hữu sẽ tự động lấy từ user hiện tại */}
+                      <Form.Item 
+                        label={
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ color: '#52c41a' }}>👤</span>
+                            <span>CCCD chủ sở hữu</span>
+                          </div>
+                        }
+                      >
+                        <Input 
+                          value={authService.getCurrentUser()?.userId || 'N/A'} 
+                          disabled 
+                          style={{ 
+                            backgroundColor: '#f5f5f5',
+                            borderRadius: '8px',
+                            border: '1px solid #d9d9d9'
+                          }}
+                        />
+                      </Form.Item>
 
-        {selectedTransactionType === 'SPLIT' && (
-          <Form.Item name="newParcels" label="Thông tin thửa đất mới" rules={[{ required: true, message: 'Bắt buộc' }]}>
-            <Input.TextArea 
-              placeholder="Nhập thông tin thửa đất mới theo định dạng JSON (VD: [{'id':'L001-1','area':100},{'id':'L001-2','area':150}])" 
-                    rows={3}
+                      {/* Conditional fields dựa trên loại giao dịch đã chọn */}
+                      {/* Field mã thửa đất chỉ hiện thị với các loại khác MERGE */}
+                      {selectedTransactionType && selectedTransactionType !== 'MERGE' && (
+                        <Form.Item 
+                          name="landParcelID" 
+                          label={
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ color: '#1890ff' }}>🏠</span>
+                              <span>Mã thửa đất</span>
+                            </div>
+                          } 
+                          rules={[{ required: true, message: 'Bắt buộc' }]}
+                        >
+                          <Select 
+                            placeholder="Chọn thửa đất" 
+                            showSearch={false}
+                            loading={landLoading}
+                            notFoundContent={landLoading ? 'Đang tải...' : 'Không có thửa đất nào'}
+                            optionLabelProp="value"
+                            style={{ borderRadius: '8px' }}
+                          >
+                            {userLands.map((land) => (
+                              <Option key={`land-${land.id}`} value={land.id}>
+                                <div style={{ padding: '4px 0' }}>
+                                  <div style={{ fontWeight: 'bold', color: '#1890ff' }}>
+                                    {land.id}
+                                  </div>
+                                  <div style={{ fontSize: '12px', color: '#666' }}>
+                                    Diện tích: {land.area}m² | Mục đích: {LAND_USE_PURPOSES[land.landUsePurpose] || land.landUsePurpose || 'Chưa có'}
+                                  </div>
+                                  <div style={{ fontSize: '12px', color: '#666' }}>
+                                    Pháp lý: {land.legalStatus && land.legalStatus.trim() !== '' ? land.legalStatus : 'Chưa có'} | Địa chỉ: {land.location || 'Chưa có'}
+                                  </div>
+                                </div>
+                              </Option>
+                            ))}
+                          </Select>
+                          {userLands.length === 0 && !landLoading && (
+                            <div style={{ marginTop: 8, color: '#ff4d4f', fontSize: '12px' }}>
+                              ⚠️ Bạn chưa có thửa đất nào. Vui lòng liên hệ cơ quan quản lý đất đai.
+                            </div>
+                          )}
+                        </Form.Item>
+                      )}
+                      
+                      {selectedTransactionType === 'TRANSFER' && (
+                        <Form.Item 
+                          name="toOwnerID" 
+                          label={
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ color: '#1890ff' }}>🔄</span>
+                              <span>CCCD người nhận chuyển nhượng</span>
+                            </div>
+                          } 
+                          rules={[{ required: true, message: 'Bắt buộc' }]}
+                        >
+                          <Input 
+                            placeholder="Nhập số CCCD người nhận" 
+                            style={{ borderRadius: '8px' }}
+                          />
+                        </Form.Item>
+                      )}
+
+                      {selectedTransactionType === 'CHANGE_PURPOSE' && (
+                        <Form.Item name="newPurpose" label="Mục đích sử dụng mới" rules={[{ required: true, message: 'Bắt buộc' }]}>
+                          <Select placeholder="Chọn mục đích sử dụng">
+                            {Object.entries(LAND_USE_PURPOSES).map(([code, name]) => (
+                              <Option key={`purpose-${code}`} value={code}>{code} - {name}</Option>
+                            ))}
+                          </Select>
+                        </Form.Item>
+                      )}
+
+                      {selectedTransactionType === 'MERGE' && (
+                        <div style={{ marginBottom: '24px' }}>
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '4px',
+                            marginBottom: '12px' 
+                          }}>
+                            <span style={{ color: '#722ed1' }}>🏗️</span>
+                            <span style={{ fontWeight: '500' }}>Các thửa đất cần gộp</span>
+                            <span style={{ color: '#ff4d4f' }}>*</span>
+                          </div>
+                          <div style={{ marginBottom: '8px', fontSize: '12px', color: '#666' }}>
+                            Chi tiết cách gộp sẽ được thể hiện trong bản đồ và tài liệu đính kèm.
+                          </div>
+                          
+                          {mergeParcelIds.map((parcelId, index) => (
+                            <div key={index} style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '12px',
+                              marginBottom: '12px' 
+                            }}>
+                              <div style={{ minWidth: '80px', fontSize: '14px', color: '#666' }}>
+                                Thửa {index + 1}:
+                              </div>
+                              <Select
+                                placeholder="Chọn thửa đất"
+                                style={{ flex: 1, borderRadius: '8px' }}
+                                value={parcelId || undefined}
+                                onChange={(value) => {
+                                  const newParcelIds = [...mergeParcelIds];
+                                  newParcelIds[index] = value || '';
+                                  setMergeParcelIds(newParcelIds);
+                                }}
+                                loading={landLoading}
+                                showSearch
+                                optionFilterProp="children"
+                                filterOption={(input, option) => {
+                                  const optionText = option.children.props?.children?.[0]?.props?.children || option.children;
+                                  return optionText?.toLowerCase().indexOf(input.toLowerCase()) >= 0;
+                                }}
+                                optionLabelProp="value"
+                              >
+                                {userLands
+                                  .filter(land => !mergeParcelIds.includes(land.id) || land.id === parcelId)
+                                  .map((land) => (
+                                  <Option key={`merge-land-${land.id}`} value={land.id}>
+                                    <div style={{ padding: '2px 0' }}>
+                                      <div style={{ fontWeight: 'bold', color: '#1890ff', fontSize: '14px' }}>
+                                        {land.id}
+                                      </div>
+                                      <div style={{ fontSize: '11px', color: '#666', lineHeight: '1.3' }}>
+                                        Diện tích: {land.area}m²
+                                      </div>
+                                      <div style={{ fontSize: '11px', color: '#666', lineHeight: '1.3' }}>
+                                        Mục đích: {LAND_USE_PURPOSES[land.landUsePurpose] || land.landUsePurpose || 'Chưa có'}
+                                      </div>
+                                    </div>
+                                  </Option>
+                                ))} 
+                              </Select>
+                              
+                              {/* Button remove chỉ hiện khi có hơn 2 field */}
+                              {mergeParcelIds.length > 2 && (
+                                <Button 
+                                  type="text" 
+                                  danger
+                                  icon={<span>❌</span>}
+                                  size="small"
+                                  onClick={() => {
+                                    const newParcelIds = mergeParcelIds.filter((_, i) => i !== index);
+                                    setMergeParcelIds(newParcelIds);
+                                  }}
+                                  style={{ minWidth: '32px' }}
+                                />
+                              )}
+                            </div>
+                          ))}
+                          
+                          {/* Button thêm thửa đất */}
+                          <Button 
+                            type="dashed" 
+                            icon={<span>➕</span>}
+                            onClick={() => {
+                              setMergeParcelIds([...mergeParcelIds, '']);
+                            }}
+                            style={{ 
+                              width: '100%',
+                              marginTop: '8px',
+                              borderRadius: '8px',
+                              color: '#722ed1',
+                              borderColor: '#722ed1'
+                            }}
+                            disabled={userLands.length <= mergeParcelIds.filter(id => id !== '').length}
+                          >
+                            Thêm thửa đất cần gộp
+                          </Button>
+                          
+                          {userLands.length === 0 && !landLoading && (
+                            <div style={{ 
+                              marginTop: '12px', 
+                              padding: '8px 12px',
+                              background: '#fff2f0',
+                              borderRadius: '6px',
+                              border: '1px solid #ffccc7',
+                              color: '#ff4d4f', 
+                              fontSize: '12px' 
+                            }}>
+                              ⚠️ Bạn chưa có thửa đất nào. Vui lòng liên hệ cơ quan quản lý đất đai.
+                            </div>
+                          )}
+                          
+                          {/* Hiển thị tóm tắt */}
+                          {mergeParcelIds.filter(id => id !== '').length >= 2 && (
+                            <div style={{
+                              marginTop: '12px',
+                              padding: '12px',
+                              background: '#f6ffed',
+                              borderRadius: '6px',
+                              border: '1px solid #b7eb8f'
+                            }}>
+                              <div style={{ color: '#52c41a', fontWeight: '500', marginBottom: '4px' }}>
+                                ✅ Sẵn sàng gộp {mergeParcelIds.filter(id => id !== '').length} thửa đất
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#666' }}>
+                                Các thửa đất: {mergeParcelIds.filter(id => id !== '').join(', ')}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Lý do tạo yêu cầu */}
+                      <Form.Item 
+                        name="reason" 
+                        label={
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ color: '#1890ff' }}>💬</span>
+                            <span>Lý do tạo yêu cầu</span>
+                          </div>
+                        } 
+                        rules={[{ required: true, message: 'Vui lòng nhập lý do tạo yêu cầu' }]}
+                      >
+                        <Input.TextArea 
+                          placeholder="Nhập lý do tạo yêu cầu..." 
+                          rows={3}
+                          maxLength={500}
+                          showCount
+                          style={{ borderRadius: '8px' }}
+                        />
+                      </Form.Item>
+                    </div>
+                  )
+                },
+                {
+                  key: 'documents',
+                  label: (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '16px' }}>📎</span>
+                      <span style={{ fontSize: '16px', fontWeight: 600 }}>Tài liệu đính kèm</span>
+                    </div>
+                  ),
+                  children: (
+                    <div style={{ padding: '0 24px 16px 24px' }}>
+                      {renderDocumentSection(selectedTransactionType)}
+                    </div>
+                  )
+                }
+              ]}
             />
-          </Form.Item>
+          </Form>
         )}
-
-        {selectedTransactionType === 'MERGE' && (
-          <>
-            <Form.Item name="parcelIDs" label="Mã các thửa đất cần gộp" rules={[{ required: true, message: 'Bắt buộc' }]}>
-              <Input placeholder="Nhập mã các thửa đất, phân cách bằng dấu phẩy (VD: L001,L002)" />
-            </Form.Item>
-            <Form.Item name="newParcel" label="Thông tin thửa đất mới" rules={[{ required: true, message: 'Bắt buộc' }]}>
-              <Input.TextArea 
-                placeholder="Nhập thông tin thửa đất mới theo định dạng JSON (VD: {'id':'L001-MERGED','area':250})" 
-                      rows={2}
-              />
-            </Form.Item>
-          </>
-        )}
-
-              {/* Lý do tạo yêu cầu */}
-              <Form.Item 
-                name="reason" 
-                label="Lý do tạo yêu cầu" 
-                rules={[{ required: true, message: 'Vui lòng nhập lý do tạo yêu cầu' }]}
-              >
-                <Input.TextArea 
-                  placeholder="Nhập lý do tạo yêu cầu..." 
-                  rows={3}
-                  maxLength={500}
-                  showCount
-                />
-              </Form.Item>
-            </div>
-          </Col>
-
-          {/* Cột phải: Tài liệu đính kèm */}
-          <Col span={12}>
-            <div style={{ 
-              padding: '20px', 
-              background: '#fafafa', 
-              borderRadius: '8px',
-              border: '1px solid #e8e8e8',
-              height: '100%',
-              minHeight: '500px'
-            }}>
-              <h4 style={{ marginBottom: '20px', color: '#52c41a', borderBottom: '2px solid #52c41a', paddingBottom: '8px' }}>
-                📎 Tài liệu đính kèm
-              </h4>
-
-        {/* Document section */}
-        {renderDocumentSection(selectedTransactionType)}
-            </div>
-          </Col>
-        </Row>
-      </Form>
+      </div>
     );
   };
 
@@ -898,6 +1298,7 @@ const TransactionManagementPage = () => {
       extra={
         <Space>
           <Input
+            className="search-input"
             placeholder="Từ khóa"
             allowClear
             style={{ width: 200 }}
@@ -914,7 +1315,6 @@ const TransactionManagementPage = () => {
           <Select placeholder="Trạng thái" allowClear style={{ width: 150 }} value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })}>
             <Option value="PENDING">Chờ xử lý</Option>
             <Option value="VERIFIED">Đã thẩm định</Option>
-            <Option value="FORWARDED">Đã chuyển tiếp</Option>
             <Option value="APPROVED">Đã phê duyệt</Option>
             <Option value="REJECTED">Bị từ chối</Option>
             <Option value="CONFIRMED">Đã xác nhận</Option>
@@ -939,29 +1339,53 @@ const TransactionManagementPage = () => {
 
       {/* Create Transaction */}
       <Modal 
-        title={selectedTransactionType ? `Tạo yêu cầu: ${getTransactionTypeText(selectedTransactionType)}` : "Chọn loại giao dịch"} 
+        className="transaction-modal"
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '18px' }}>🏠</span>
+            <span>{selectedTransactionType ? `Tạo yêu cầu: ${getTransactionTypeText(selectedTransactionType)}` : "Chọn loại giao dịch"}</span>
+          </div>
+        }
         open={createOpen} 
-        onOk={selectedTransactionType ? onCreate : null}
+        onOk={selectedTransactionType && currentStep === 1 ? onCreate : null}
         onCancel={() => {
-          setCreateOpen(false);
-          form.resetFields();
-          setSelectedDocuments({});
-          setSelectedTransactionType(null);
-        }} 
-        confirmLoading={loading} 
-        width={1200}
-        okText={selectedTransactionType ? "Tạo yêu cầu" : undefined}
-        cancelText="Hủy"
-        footer={selectedTransactionType ? undefined : [
-          <Button key="cancel" onClick={() => {
             setCreateOpen(false);
             form.resetFields();
             setSelectedDocuments({});
             setSelectedTransactionType(null);
-          }}>
-            Hủy
-          </Button>
-        ]}
+            setMergeParcelIds(['', '']); // Reset merge fields
+          }} 
+          confirmLoading={loading}
+        width={1400}
+        okText={selectedTransactionType && currentStep === 1 ? "Tạo yêu cầu" : undefined}
+        cancelText="Hủy"
+        style={{ top: 20 }}
+        styles={{
+          body: {
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            padding: '24px'
+          }
+        }}
+        footer={(() => {
+          if (!selectedTransactionType || currentStep === 0) {
+            return [
+              <Button key="cancel" onClick={() => {
+                setCreateOpen(false);
+                form.resetFields();
+                setSelectedDocuments({});
+                setSelectedTransactionType(null);
+                setMergeParcelIds(['', '']); // Reset merge fields  
+                setCurrentStep(0);
+              }}>Hủy</Button>
+            ];
+          }
+          // Footer chỉ có 2 bước: chọn loại và nhập thông tin
+          return [
+            <Button key="back" onClick={() => setCurrentStep(prev => Math.max(0, prev - 1))}>Quay lại</Button>,
+            <Button key="create" type="primary" loading={loading} onClick={onCreate}>Tạo yêu cầu</Button>
+          ];
+        })()}
       >
         {renderCreateForm()}
       </Modal>
@@ -1114,7 +1538,7 @@ const TransactionManagementPage = () => {
                       ))}
                     </div>
                   ) : documents && documents.length > 0 ? (
-                    // Hiển thị tài liệu giống hệt Org2
+                    // Hiển thị tài liệu - Org3 có thể xem tài liệu theo ID
                     <div>
                       <div style={{ marginBottom: '8px', color: '#666', fontSize: '12px' }}>
                         {documents.length} tài liệu
@@ -1183,6 +1607,104 @@ const TransactionManagementPage = () => {
                 </div>
               </div>
             )}
+
+            {/* Accept/Reject Transfer buttons for recipients */}
+            {(() => {
+              const currentUser = authService.getCurrentUser();
+              const isRecipient = selected.type === 'TRANSFER' && 
+                                selected.toOwnerId === currentUser?.userId && 
+                                selected.status === 'PENDING';
+              
+              if (isRecipient) {
+                return (
+                  <div style={{ marginTop: 24 }}>
+                    <Divider>Xác nhận chuyển nhượng</Divider>
+                    <div style={{
+                      background: '#f0f9ff',
+                      border: '1px solid #d6e4ff',
+                      borderRadius: '8px',
+                      padding: '20px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ marginBottom: 16 }}>
+                        <Text strong style={{ fontSize: '16px', color: '#1890ff' }}>
+                          🔔 Bạn là người nhận chuyển nhượng
+                        </Text>
+                      </div>
+                      <div style={{ marginBottom: 20, color: '#666', lineHeight: 1.6 }}>
+                        Giao dịch chuyển nhượng này cần sự xác nhận của bạn để có thể tiếp tục được xử lý.
+                        Vui lòng xem xét kỹ các tài liệu đính kèm và quyết định chấp nhận hoặc từ chối.
+                      </div>
+                      <Space size="large">
+                        <Button
+                          type="primary"
+                          size="large"
+                          icon={<CheckCircleOutlined />}
+                          loading={loading}
+                          onClick={async () => {
+                            try {
+                              setLoading(true);
+                              
+                              await transactionService.confirmTransfer({
+                                txID: selected.txId,
+                                landParcelID: selected.landParcelId,
+                                toOwnerID: selected.toOwnerId,
+                                isAccepted: true,
+                                reason: ''
+                              });
+                              
+                              message.success('Chấp nhận giao dịch chuyển nhượng thành công!');
+                              setDetailOpen(false);
+                              loadMyTransactions();
+                            } catch (e) {
+                              message.error(e.message || 'Chấp nhận thất bại');
+                            } finally {
+                              setLoading(false);
+                            }
+                          }}
+                          style={{ minWidth: '140px' }}
+                        >
+                          Nhận chuyển nhượng
+                        </Button>
+                        <Button
+                          danger
+                          size="large"
+                          loading={loading}
+                          onClick={async () => {
+                            try {
+                              setLoading(true);
+                              
+                              await transactionService.confirmTransfer({
+                                txID: selected.txId,
+                                landParcelID: selected.landParcelId,
+                                toOwnerID: selected.toOwnerId,
+                                isAccepted: false,
+                                reason: 'Từ chối chuyển nhượng'
+                              });
+                              
+                              message.success('Từ chối giao dịch chuyển nhượng thành công!');
+                              setDetailOpen(false);
+                              loadMyTransactions();
+                            } catch (e) {
+                              message.error(e.message || 'Từ chối thất bại');
+                            } finally {
+                              setLoading(false);
+                            }
+                          }}
+                          style={{ minWidth: '140px' }}
+                        >
+                          Từ chối
+                        </Button>
+                      </Space>
+                      <div style={{ marginTop: 16, fontSize: '12px', color: '#999' }}>
+                        💡 Sau khi xác nhận, giao dịch sẽ được chuyển đến cơ quan có thẩm quyền để thẩm định và phê duyệt.
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
         )}
       </Drawer>
@@ -1231,14 +1753,37 @@ const TransactionManagementPage = () => {
             >
               <Select
                 mode="multiple"
-                placeholder="Chọn tài liệu từ danh sách của bạn"
+                placeholder={
+                  (() => {
+                    const availableDocs = userDocuments.filter(doc => {
+                      const existingDocIds = selected?.documentIds || [];
+                      return !existingDocIds.includes(doc.docID);
+                    });
+                    return availableDocs.length > 0 
+                      ? "Chọn tài liệu từ danh sách của bạn"
+                      : "Không có tài liệu nào có thể bổ sung";
+                  })()
+                }
                 style={{ width: '100%' }}
+                disabled={(() => {
+                  const availableDocs = userDocuments.filter(doc => {
+                    const existingDocIds = selected?.documentIds || [];
+                    return !existingDocIds.includes(doc.docID);
+                  });
+                  return availableDocs.length === 0;
+                })()}
                 filterOption={(input, option) =>
-                  option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                  option.children.props.children[0].props.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
                 }
               >
-                {userDocuments.map(doc => (
-                  <Option key={doc.docID} value={doc.docID}>
+                {userDocuments
+                  .filter(doc => {
+                    // Lọc ra những tài liệu chưa được link với giao dịch này
+                    const existingDocIds = selected?.documentIds || [];
+                    return !existingDocIds.includes(doc.docID);
+                  })
+                  .map(doc => (
+                  <Option key={`supplement-doc-${doc.docID}`} value={doc.docID}>
                     <div>
                       <strong>{doc.title}</strong>
                       <div style={{ fontSize: '12px', color: '#666' }}>
@@ -1249,6 +1794,51 @@ const TransactionManagementPage = () => {
                 ))}
               </Select>
             </Form.Item>
+            
+            {(() => {
+              const availableDocs = userDocuments.filter(doc => {
+                const existingDocIds = selected?.documentIds || [];
+                return !existingDocIds.includes(doc.docID);
+              });
+              const existingCount = (selected?.documentIds || []).length;
+              const totalCount = userDocuments.length;
+              
+              if (availableDocs.length === 0 && totalCount > 0) {
+                return (
+                  <div style={{ 
+                    marginTop: -12, 
+                    marginBottom: 12,
+                    padding: 12, 
+                    backgroundColor: '#fff2f0', 
+                    borderRadius: 4,
+                    border: '1px solid #ffccc7'
+                  }}>
+                    <div style={{ color: '#ff4d4f', fontSize: '14px', marginBottom: 4 }}>
+                      ⚠️ <strong>Không có tài liệu mới để bổ sung</strong>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#666' }}>
+                      Tất cả {totalCount} tài liệu của bạn đã được liên kết với giao dịch này rồi.
+                      Bạn cần tạo tài liệu mới trước khi có thể bổ sung.
+                    </div>
+                  </div>
+                );
+              } else if (availableDocs.length > 0 && existingCount > 0) {
+                return (
+                  <div style={{ 
+                    marginTop: -12, 
+                    marginBottom: 12,
+                    padding: 8, 
+                    backgroundColor: '#f0f9ff', 
+                    borderRadius: 4,
+                    fontSize: '12px',
+                    color: '#1890ff'
+                  }}>
+                    📊 Có {availableDocs.length} tài liệu có thể bổ sung (Tổng cộng: {totalCount}, Đã liên kết: {existingCount})
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             <div style={{ marginTop: 16, padding: 12, backgroundColor: '#f0f0f0', borderRadius: 4 }}>
               <Text type="secondary" style={{ fontSize: '12px' }}>

@@ -290,7 +290,7 @@ const DocumentManagementPage = () => {
     { title: 'Tiêu đề', dataIndex: 'title', key: 'title' },
     { title: 'Loại', dataIndex: 'type', key: 'type', render: v => <Tag color="blue">{v}</Tag> },
     { title: 'Trạng thái', dataIndex: 'status', key: 'status', render: v => {
-        if (v === 'VERIFIED') return <Tag color="green">Đã xác thực</Tag>;
+        if (v === 'VERIFIED') return <Tag color="green">Đã thẩm định</Tag>;
         if (v === 'REJECTED') return <Tag color="red">Không hợp lệ</Tag>;
         return <Tag color="orange">Chờ xác thực</Tag>;
       }
@@ -360,7 +360,7 @@ const DocumentManagementPage = () => {
             ))}
           </Select>
           <Select placeholder="Trạng thái xác thực" allowClear style={{ width: 150 }} value={filters.verified} onChange={(v) => setFilters({ ...filters, verified: v })}>
-            <Option value={true}>Đã xác thực</Option>
+            <Option value={true}>Đã thẩm định</Option>
             <Option value={false}>Chờ xác thực</Option>
           </Select>
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
@@ -520,7 +520,7 @@ const DocumentManagementPage = () => {
                             <br />
                             <div style={{ marginTop: 6 }}>
                               {selected.verified ? (
-                                <Tag color="green">Đã xác thực</Tag>
+                                <Tag color="green">Đã thẩm định</Tag>
                               ) : (
                                 <Tag color="orange">Chờ xác thực</Tag>
                               )}

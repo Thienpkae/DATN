@@ -3,7 +3,12 @@ import { Card, Table, Button, Input, Space, Tag, message, Drawer, Row, Col, Tabs
 import { SearchOutlined, ReloadOutlined, HistoryOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons';
 import landService from '../../../services/landService';
 import authService from '../../../services/auth';
+import documentService from '../../../services/documentService';
 import { LAND_USE_PURPOSES, LEGAL_STATUSES } from '../../../services/index';
+
+// Import modal components for document viewing
+import DocumentDetailModal from '../../Common/DocumentDetailModal';
+import OnlineDocumentViewer from '../../Common/OnlineDocumentViewer';
 const { TabPane } = Tabs;
 const { Text } = Typography;
 
@@ -14,6 +19,14 @@ const LandManagementPage = () => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [history, setHistory] = useState([]);
+  const [activeTabKey, setActiveTabKey] = useState('1');
+  
+  // Document states
+  const [documents, setDocuments] = useState([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [documentDetailOpen, setDocumentDetailOpen] = useState(false);
+  const [onlineViewerOpen, setOnlineViewerOpen] = useState(false);
 
   const loadMyLands = async () => {
     try {
@@ -53,10 +66,44 @@ const LandManagementPage = () => {
     try {
       setSelected(record);
       setDetailOpen(true);
+      setActiveTabKey('1');
       const res = await landService.getLandParcelHistory(record.id || record.ID || record.landId);
       setHistory(Array.isArray(res) ? res : (res?.data ?? []));
+      
+      // Load documents if available
+      if (record.documentIds && record.documentIds.length > 0) {
+        setDocuments([]);
+        setDocumentsLoading(true);
+        
+        try {
+          const docPromises = record.documentIds.map(async (docId) => {
+            try {
+              return await documentService.getDocument(docId);
+            } catch (e) {
+              console.warn(`Không thể load tài liệu ${docId}:`, e);
+              return null;
+            }
+          });
+          
+          const docs = await Promise.all(docPromises);
+          const validDocs = docs.filter(doc => doc !== null);
+          setDocuments(validDocs);
+          
+          console.log('📄 Loaded documents:', validDocs.length, 'out of', record.documentIds.length);
+        } catch (e) {
+          console.warn('Không thể load danh sách tài liệu:', e);
+          setDocuments([]);
+        } finally {
+          setDocumentsLoading(false);
+        }
+      } else {
+        setDocuments([]);
+        setDocumentsLoading(false);
+      }
     } catch (e) {
       setHistory([]);
+      setDocuments([]);
+      setDocumentsLoading(false);
     }
   };
 
@@ -64,11 +111,31 @@ const LandManagementPage = () => {
     try {
       setSelected(record);
       setDetailOpen(true);
+      setActiveTabKey('3');
       const res = await landService.getLandParcelHistory(record.id || record.ID || record.landId);
       setHistory(Array.isArray(res) ? res : (res?.data ?? []));
     } catch (e) {
       setHistory([]);
     }
+  };
+
+  // Helper functions for document handling
+  const onViewDocumentDetail = async (document) => {
+    setSelectedDocument(document);
+    setDocumentDetailOpen(true);
+    console.log('🔗 Mở modal xem chi tiết tài liệu:', document.docID);
+  };
+
+  const getDocumentStatusColor = (doc) => {
+    if (doc.status === 'VERIFIED') return 'green';
+    if (doc.status === 'REJECTED') return 'red';
+    return 'orange';
+  };
+
+  const getDocumentStatusText = (doc) => {
+    if (doc.status === 'VERIFIED') return 'Đã thẩm định';
+    if (doc.status === 'REJECTED') return 'Không hợp lệ';
+    return 'Chờ xác thực';
   };
 
   const columns = useMemo(() => ([
@@ -202,7 +269,7 @@ const LandManagementPage = () => {
         onClose={() => setDetailOpen(false)}
       >
         {selected && (
-          <Tabs defaultActiveKey="1">
+          <Tabs activeKey={activeTabKey} onChange={(k) => setActiveTabKey(k)}>
             <TabPane tab="Thông tin cơ bản" key="1">
               <Row gutter={[16, 16]}>
                 <Col span={12}>
@@ -270,37 +337,102 @@ const LandManagementPage = () => {
               </Row>
             </TabPane>
             <TabPane tab="Tài liệu liên quan" key="2">
-              <List
-                header={<div><strong>Danh sách tài liệu ({selected.documentIds?.length || 0})</strong></div>}
-                variant="bordered"
-                dataSource={selected.documentIds || []}
-                renderItem={(docId, index) => (
-                  <List.Item
-                    key={`doc-${docId}-${index}`}
-                    actions={[
-                      <Button
-                        key={`btn-${docId}`}
-                        size="small"
-                        icon={<EyeOutlined />}
-                        onClick={() => {
-                          message.info(`Xem tài liệu: ${docId}`);
-                        }}
-                      >
-                        Xem
-                      </Button>
-                    ]}
-                  >
-                    <List.Item.Meta
-                      avatar={<FileTextOutlined />}
-                      title={`Tài liệu ${index + 1}`}
-                      description={`ID: ${docId}`}
-                    />
-                  </List.Item>
-                )}
-                locale={{
-                  emptyText: 'Chưa có tài liệu nào được liên kết'
-                }}
-              />
+              <div style={{ marginTop: 16 }}>
+                <strong>Tài liệu đính kèm:</strong>
+                <div style={{ marginTop: 8 }}>
+                  {documentsLoading ? (
+                    // Loading skeleton
+                    <div>
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between',
+                          padding: '8px 12px',
+                          marginBottom: '8px',
+                          background: '#f8f9fa',
+                          borderRadius: '6px',
+                          border: '1px solid #e9ecef'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ width: '60%', height: '16px', background: '#e9ecef', borderRadius: '4px', marginBottom: '4px' }} />
+                            <div style={{ width: '40%', height: '12px', background: '#e9ecef', borderRadius: '4px' }} />
+                          </div>
+                          <Space>
+                            <div style={{ width: '60px', height: '24px', background: '#e9ecef', borderRadius: '4px' }} />
+                          </Space>
+                        </div>
+                      ))}
+                    </div>
+                  ) : documents && documents.length > 0 ? (
+                    // Hiển thị tài liệu - Org3 có thể xem tài liệu theo ID
+                    <div>
+                      <div style={{ marginBottom: '8px', color: '#666', fontSize: '12px' }}>
+                        {documents.length} tài liệu
+                      </div>
+                      {documents.map((doc, index) => (
+                        <div key={index} style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between',
+                          padding: '8px 12px',
+                          marginBottom: '8px',
+                          background: '#f8f9fa',
+                          borderRadius: '6px',
+                          border: '1px solid #e9ecef'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: '500', color: '#1890ff' }}>
+                              {doc.title || doc.docID}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                              {doc.type} • {doc.fileSize ? `${(doc.fileSize / 1024).toFixed(2)} KB` : 'N/A'}
+                            </div>
+                          </div>
+                          <Space>
+                            <Tooltip title="Xem chi tiết tài liệu">
+                              <Button 
+                                type="text" 
+                                icon={<FileTextOutlined />} 
+                                size="small"
+                                onClick={() => onViewDocumentDetail(doc)}
+                                style={{ color: '#1890ff' }}
+                              />
+                            </Tooltip>
+                            <Tag 
+                              color={getDocumentStatusColor(doc)} 
+                              size="small"
+                              style={{ 
+                                width: '120px',
+                                minWidth: '120px',
+                                textAlign: 'center',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                padding: '4px 12px'
+                              }}
+                            >
+                              {getDocumentStatusText(doc)}
+                            </Tag>
+                          </Space>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    // Không có tài liệu
+                    <div style={{ 
+                      padding: '16px', 
+                      textAlign: 'center', 
+                      color: '#999',
+                      background: '#f8f9fa',
+                      borderRadius: '6px',
+                      border: '1px dashed #e9ecef'
+                    }}>
+                      <FileTextOutlined style={{ fontSize: '24px', marginBottom: '8px', color: '#ccc' }} />
+                      <div>Chưa có tài liệu liên kết</div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </TabPane>
             <TabPane tab="Lịch sử thửa đất" key="3">
               <div>
@@ -315,17 +447,18 @@ const LandManagementPage = () => {
                   </Button>
                 </div>
                 <List
-                  header={<div><strong>Lịch sử thay đổi thửa đất ({history.length})</strong></div>}
-                  variant="bordered"
+                  header={<div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <strong>Lịch sử thay đổi thửa đất ({history.length})</strong>
+                    {history.length>0 && <Tag color="blue">{selected?.id}</Tag>}
+                  </div>}
+                  bordered
                   dataSource={history}
                   renderItem={(item, index) => (
-                    <List.Item style={{ padding: '20px 24px' }}>
+                    <List.Item style={{ padding: '16px 20px', borderRadius: 8 }}>
                       <div style={{ width: '100%' }}>
-                        <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '2px solid #f0f0f0' }}>
-                          <Text strong style={{ fontSize: 16 }}>{`Thay đổi ${history.length - index}`}</Text>
-                          <div style={{ float: 'right' }}>
-                            {item.isDelete ? <Tag color="red">Vô hiệu</Tag> : <Tag color="green">Hiệu lực</Tag>}
-                          </div>
+                        <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center', marginBottom: 12 }}>
+                          <Text strong style={{ fontSize: 15 }}>{`Thay đổi ${history.length - index}`}</Text>
+                          {item.isDelete ? <Tag color="red">Vô hiệu</Tag> : <Tag color="green">Hiệu lực</Tag>}
                         </div>
                         <div style={{ lineHeight: '1.8' }}>
                           <div style={{ marginBottom: 12 }}>
@@ -342,6 +475,11 @@ const LandManagementPage = () => {
                           </div>
                           {item.land && (
                             <>
+                              <div style={{ marginBottom: 12 }}>
+                                <Text strong>Chủ sử dụng đất: </Text>
+                                <Text type="secondary">{item.land.ownerId || 'Chưa bổ sung'}</Text>
+                              </div>
+                              
                               <div style={{ marginBottom: 12 }}>
                                 <Text strong>Diện tích: </Text>
                                 <Text type="secondary">{item.land.area || 'Chưa bổ sung'} m²</Text>
@@ -411,6 +549,21 @@ const LandManagementPage = () => {
           </Tabs>
         )}
       </Drawer>
+
+      {/* Document Detail Modal */}
+      <DocumentDetailModal
+        visible={documentDetailOpen}
+        onClose={() => setDocumentDetailOpen(false)}
+        document={selectedDocument}
+        userRole="Org3"
+      />
+
+      {/* Online Document Viewer */}
+      <OnlineDocumentViewer
+        visible={onlineViewerOpen}
+        onCancel={() => setOnlineViewerOpen(false)}
+        document={selectedDocument}
+      />
     </Card>
   );
 };

@@ -361,9 +361,6 @@ const Register = () => {
 
             <div style={{ textAlign: 'center' }}>
               <Space direction="vertical" size="small">
-                <Text type="secondary" style={{ fontSize: '14px' }}>
-                  {isAdminRegistration ? 'Quay lại đăng nhập?' : 'Quay lại đăng nhập?'}
-                </Text>
                 <Link 
                   to="/login" 
                   style={{ 

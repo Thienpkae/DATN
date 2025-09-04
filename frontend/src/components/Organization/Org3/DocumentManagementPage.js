@@ -289,7 +289,7 @@ const DocumentManagementPage = () => {
       dataIndex: 'status', 
       key: 'status', 
       render: v => {
-        if (v === 'VERIFIED') return <Badge status="success" text="Đã xác thực" />;
+        if (v === 'VERIFIED') return <Badge status="success" text="Đã thẩm định" />;
         if (v === 'REJECTED') return <Badge status="error" text="Không hợp lệ" />;
         return <Badge status="processing" text="Chờ xác thực" />;
       }
@@ -444,7 +444,7 @@ const DocumentManagementPage = () => {
                             <br />
                             <div style={{ marginTop: 6 }}>
                               {selected.verified ? (
-                                <Tag color="green">Đã xác thực</Tag>
+                                <Tag color="green">Đã thẩm định</Tag>
                               ) : (
                                 <Tag color="orange">Chờ xác thực</Tag>
                               )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Modal, Tabs, Row, Col, Tag, Button, Space, Typography, Divider, Form, Input, message, Skeleton } from 'antd';
+import { Modal, Tabs, Row, Col, Tag, Button, Space, Typography, Divider, Form, Input, message, Skeleton, Spin } from 'antd';
 import { 
   FileTextOutlined, 
   EyeOutlined,
@@ -18,7 +18,13 @@ const DocumentDetailModal = ({
   onClose, 
   onVerify, 
   onReject,
+  onAnalyze: externalOnAnalyze, // External analyze function
+  analysis, // Analysis results from external source
+  blockchainData, // Blockchain data for comparison
+  comparisonResult, // Comparison result
   userRole = 'Org2', // 'Org1', 'Org2', 'Org3'
+  analyzing: externalAnalyzing, // External analyzing state
+  ...props
 }) => {
   const [documentHistory, setDocumentHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -28,13 +34,16 @@ const DocumentDetailModal = ({
   const [rejectionReason, setRejectionReason] = useState('');
   const [onlineViewerOpen, setOnlineViewerOpen] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  
+  // Get analyzing state from props if provided, otherwise use internal state
+  const isAnalyzing = externalAnalyzing !== undefined ? externalAnalyzing : analyzing;
 
   // Helper function để xác định trạng thái tài liệu dựa trên logic 3 trạng thái
   const getDocumentStatus = (doc) => {
     if (!doc) return { text: 'N/A', color: 'default' };
     
     if (doc.status === 'VERIFIED') {
-      return { text: 'Đã xác thực', color: 'green' };
+      return { text: 'Đã thẩm định', color: 'green' };
     }
     
     if (doc.status === 'REJECTED') {
@@ -122,11 +131,41 @@ const DocumentDetailModal = ({
   const onAnalyze = async (docID) => {
     try {
       setAnalyzing(true);
-      // Implement analysis logic here
-      message.info('Chức năng phân tích đang được phát triển');
-      setAnalyzing(false);
+      console.log('Starting document analysis for:', docID);
+      
+      // Call document analysis API with Gemini
+      const result = await documentService.analyzeDocument(docID, true); // useGemini = true
+      
+      if (result.success && result.data && result.data.analysis) {
+        const analysisData = result.data.analysis;
+        console.log('Analysis result:', analysisData);
+        
+        // Display analysis results
+        const extractedInfo = analysisData.extractedInfo;
+        let analysisMessage = 'Phân tích tài liệu hoàn thành:\n\n';
+        
+        if (extractedInfo) {
+          if (extractedInfo.cccd) analysisMessage += `🆔 CCCD/CMND: ${extractedInfo.cccd}\n`;
+          if (extractedInfo.landParcelID) analysisMessage += `🏠 Mã thửa đất: ${extractedInfo.landParcelID}\n`;
+          if (extractedInfo.ownerName) analysisMessage += `👤 Tên chủ sử dụng: ${extractedInfo.ownerName}\n`;
+          if (extractedInfo.landArea) analysisMessage += `📏 Diện tích: ${extractedInfo.landArea} m²\n`;
+          if (extractedInfo.landLocation) analysisMessage += `📍 Địa chỉ: ${extractedInfo.landLocation}\n`;
+          if (extractedInfo.landType) analysisMessage += `🌿 Loại đất: ${extractedInfo.landType}\n`;
+          if (analysisData.confidence) analysisMessage += `\n📊 Độ tin cậy: ${analysisData.confidence}%`;
+        }
+        
+        message.success({
+          content: analysisMessage,
+          duration: 10, // Show for 10 seconds
+          style: { whiteSpace: 'pre-line' }
+        });
+      } else {
+        throw new Error('Dữ liệu phân tích không hợp lệ');
+      }
     } catch (e) {
-      message.error('Phân tích thất bại');
+      console.error('Analysis error:', e);
+      message.error(e.message || 'Phân tích thất bại');
+    } finally {
       setAnalyzing(false);
     }
   };
@@ -374,19 +413,46 @@ const DocumentDetailModal = ({
               <Button
                 type='primary'
                 icon={<AnalyzeIcon />}
-                onClick={() => onAnalyze(document?.docID)}
-                loading={analyzing}
+                onClick={() => externalOnAnalyze ? externalOnAnalyze(document?.docID) : onAnalyze(document?.docID)}
+                loading={isAnalyzing}
+                disabled={isAnalyzing}
               >
-                Phân tích tài liệu với Gemini
+                {isAnalyzing ? 'Đang phân tích...' : 'Phân tích tài liệu với Gemini'}
               </Button>
             </div>
-            <div style={{ textAlign: 'center', padding: 32 }}>
-              <Text type='secondary'>Chưa có kết quả phân tích</Text>
-              <br />
-              <Text type='secondary' style={{ fontSize: '12px' }}>
-                Nhấn nút "Phân tích tài liệu" để bắt đầu phân tích
-              </Text>
-            </div>
+            
+            {/* Loading overlay when analyzing */}
+            {isAnalyzing ? (
+              <div style={{
+                position: 'relative',
+                minHeight: 200,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(255, 255, 255, 0.9)',
+                borderRadius: 8,
+                border: '1px solid #e8e8e8'
+              }}>
+                <Spin size="large">
+                  <div style={{ textAlign: 'center', marginTop: 16 }}>
+                    <div style={{ fontSize: 16, fontWeight: 'bold', color: '#1890ff', marginBottom: 8 }}>
+                      🤖 Đang phân tích tài liệu với Gemini AI
+                    </div>
+                    <div style={{ fontSize: 12, color: '#666' }}>
+                      Vui lòng chờ trong giây lát...
+                    </div>
+                  </div>
+                </Spin>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: 32 }}>
+                <Text type='secondary'>Chưa có kết quả phân tích</Text>
+                <br />
+                <Text type='secondary' style={{ fontSize: '12px' }}>
+                  Nhấn nút "Phân tích tài liệu" để bắt đầu phân tích
+                </Text>
+              </div>
+            )}
           </div>
         );
       } else {
@@ -397,19 +463,159 @@ const DocumentDetailModal = ({
               <Button
                 type='primary'
                 icon={<AnalyzeIcon />}
-                onClick={() => onAnalyze(document?.docID)}
-                loading={analyzing}
+                onClick={() => externalOnAnalyze ? externalOnAnalyze(document?.docID) : onAnalyze(document?.docID)}
+                loading={isAnalyzing}
+                disabled={isAnalyzing}
               >
-                Phân tích tài liệu với Gemini
+                {isAnalyzing ? 'Đang phân tích...' : 'Phân tích tài liệu với Gemini'}
               </Button>
             </div>
-            <div style={{ textAlign: 'center', padding: 32 }}>
-              <Text type='secondary'>Chưa có kết quả phân tích</Text>
-              <br />
-              <Text type='secondary' style={{ fontSize: '12px' }}>
-                Nhấn nút "Phân tích tài liệu" để bắt đầu phân tích và hỗ trợ quyết định xác thực
-              </Text>
-            </div>
+            
+            {/* Loading overlay when analyzing */}
+            {isAnalyzing ? (
+              <div style={{
+                position: 'relative',
+                minHeight: 200,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(255, 255, 255, 0.9)',
+                borderRadius: 8,
+                border: '1px solid #e8e8e8'
+              }}>
+                <Spin size="large">
+                  <div style={{ textAlign: 'center', marginTop: 16 }}>
+                    <div style={{ fontSize: 16, fontWeight: 'bold', color: '#1890ff', marginBottom: 8 }}>
+                      🤖 Đang phân tích tài liệu với Gemini AI
+                    </div>
+                    <div style={{ fontSize: 12, color: '#666' }}>
+                      Vui lòng chờ trong giây lát...
+                    </div>
+                  </div>
+                </Spin>
+              </div>
+            ) : analysis && analysis.extractedInfo ? (
+              <div>
+                <div style={{ marginBottom: 24 }}>
+                  <Text strong style={{ fontSize: 16, color: '#1890ff' }}>Phân tích tài liệu hoàn thành:</Text>
+                </div>
+                
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <div style={{ background: '#f0f2ff', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+                      <Text strong>🆔 CCCD/CMND: </Text>
+                      <Text>{analysis.extractedInfo.cccd || 'N/A'}</Text>
+                    </div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ background: '#f0f2ff', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+                      <Text strong>🏠 Mã thửa đất: </Text>
+                      <Text>{analysis.extractedInfo.landParcelID || 'N/A'}</Text>
+                    </div>
+                  </Col>
+                </Row>
+                
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <div style={{ background: '#f0f2ff', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+                      <Text strong>👤 Tên chủ sử dụng: </Text>
+                      <Text>{analysis.extractedInfo.ownerName || 'N/A'}</Text>
+                    </div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ background: '#f0f2ff', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+                      <Text strong>📏 Diện tích: </Text>
+                      <Text>{analysis.extractedInfo.landArea ? `${analysis.extractedInfo.landArea} m²` : 'N/A'}</Text>
+                    </div>
+                  </Col>
+                </Row>
+                
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <div style={{ background: '#f0f2ff', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+                      <Text strong>📍 Địa chỉ: </Text>
+                      <Text>{analysis.extractedInfo.landLocation || 'N/A'}</Text>
+                    </div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ background: '#f0f2ff', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+                      <Text strong>🌿 Loại đất: </Text>
+                      <Text>{analysis.extractedInfo.landType || 'N/A'}</Text>
+                    </div>
+                  </Col>
+                </Row>
+                
+                {analysis.confidence && (
+                  <div style={{ background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '8px', padding: '12px', marginBottom: '16px', textAlign: 'center' }}>
+                    <Text strong>📊 Độ tin cậy: {analysis.confidence}%</Text>
+                  </div>
+                )}
+                
+                {/* Blockchain Comparison Results */}
+                {comparisonResult && (
+                  <div>
+                    <Divider />
+                    <Text strong style={{ fontSize: 16, color: '#1890ff' }}>Kết quả so sánh với Blockchain:</Text>
+                    <div style={{ marginTop: 16 }}>
+                      <div style={{ 
+                        background: comparisonResult.matchPercentage >= 80 ? '#f6ffed' : comparisonResult.matchPercentage <= 30 ? '#fff2f0' : '#fff7e6', 
+                        border: comparisonResult.matchPercentage >= 80 ? '1px solid #b7eb8f' : comparisonResult.matchPercentage <= 30 ? '1px solid #ffccc7' : '1px solid #ffd591',
+                        borderRadius: '8px', 
+                        padding: '16px', 
+                        textAlign: 'center',
+                        marginBottom: '16px'
+                      }}>
+                        <Text strong style={{ fontSize: 18 }}>
+                          Độ khớp: {comparisonResult.matchPercentage}%
+                        </Text>
+                        <br />
+                        <Text type="secondary">
+                          Khớp {comparisonResult.matchedFields}/{comparisonResult.totalFields} trường thông tin
+                        </Text>
+                      </div>
+                      
+                      {/* Detailed comparison */}
+                      {comparisonResult.details && comparisonResult.details.length > 0 && (
+                        <div style={{ background: '#fafafa', padding: '12px', borderRadius: '8px' }}>
+                          <Text strong style={{ marginBottom: 8, display: 'block' }}>Chi tiết so sánh:</Text>
+                          {comparisonResult.details.map((detail, index) => (
+                            <div key={index} style={{ marginBottom: '4px' }}>
+                              <Text style={{ fontSize: '12px' }}>{detail}</Text>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Recommendation */}
+                      {comparisonResult.recommendation && (
+                        <div style={{ 
+                          marginTop: 16,
+                          background: comparisonResult.recommendation === 'verify' ? '#f6ffed' : comparisonResult.recommendation === 'reject' ? '#fff2f0' : '#fff7e6',
+                          border: comparisonResult.recommendation === 'verify' ? '1px solid #b7eb8f' : comparisonResult.recommendation === 'reject' ? '1px solid #ffccc7' : '1px solid #ffd591',
+                          borderRadius: '8px', 
+                          padding: '12px'
+                        }}>
+                          <Text strong>Khuyến nghị: </Text>
+                          <Text>
+                            {comparisonResult.recommendation === 'verify' ? '✅ Nên xác thực tài liệu' : 
+                             comparisonResult.recommendation === 'reject' ? '❌ Nên từ chối tài liệu' : 
+                             '⚠️ Cần xem xét kỹ thêm'}
+                          </Text>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : !isAnalyzing ? (
+              <div style={{ textAlign: 'center', padding: 32 }}>
+                <Text type='secondary'>Chưa có kết quả phân tích</Text>
+                <br />
+                <Text type='secondary' style={{ fontSize: '12px' }}>
+                  Nhấn nút "Phân tích tài liệu" để bắt đầu phân tích và hỗ trợ quyết định xác thực
+                </Text>
+              </div>
+            ) : null}
             <Divider />
             <div
               style={{

@@ -20,7 +20,7 @@ import {
   TransactionOutlined,
   HomeOutlined
 } from '@ant-design/icons';
-import notificationService from '../../services/notification';
+import notificationService from '../../services/notificationService';
 import { useAuth } from '../../hooks/useAuth';
 
 const { Text, Title } = Typography;
@@ -66,14 +66,19 @@ const NotificationCenter = () => {
 
   const fetchNotifications = async () => {
     try {
-      const response = await notificationService.getUserNotifications();
+      const response = await notificationService.getMyNotifications();
       
       if (response.success && response.data) {
         // Handle different response structures
         const notificationsData = response.data.notifications || response.data || [];
         const unreadCountData = response.data.pagination?.unreadCount || (Array.isArray(notificationsData) ? notificationsData.filter(n => !n.read).length : 0);
         
-        setNotifications(Array.isArray(notificationsData) ? notificationsData : []);
+        // Dọn dẹp: chỉ giữ tối đa 50 bản ghi gần nhất, loại bỏ bản quá cũ (>60 ngày)
+        const sixtyDaysAgo = Date.now() - 60 * 24 * 3600 * 1000;
+        const cleaned = (Array.isArray(notificationsData) ? notificationsData : [])
+          .filter(n => new Date(n.createdAt).getTime() >= sixtyDaysAgo)
+          .slice(0, 50);
+        setNotifications(cleaned);
         setUnreadCount(unreadCountData);
       }
     } catch (error) {
@@ -84,14 +89,18 @@ const NotificationCenter = () => {
   // Polling for notifications instead of WebSocket
   const pollNotifications = useCallback(async () => {
     try {
-      const response = await notificationService.getUserNotifications();
+      const response = await notificationService.getMyNotifications();
       
       if (response.success && response.data) {
         // Handle different response structures
         const notificationsData = response.data.notifications || response.data || [];
         const unreadCountData = response.data.pagination?.unreadCount || (Array.isArray(notificationsData) ? notificationsData.filter(n => !n.read).length : 0);
         
-        setNotifications(Array.isArray(notificationsData) ? notificationsData : []);
+        const sixtyDaysAgo = Date.now() - 60 * 24 * 3600 * 1000;
+        const cleaned = (Array.isArray(notificationsData) ? notificationsData : [])
+          .filter(n => new Date(n.createdAt).getTime() >= sixtyDaysAgo)
+          .slice(0, 50);
+        setNotifications(cleaned);
         setUnreadCount(unreadCountData);
       }
     } catch (error) {

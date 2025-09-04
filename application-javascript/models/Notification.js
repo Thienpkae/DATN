@@ -23,7 +23,6 @@ const notificationSchema = new mongoose.Schema({
             'REISSUE_REQUEST_CREATED',      // Yêu cầu cấp lại GCN đã tạo
             'TRANSFER_CONFIRMED',           // Chuyển nhượng đã xác nhận
             'TRANSACTION_PROCESSED',        // Giao dịch đã xử lý
-            'TRANSACTION_FORWARDED',        // Giao dịch đã chuyển tiếp
             'TRANSACTION_APPROVED',         // Giao dịch được phê duyệt
             'TRANSACTION_REJECTED',         // Giao dịch bị từ chối
             
@@ -131,7 +130,6 @@ notificationSchema.virtual('actionUrl').get(function() {
         case 'REISSUE_REQUEST_CREATED':
         case 'TRANSFER_CONFIRMED':
         case 'TRANSACTION_PROCESSED':
-        case 'TRANSACTION_FORWARDED':
         case 'TRANSACTION_APPROVED':
         case 'TRANSACTION_REJECTED':
             return `/transactions/${transactionId}`;

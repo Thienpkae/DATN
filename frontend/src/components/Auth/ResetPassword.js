@@ -11,16 +11,14 @@ import {
   Row,
   Col,
   theme,
-  Steps,
-  Divider
+  Steps
 } from 'antd';
 import { 
   SafetyOutlined, 
   LockOutlined, 
   KeyOutlined,
   CheckCircleOutlined,
-  ArrowLeftOutlined,
-  ReloadOutlined
+  ArrowLeftOutlined
 } from '@ant-design/icons';
 import authService from '../../services/auth';
 import useMessage from '../../hooks/useMessage';
@@ -30,9 +28,7 @@ const { useToken } = theme;
 
 const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
-  const [resendLoading, setResendLoading] = useState(false);
-  const [step, setStep] = useState(0); // 0: Nhập OTP và mật khẩu, 1: Thành công
-  const [countdown, setCountdown] = useState(0);
+  const [step, setStep] = useState(0); // 0: Nhập mật khẩu, 1: Thành công
   const [form] = Form.useForm();
   const message = useMessage();
   const navigate = useNavigate();
@@ -46,46 +42,26 @@ const ResetPassword = () => {
   const verifiedOtp = location.state?.verifiedOtp;
 
   useEffect(() => {
-    // Nếu không có thông tin user, redirect về forgot password
-    if (!userInfo || !fromForgotPassword) {
+    // Nếu không có thông tin user hoặc OTP chưa được verify, redirect về forgot password
+    if (!userInfo || !fromForgotPassword || !otpVerified || !verifiedOtp) {
       navigate('/forgot-password', { replace: true });
       return;
     }
-
-    // Nếu OTP đã được verify, tự động fill vào form
-    if (otpVerified && verifiedOtp) {
-      form.setFieldsValue({
-        otp: verifiedOtp
-      });
-    }
-
-    // Bắt đầu countdown cho resend OTP (60 giây)
-    setCountdown(60);
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [userInfo, fromForgotPassword, otpVerified, verifiedOtp, navigate, form]);
+  }, [userInfo, fromForgotPassword, otpVerified, verifiedOtp, navigate]);
 
   const onFinish = async (values) => {
     setLoading(true);
     try {
-      // Đảm bảo có OTP - hoặc từ verify trước đó hoặc từ form
-      const otp = otpVerified ? verifiedOtp : values.otp;
-      if (!otp) {
-        throw new Error('Thiếu mã OTP');
+      // Sử dụng OTP đã được verify từ bước trước
+      if (!verifiedOtp) {
+        message.error('Không tìm thấy mã OTP. Vui lòng thử lại từ đầu.');
+        navigate('/forgot-password', { replace: true });
+        return;
       }
 
       const resetData = {
         cccd: userInfo.cccd || '',  // CCCD nếu có
-        otp: otp,
+        otp: verifiedOtp,  // Sử dụng OTP đã verify
         newPassword: values.newPassword
       };
 
@@ -129,38 +105,6 @@ const ResetPassword = () => {
     }
   };
 
-  const handleResendOTP = async () => {
-    if (countdown > 0) return;
-    
-    setResendLoading(true);
-    try {
-      const requestData = {
-        cccd: userInfo.cccd || '',
-        phone: userInfo.phone
-      };
-
-      await authService.forgotPassword(requestData.cccd, requestData.phone);
-      
-      message.success('OTP mới đã được gửi đến số điện thoại của bạn');
-      
-      // Restart countdown
-      setCountdown(60);
-      const timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      
-    } catch (error) {
-      message.error('Gửi lại OTP thất bại. Vui lòng thử lại.');
-    } finally {
-      setResendLoading(false);
-    }
-  };
 
   const handleGoToLogin = () => {
     navigate('/login', { replace: true });
@@ -299,7 +243,7 @@ const ResetPassword = () => {
                 Đặt lại mật khẩu
               </Title>
               <Text type="secondary" style={{ fontSize: '16px' }}>
-                Nhập mã OTP và mật khẩu mới để hoàn tất
+                Nhập mật khẩu mới để hoàn tất quá trình đặt lại mật khẩu
               </Text>
             </div>
 
@@ -315,32 +259,14 @@ const ResetPassword = () => {
               ]}
             />
 
-            {/* OTP Verified Alert */}
-            {otpVerified && verifiedOtp && (
-              <Alert
-                message="OTP đã được xác thực"
-                description="Mã OTP đã được xác thực thành công từ bước trước. Vui lòng nhập mật khẩu mới để hoàn tất."
-                type="success"
-                showIcon
-                style={{ marginBottom: '1.5rem' }}
-              />
-            )}
-
-            {/* Info Alert */}
-            {!otpVerified && (
-              <Alert
-                message="Thông tin xác thực"
-                description={
-                  <div>
-                    <p>Mã OTP đã được gửi đến: <strong>{userInfo.phone}</strong></p>
-                    <p>Vui lòng kiểm tra tin nhắn và nhập mã OTP cùng với mật khẩu mới bên dưới.</p>
-                  </div>
-                }
-                type="info"
-                showIcon
-                style={{ marginBottom: '1.5rem' }}
-              />
-            )}
+            {/* Success Alert */}
+            <Alert
+              message="OTP đã được xác thực"
+              description="Mã OTP đã được xác thực thành công. Vui lòng nhập mật khẩu mới để hoàn tất quá trình đặt lại mật khẩu."
+              type="success"
+              showIcon
+              style={{ marginBottom: '1.5rem' }}
+            />
             
             <Form
               form={form}
@@ -351,37 +277,6 @@ const ResetPassword = () => {
               autoComplete="off"
               requiredMark={false}
             >
-              {/* Chỉ hiển thị field OTP nếu chưa được xác thực */}
-              {!otpVerified && (
-                <Form.Item
-                  name="otp"
-                  label={
-                    <Space>
-                      <SafetyOutlined />
-                      <span style={{ fontWeight: 600 }}>Mã OTP</span>
-                    </Space>
-                  }
-                  rules={[
-                    { required: true, message: 'Vui lòng nhập mã OTP!' },
-                    { len: 6, message: 'Mã OTP phải có 6 chữ số!' },
-                    { pattern: /^\d{6}$/, message: 'Mã OTP chỉ chứa số!' }
-                  ]}
-                >
-                  <Input
-                    prefix={<SafetyOutlined style={{ color: themeToken.colorTextSecondary }} />}
-                    placeholder="Nhập mã OTP 6 chữ số"
-                    maxLength={6}
-                    style={{ 
-                      height: '48px',
-                      fontSize: '18px',
-                      textAlign: 'center',
-                      letterSpacing: '2px'
-                    }}
-                  />
-                </Form.Item>
-              )}
-
-              <Divider />
 
               <Form.Item
                 name="newPassword"
@@ -458,28 +353,6 @@ const ResetPassword = () => {
                 </Button>
               </Form.Item>
 
-              {/* Resend OTP */}
-              <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-                <Space direction="vertical" size="small">
-                  <Text type="secondary" style={{ fontSize: '14px' }}>
-                    Chưa nhận được OTP?
-                  </Text>
-                  <Button 
-                    type="link" 
-                    onClick={handleResendOTP}
-                    loading={resendLoading}
-                    disabled={countdown > 0}
-                    icon={<ReloadOutlined />}
-                    style={{ 
-                      fontSize: '14px',
-                      padding: 0,
-                      height: 'auto'
-                    }}
-                  >
-                    {countdown > 0 ? `Gửi lại sau ${countdown}s` : 'Gửi lại OTP'}
-                  </Button>
-                </Space>
-              </div>
 
               <div style={{ textAlign: 'center' }}>
                 <Link 

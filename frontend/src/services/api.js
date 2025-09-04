@@ -94,11 +94,11 @@ export const API_ENDPOINTS = {
 
   NOTIFICATIONS: {
     LIST: '/notifications',
-    UNREAD_COUNT: '/notifications/unread-count',
-    MARK_READ: '/notifications/mark-read',
+    GET_UNREAD_COUNT: '/notifications/unread-count',
+    MARK_READ: '/notifications/:id/read',
     MARK_ALL_READ: '/notifications/mark-all-read',
-    PREFERENCES: '/notifications/preferences',
-    SEND: '/notifications/send',
+    DELETE: '/notifications/:id',
+    ARCHIVE: '/notifications/:id/archive',
   },
   IPFS: {
     UPLOAD: '/ipfs/upload',

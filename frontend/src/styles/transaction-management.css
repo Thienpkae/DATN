@@ -1,0 +1,357 @@
+/* Custom styles for Transaction Management Page - Thuần trắng nhất quán */
+
+/* Transaction Type Selection Cards */
+.transaction-type-card {
+  transition: all 0.3s ease;
+  border: 1px solid #f0f0f0;
+  cursor: pointer;
+  background: white;
+}
+
+.transaction-type-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border-color: #d9d9d9;
+}
+
+.transaction-type-card.selected {
+  border-color: #d9d9d9;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* Header - Thuần trắng hoàn toàn */
+.gradient-header {
+  background: white;
+  color: #262626;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid #f0f0f0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.gradient-header h2 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.gradient-header p {
+  margin: 0;
+  opacity: 0.9;
+  font-size: 14px;
+  color: #595959;
+}
+
+/* Progress Steps - Thuần trắng */
+.ant-steps-item-process .ant-steps-item-icon {
+  background: #f5f5f5;
+  border-color: #d9d9d9;
+  color: #595959;
+}
+
+.ant-steps-item-finish .ant-steps-item-icon {
+  background: #f5f5f5;
+  border-color: #d9d9d9;
+  color: #595959;
+}
+
+/* Form Cards - Thuần trắng */
+.form-card {
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  overflow: hidden;
+  border: 1px solid #f0f0f0;
+  background: white;
+  height: 100%;
+}
+
+.form-card .ant-card-head {
+  background: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+  border-radius: 8px 8px 0 0;
+  padding: 16px 20px;
+}
+
+.form-card .ant-card-body {
+  padding: 20px;
+  background: white;
+}
+
+/* Tối ưu spacing cho form fields */
+.form-card .ant-form-item {
+  margin-bottom: 16px;
+}
+
+.form-card .ant-form-item-label {
+  padding-bottom: 6px;
+}
+
+.form-card .ant-form-item-label > label {
+  font-weight: 500;
+  color: #262626;
+}
+
+/* Document Requirement Cards */
+.document-requirement-card {
+  border-radius: 6px;
+  border: 1px solid #f0f0f0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  background: white;
+  margin-bottom: 12px;
+}
+
+.document-requirement-card:hover {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.document-type-badge {
+  font-size: 12px;
+  color: #595959;
+  background: #f5f5f5;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  display: inline-block;
+  border: 1px solid #f0f0f0;
+}
+
+.document-type-badge.required {
+  color: #595959;
+  background: #f5f5f5;
+  border: 1px solid #f0f0f0;
+}
+
+.document-type-badge.optional {
+  color: #595959;
+  background: #f5f5f5;
+  border: 1px solid #f0f0f0;
+}
+
+/* Modal Improvements - Thuần trắng */
+.transaction-modal .ant-modal-content {
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.transaction-modal .ant-modal-header {
+  background: white;
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 20px;
+}
+
+.transaction-modal .ant-modal-title {
+  color: #262626;
+  font-weight: 600;
+}
+
+.transaction-modal .ant-modal-close {
+  color: #595959;
+}
+
+.transaction-modal .ant-modal-close:hover {
+  color: #262626;
+}
+
+/* Input Fields - Thuần trắng */
+.ant-input, .ant-select-selector, .ant-input-number {
+  border-radius: 6px !important;
+  border: 1px solid #d9d9d9 !important;
+  transition: all 0.2s ease;
+  background: white !important;
+}
+
+.ant-input:focus, .ant-select-focused .ant-select-selector, .ant-input-number-focused {
+  border-color: #d9d9d9 !important;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.05) !important;
+  background: white !important;
+}
+
+/* Bỏ viền trong cho input fields */
+.ant-input:focus, .ant-select-focused .ant-select-selector, .ant-input-number-focused {
+  outline: none !important;
+}
+
+/* Bỏ viền trong của input nằm trong affix wrapper (search) */
+.ant-input-affix-wrapper .ant-input {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.ant-input-affix-wrapper:focus, .ant-input-affix-wrapper-focused {
+  box-shadow: none !important;
+}
+
+/* (Removed) Search Input overrides */
+
+/* Button Improvements - Thuần trắng */
+.ant-btn {
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.ant-btn-primary {
+  background: #f5f5f5;
+  border: 1px solid #d9d9d9;
+  color: #262626;
+  box-shadow: none;
+}
+
+.ant-btn-primary:hover, .ant-btn-primary:focus {
+  background: #f0f0f0;
+  border-color: #d9d9d9;
+  color: #262626;
+}
+
+.ant-btn-default {
+  border: 1px solid #d9d9d9;
+  background: white;
+  color: #262626;
+}
+
+.ant-btn-default:hover, .ant-btn-default:focus {
+  border-color: #d9d9d9;
+  background: #fafafa;
+  color: #262626;
+}
+
+/* Layout for 2 columns - Tối ưu cân bằng */
+.form-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+  min-height: 400px;
+}
+
+@media (max-width: 768px) {
+  .form-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+/* Scrollable content for document section - Tối ưu chiều cao */
+.document-section-body {
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.document-section-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.document-section-body::-webkit-scrollbar-track {
+  background: #f5f5f5;
+  border-radius: 3px;
+}
+
+.document-section-body::-webkit-scrollbar-thumb {
+  background: #d9d9d9;
+  border-radius: 3px;
+}
+
+/* Alert Improvements - Thuần trắng */
+.ant-alert {
+  border-radius: 6px;
+  border: 1px solid #f0f0f0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  background: white;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .transaction-type-card {
+    margin-bottom: 16px;
+  }
+  
+  .form-card {
+    margin-bottom: 16px;
+  }
+  
+  .ant-modal {
+    margin: 16px;
+    max-width: calc(100vw - 32px);
+  }
+}
+
+/* Animation for card selection */
+@keyframes cardSelect {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.transaction-type-card:active {
+  animation: cardSelect 0.2s ease;
+}
+
+/* Loading states */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  z-index: 10;
+}
+
+/* Success indicators */
+.success-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: #f5f5f5;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  flex-shrink: 0;
+  border: 1px solid #f0f0f0;
+}
+
+.success-indicator::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: #595959;
+  border-radius: 50%;
+}
+
+/* Form field icons */
+.form-field-icon {
+  margin-right: 8px;
+  font-size: 16px;
+  color: #595959;
+}
+
+/* Document selection improvements */
+.document-select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.document-select-option .ant-tag {
+  margin: 0;
+  background: #f5f5f5;
+  border: 1px solid #f0f0f0;
+  color: #595959;
+}
