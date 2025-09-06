@@ -1,38 +1,38 @@
 {
-    "name": "land",
-    "version": "1.0.0",
-    "description": "land application implemented in JavaScript",
-    "engines": {
-        "node": ">=12",
-        "npm": ">=5"
-    },
-    "engineStrict": true,
-    "author": "Hyperledger",
-    "license": "Apache-2.0",
-    "scripts": {
-        "lint": "eslint *.js"
-    },
-    "dependencies": {
-        "axios": "^1.5.0",
-        "bcrypt": "^5.1.0",
-        "cors": "^2.8.5",
-        "dotenv": "^16.3.1",
-        "express": "^4.18.2",
-        "fabric-ca-client": "^2.2.19",
-        "fabric-common": "^2.2.19",
-        "fabric-network": "^2.2.19",
-        "firebase-admin": "^12.0.0",
-        "form-data": "^4.0.0",
-        "jsonwebtoken": "^9.0.2",
-        "mongoose": "^7.5.0",
-        "multer": "^1.4.5-lts.1",
-        "node-cron": "^3.0.3",
-        "pdf-parse": "^1.1.1",
-        "speakeasy": "^2.0.0",
-        "validator": "^13.11.0",
-        "ws": "^8.18.3"
-    },
-    "devDependencies": {
-        "eslint": "^7.32.0"
-    }
+  "name": "land",
+  "version": "1.0.0",
+  "description": "land application implemented in JavaScript",
+  "engines": {
+    "node": ">=12",
+    "npm": ">=5"
+  },
+  "engineStrict": true,
+  "author": "Hyperledger",
+  "license": "Apache-2.0",
+  "scripts": {
+    "lint": "eslint *.js"
+  },
+  "dependencies": {
+    "axios": "",
+    "bcrypt": "",
+    "cors": "",
+    "dotenv": "",
+    "express": "",
+    "fabric-ca-client": "",
+    "fabric-common": "",
+    "fabric-network": "",
+    "firebase-admin": "",
+    "form-data": "",
+    "jsonwebtoken": "",
+    "mongoose": "",
+    "multer": "",
+    "node-cron": "",
+    "pdf-parse": "",
+    "speakeasy": "",
+    "validator": "",
+    "ws": ""
+  },
+  "devDependencies": {
+    "eslint": ""
+  }
 }
