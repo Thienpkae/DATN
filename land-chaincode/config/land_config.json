@@ -1,0 +1,29 @@
+{
+  "data_source": {
+    "type": "json_file",
+    "path": "data/land_data.json",
+    "format": "chaincode_land_data"
+  },
+  "initialization": {
+    "auto_load": true,
+    "check_existing": true,
+    "batch_size": 1000,
+    "max_retries": 3
+  },
+  "validation": {
+    "strict_mode": true,
+    "required_fields": [
+      "id",
+      "ownerID",
+      "area",
+      "location",
+      "landUsePurpose"
+    ],
+    "skip_invalid": true
+  },
+  "logging": {
+    "level": "INFO",
+    "log_success": true,
+    "log_errors": true
+  }
+}

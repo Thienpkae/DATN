@@ -28,6 +28,7 @@
     "multer": "",
     "node-cron": "",
     "pdf-parse": "",
+    "proj4": "^2.11.0",
     "speakeasy": "",
     "validator": "",
     "ws": ""

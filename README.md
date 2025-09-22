@@ -18,6 +18,8 @@ cd addOrg3
 cd ..
 
 ./network.sh deployCC -ccn land-cc -ccp ../land-chaincode/ -ccl go -cci "Init"
+
+./load_data.sh
 ```
 
 <h3> Deploy Backend in 2th terminal </h3>

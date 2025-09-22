@@ -3,6 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const zlib = require('zlib');
 const {
     authenticateJWT,
     requireAdmin,
@@ -26,6 +27,7 @@ const reportService = require('./services/reportService');
 const userService = require('./services/userService');
 const dashboardService = require('./services/dashboardService');
 const logService = require('./services/logService');
+const mapService = require('./services/mapService');
 const { initializeAdminAccounts, initializeUserAccounts } = require('./services/initializationService');
 const notificationRoutes = require('./routes/notificationRoutes');
 require('dotenv').config({ path: path.resolve(__dirname, './.env') });
@@ -37,6 +39,72 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve full GeoGIS frontend (HTML/CSS/JS) and its data
+const geogisRootDir = path.resolve(__dirname, '../geogis-frontend');
+const geogisDataDir = path.resolve(__dirname, '../geogis-frontend/data');
+app.use('/geogis', express.static(geogisRootDir));
+app.use('/static/geogis', express.static(geogisDataDir));
+
+// Org1 on-chain cadastral map (HTML)
+app.get('/org1/cadastral-map', authenticateJWT, checkOrg(['Org1']), (req, res) => {
+    const html = `<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Org1 - Bản đồ địa chính (On-chain)</title>
+  <link href="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    .popup { font: 12px/1.4 sans-serif; }
+  </style>
+  <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: {
+        version: 8,
+        sources: {
+          parcels: {
+            type: 'geojson',
+            data: '${req.protocol}://${req.get('host')}/api/org1/map/geojson'
+          }
+        },
+        layers: [
+          { id: 'parcels-fill', type: 'fill', source: 'parcels', paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.25 } },
+          { id: 'parcels-line', type: 'line', source: 'parcels', paint: { 'line-color': '#1d4ed8', 'line-width': 0.8 } }
+        ]
+      },
+      center: [105.8, 21.0],
+      zoom: 8
+    });
+    const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
+    map.on('mousemove', 'parcels-fill', (e) => {
+      const f = e.features && e.features[0];
+      if (!f) return;
+      const p = f.properties || {};
+      const html = '<div class="popup">' +
+        '<b>Thửa:</b> ' + (p.id || '') + '<br/>' +
+        '<b>DC:</b> ' + (p.dc || '') + '<br/>' +
+        '<b>Diện tích:</b> ' + (p.area || '') + '<br/>' +
+        '<b>Mục đích:</b> ' + (p.usePurpose || '') +
+      '</div>';
+      popup.setLngLat(e.lngLat).setHTML(html).addTo(map);
+    });
+    map.on('mouseleave', 'parcels-fill', () => popup.remove());
+  </script>
+  </body>
+  </html>`;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+});
+
+// Org1 on-chain GeoJSON endpoint (gzipped)
+app.get('/api/org1/map/geojson', authenticateJWT, checkOrg(['Org1']), mapService.getOrg1CadastralGeoJSON);
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGO_URI, {

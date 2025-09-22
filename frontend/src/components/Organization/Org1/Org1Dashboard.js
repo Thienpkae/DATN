@@ -19,6 +19,7 @@ import {
 import LandManagementPage from './LandManagementPage';
 import DocumentManagementPage from './DocumentManagementPage';
 import TransactionManagementPage from './TransactionManagementPage';
+import OnchainGISPage from './OnchainGISPage';
 import NotificationCenter from '../../Common/NotificationCenter';
 import { normalizeVietnameseName } from '../../../utils/text';
 
@@ -123,8 +124,21 @@ const Org1Dashboard = ({ user, onLogout }) => {
                   </span>
                 ),
                 children: (
-                  <Card bordered={false} style={{ padding: 0 }}>
+                  <Card variant="borderless" style={{ padding: 0 }}>
                     <LandManagementPage />
+                  </Card>
+                )
+              },
+              {
+                key: 'gis',
+                label: (
+                  <span>
+                    <AppstoreOutlined /> Bản đồ GIS
+                  </span>
+                ),
+                children: (
+                  <Card variant="borderless" style={{ padding: 0 }}>
+                    <OnchainGISPage />
                   </Card>
                 )
               },
@@ -136,7 +150,7 @@ const Org1Dashboard = ({ user, onLogout }) => {
                   </span>
                 ),
                 children: (
-                  <Card bordered={false} style={{ padding: 0 }}>
+                  <Card variant="borderless" style={{ padding: 0 }}>
                     <DocumentManagementPage />
                   </Card>
                 )
@@ -149,7 +163,7 @@ const Org1Dashboard = ({ user, onLogout }) => {
                   </span>
                 ),
                 children: (
-                  <Card bordered={false} style={{ padding: 0 }}>
+                  <Card variant="borderless" style={{ padding: 0 }}>
                     <TransactionManagementPage />
                   </Card>
                 )

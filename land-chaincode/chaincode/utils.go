@@ -12,25 +12,7 @@ import (
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
-var validLandUsePurposes = map[string]bool{
-	"BHK": true, // Đất bằng trồng cây hàng năm khác
-	"DTL": true, // Đất thủy lợi
-	"LUC": true, // Đất chuyên trồng lúa nước
-	"DGT": true, // Đất giao thông
-	"LNQ": true, // Đất trồng cây lâu năm khác
-	"ONT": true, // Đất ở tại nông thôn
-	"SKC": true, // Đất khu công nghiệp
-}
-
-var validLegalStatuses = map[string]bool{
-	"":               true, // Chưa có trạng thái pháp lý (đất chưa được cấp GCN)
-	"HNK":            true, // Đất trồng cây hàng năm khác
-	"LUA":            true, // Đất lúa nước còn lại
-	"ONT*":           true, // Đất ở tại nông thôn
-	"CLN":            true, // Đất trồng cây lâu năm
-	"Đang tranh chấp": true, // Đất đang tranh chấp
-	"Đang thế chấp":   true, // Đất đang thế chấp
-}
+// Removed validLandUsePurposes and validLegalStatuses maps as requested
 
 // Các loại tài liệu hợp lệ trong hệ thống
 var validDocumentTypes = map[string]bool{
@@ -90,12 +72,7 @@ func ValidateLand(ctx contractapi.TransactionContextInterface, land Land, isUpda
 	if land.Location == "" {
 		return fmt.Errorf("vị trí thửa đất không được để trống")
 	}
-	if !validLandUsePurposes[land.LandUsePurpose] {
-		return fmt.Errorf("mục đích sử dụng đất %s không hợp lệ", land.LandUsePurpose)
-	}
-	if !validLegalStatuses[land.LegalStatus] {
-		return fmt.Errorf("trạng thái pháp lý %s không hợp lệ", land.LegalStatus)
-	}
+	// Removed landUsePurpose and legalStatus validation as requested
 
 	// Validate IPFS documents if any
 	for _, docID := range land.DocumentIDs {
@@ -139,13 +116,7 @@ func ValidateDocumentType(docType string) error {
 	return nil
 }
 
-// ValidateLandUsePurpose kiểm tra mục đích sử dụng đất
-func ValidateLandUsePurpose(purpose string) error {
-	if !validLandUsePurposes[purpose] {
-		return fmt.Errorf("mục đích sử dụng đất %s không hợp lệ", purpose)
-	}
-	return nil
-}
+// ValidateLandUsePurpose function removed as requested
 
 // VerifyLandOwnership kiểm tra quyền sở hữu thửa đất
 func VerifyLandOwnership(ctx contractapi.TransactionContextInterface, landID, ownerID string) error {
@@ -631,3 +602,4 @@ func SetDocumentPending(doc *Document) {
 	doc.VerifiedAt = time.Time{}
 	doc.UpdatedAt = time.Now()
 }
+

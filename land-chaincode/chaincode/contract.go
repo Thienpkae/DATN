@@ -17,8 +17,8 @@ type LandRegistryChaincode struct {
 func (s *LandRegistryChaincode) Init(ctx contractapi.TransactionContextInterface) error {
 	fmt.Println("🚀 Bắt đầu khởi tạo Land Registry Chaincode...")
 
-	// Gọi hàm khởi tạo dữ liệu trực tiếp (bỏ qua kiểm tra tổ chức)
-	err := s.initLandDataInternal(ctx)
+	// Gọi hàm khởi tạo dữ liệu mẫu
+	err := s.InitRealData(ctx)
 	if err != nil {
 		fmt.Printf("❌ Lỗi khi khởi tạo dữ liệu thửa đất: %v\n", err)
 		return fmt.Errorf("lỗi khởi tạo dữ liệu thửa đất: %v", err)
@@ -28,171 +28,11 @@ func (s *LandRegistryChaincode) Init(ctx contractapi.TransactionContextInterface
 	return nil
 }
 
-// InitLandData - Khởi tạo dữ liệu thửa đất từ dữ liệu thực tế (có kiểm tra quyền)
-func (s *LandRegistryChaincode) InitLandData(ctx contractapi.TransactionContextInterface) error {
-	// Chỉ cho phép Org1MSP thực hiện khởi tạo
-	if err := CheckOrganization(ctx, []string{"Org1MSP"}); err != nil {
-		return err
-	}
-
-	return s.initLandDataInternal(ctx)
-}
-
-// initLandDataInternal - Hàm nội bộ khởi tạo dữ liệu thửa đất (không kiểm tra quyền)
-func (s *LandRegistryChaincode) initLandDataInternal(ctx contractapi.TransactionContextInterface) error {
-
-	// Lấy timestamp
-	txTime, err := GetTxTimestampAsTime(ctx)
-	if err != nil {
-		return fmt.Errorf("lỗi khi lấy timestamp: %v", err)
-	}
-
-	// Dữ liệu thực tế từ bản đồ số
-	landData := []struct {
-		MapNumber   int
-		PlotNumber  int
-		OwnerName   string
-		Area        float64
-		LandPurpose string
-		LegalArea   float64
-		LegalStatus string
-		Address     string
-		OwnerCCCD   string
-	}{
-		{1, 2, "UBND xã", 57.2, "BHK", 0, "", "", "001000000022"},
-		{1, 3, "UBND xã", 58.5, "BHK", 0, "", "", "001000000022"},
-		{1, 4, "Ông: Bùi Văn Dậu", 193.1, "BHK", 193.1, "HNK", "Đồng Bãi Tổng, xã Đan Phượng, huyện Đan Phượng, thành phố Hà Nội", "001204037324"},
-		{1, 5, "Ông: Bùi Mạnh Thắng", 135.0, "BHK", 135.0, "HNK", "Đồng Bãi Tổng, xã Đan Phượng, huyện Đan Phượng, thành phố Hà Nội", "001204037325"},
-		{1, 27, "Tạ Thị Thơm", 143.1, "BHK", 143.1, "HNK", "Đồng Bãi Tổng, xã Đan Phượng, huyện Đan Phượng, thành phố Hà Nội", "001204037326"},
-		{1, 28, "Bùi Văn Đệ", 213.8, "BHK", 0, "", "", "001204037327"},
-		{1, 29, "UBND xã", 266.8, "DTL", 0, "", "", "001000000028"},
-		{1, 57, "Ông: Nguyễn Văn Minh", 800.2, "BHK", 800.2, "HNK", "Đồng Bãi Tổng Màu, xã Đan Phượng, huyện Đan Phượng, thành phố Hà Nội", "001204037329"},
-		{1, 58, "Hộ ông: Nguyễn Hữu Hợi", 1262.1, "BHK", 1262.1, "HNK", "Đồng Bãi Tổng Màu, xã Đan Phượng, huyện Đan Phượng, thành phố Hà Nội", "001204037330"},
-		{1, 165, "Hộ bà: Nguyễn Thị Nhu", 402.5, "LUC", 402.5, "LUA", "Đồng Bãi Tổng, xã Đan Phượng, huyện Đan Phượng, thành phố Hà Nội", "001204037331"},
-		{1, 201, "Ông: Bùi Văn Bình", 1268.2, "LUC", 1268.2, "LUA", "Đồng Khổ 7, xã Đan Phượng, huyện Đan Phượng, thành phố Hà Nội", "001204037332"},
-		{2, 374, "Hộ ông: Nguyễn Hữu Thắng", 239.2, "LUC", 239.2, "LUA", "Đồng Bãi Tổng Màu, xã Đan Phượng, huyện Đan Phượng, thành phố Hà Nội", "001204037333"},
-		{2, 430, "UBND xã", 540.4, "DTL", 0, "", "", "001000000034"},
-		{3, 37, "Hộ bà: Nguyễn Thị Yến", 296.0, "LUC", 296.0, "LUA", "Bãi Tổng màu, xã Đan Phượng, huyện Đan Phượng, thành phố Hà Nội", "001204037335"},
-		{3, 84, "UBND xã", 1362.7, "DTL", 0, "", "", "001000000036"},
-		{4, 30, "UBND xã", 1993.9, "DGT", 0, "", "", "001000000037"},
-		{5, 153, "Bùi Mạnh Hưng", 539.7, "LUC", 0, "", "", "001204037338"},
-		{6, 71, "UBND xã", 7070.2, "DGT", 0, "", "", "001000000039"},
-		{6, 76, "Nguyễn Xuân Thuỷ", 1955.0, "LNQ", 0, "", "Đồng Rằm, xã Đan Phượng, huyện Đan Phượng, thành phố Hà Nội", "001204037340"},
-		{7, 27, "Hộ ông: Nguyễn Hữu Sông", 511.2, "LNQ", 0, "", "", "001204037341"},
-		{7, 49, "Ông: Nguyễn Xuân Trường", 314.0, "LUC", 314.0, "LUA", "", "001204037342"},
-		{8, 83, "Ông: Chu Văn Cát", 626.0, "LUC", 626.0, "LUA", "", "001204037343"},
-		{8, 89, "Hộ ông: Nguyễn Đăng Sơn", 406.0, "LUC", 406.0, "LUA", "", "001204037344"},
-		{9, 23, "Ông: Nguyễn Đăng Thư", 580.0, "LUC", 580.0, "LUA", "", "001204037345"},
-		{10, 15, "Nguyễn Hữu Thắng", 125.2, "ONT", 0, "", "", "001204037346"},
-		{10, 21, "Cty CPXK thực phẩm", 17929.2, "SKC", 0, "", "", "001204037347"},
-		{10, 45, "Công ty TNHH Minh Phát", 10004.2, "SKC", 0, "", "", "001204037348"},
-		{11, 3, "Hợp Tác Xã", 1200.0, "LNQ", 0, "", "", "001204037349"},
-		{11, 45, "Nguyễn Văn Hữu", 2077.0, "SKC", 0, "", "", "001204037350"},
-		{11, 48, "Hộ ông: Bùi Văn Nở", 80.2, "ONT", 80.2, "ONT*", "", "001204037352"},
-		{11, 68, "Bà: Trần Thị Bạch Tuyết", 2302.1, "BHK", 2302.1, "HNK", "", "001204037353"},
-		{12, 70, "Bà: Bùi Thị Lợi", 115.7, "ONT", 115.7, "ONT*", "", "001204037354"},
-		{12, 93, "Nguyễn Mạnh Kim", 1371.0, "LNQ", 0, "", "", "001204037355"},
-		{13, 343, "Hộ ông: Phạm Minh Thắng", 804.9, "BHK", 804.9, "HNK", "", "001204037356"},
-		{14, 116, "Hộ ông: Chu Văn Hè", 374.9, "LUC", 374.9, "LUA", "", "001204037357"},
-		{14, 453, "Ông: Chu Văn Việt", 597.8, "LUC", 597.8, "LUA", "", "001204037358"},
-		{15, 81, "Phạm Văn Chung", 250.9, "LUC", 0, "", "", "001204037359"},
-		{15, 437, "Nguyễn Văn Chiến", 74.1, "SKC", 0, "", "", "001204037360"},
-		{16, 56, "Bùi Thị Nhâm", 83.4, "SKC", 0, "", "", "001204037361"},
-		{17, 7, "Nguyễn Văn Tước", 1139.6, "LNQ", 0, "", "", "001204037362"},
-		{18, 8, "Ông: Nguyễn Văn Liên", 606.5, "LUC", 606.5, "", "", "001204037363"},
-		{18, 18, "Bà: Bùi Thị Lan", 663.5, "LUC", 663.5, "LUA", "", "001204037364"},
-		{19, 8, "Ông: Bùi Vinh Viết", 1862.5, "LUC", 1862.5, "LUA", "", "001204037365"},
-		{19, 26, "Hộ ông: Tạ Đăng Bình", 90.0, "ONT", 90.0, "ONT*", "", "001204037367"},
-		{19, 280, "Bà: Tạ Thị Đậm", 500.2, "LNQ", 500.2, "CLN", "", "001204037368"},
-		{20, 18, "Hộ ông: Nguyễn Văn Quảng", 108.8, "ONT", 108.8, "ONT*", "", "001204037369"},
-		{20, 56, "Hộ ông: Nguyễn Hữu Bách", 106.7, "ONT", 106.7, "ONT*", "", "001204037370"},
-		{20, 105, "Ông: Nguyễn Kiến Thức", 203.8, "ONT", 203.8, "ONT*", "", "001204037371"},
-		{20, 177, "Ông: Nguyễn Văn Doãn", 89.0, "ONT", 89.0, "ONT*", "", "001204037372"},
-		{21, 70, "Hộ bà: Nguyễn Thị Yến", 153.0, "ONT", 153.0, "ONT*", "", "001204037373"},
-		{21, 85, "Bà: Nguyễn Thị Thanh", 362.9, "LUC", 362.9, "LUA", "", "001204037374"},
-		{21, 198, "Hộ ông: Ngô Văn ích", 364.5, "ONT", 364.5, "ONT*", "", "001204037375"},
-		{22, 47, "Bà: Bùi Thị Năm", 384.1, "LUC", 384.1, "LUA", "", "001204037376"},
-		{23, 5, "Cty CP Xây Dựng Số 1", 22047.6, "SKC", 0, "", "", "001204037377"},
-		{23, 13, "Cty CNHH Gia Nhất", 5018.3, "SKC", 0, "", "", "001204037378"},
-	}
-
-	var successCount, errorCount int
-
-	for _, data := range landData {
-		// Tạo LandID bằng cách kết hợp mapNumber và plotNumber
-		landID := fmt.Sprintf("%d-%d", data.MapNumber, data.PlotNumber)
-
-		// Kiểm tra xem thửa đất đã tồn tại chưa
-		exists, err := CheckLandExists(ctx, landID)
-		if err != nil {
-			fmt.Printf("Lỗi khi kiểm tra thửa đất %s: %v\n", landID, err)
-			errorCount++
-			continue
-		}
-		if exists {
-			fmt.Printf("Thửa đất %s đã tồn tại, bỏ qua\n", landID)
-			continue
-		}
-
-		// Xác định địa chỉ
-		location := data.Address
-		if location == "" {
-			location = "Xã Đan Phượng, huyện Đan Phượng, thành phố Hà Nội"
-		}
-
-		// Tạo thửa đất mới
-		land := Land{
-			ID:             landID,
-			OwnerID:        data.OwnerCCCD,
-			Area:           data.Area,
-			Location:       location,
-			LandUsePurpose: data.LandPurpose,
-			LegalStatus:    data.LegalStatus,
-			CertificateID:  "",
-			LegalInfo:      "",
-			DocumentIDs:    []string{},
-			CreatedAt:      txTime,
-			UpdatedAt:      txTime,
-		}
-
-		// Validate thửa đất
-		if err := ValidateLand(ctx, land, false); err != nil {
-			fmt.Printf("Thửa đất %s không hợp lệ: %v\n", landID, err)
-			errorCount++
-			continue
-		}
-
-		// Lưu thửa đất
-		landJSON, err := json.Marshal(land)
-		if err != nil {
-			fmt.Printf("Lỗi khi mã hóa thửa đất %s: %v\n", landID, err)
-			errorCount++
-			continue
-		}
-
-		if err := ctx.GetStub().PutState(landID, landJSON); err != nil {
-			fmt.Printf("Lỗi khi lưu thửa đất %s: %v\n", landID, err)
-			errorCount++
-			continue
-		}
-
-		successCount++
-		fmt.Printf("✅ Đã tạo thửa đất %s cho %s\n", landID, data.OwnerName)
-	}
-
-	// Ghi log kết quả
-	result := fmt.Sprintf("Khởi tạo hoàn thành: %d thành công, %d lỗi", successCount, errorCount)
-	fmt.Println(result)
-
-	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "INIT_LAND_DATA", "SYSTEM", result)
-}
-
 // ========================================
 // LAND PARCEL MANAGEMENT FUNCTIONS
-// ========================================
 
 // CreateLandParcel - Tạo thửa đất mới
-func (s *LandRegistryChaincode) CreateLandParcel(ctx contractapi.TransactionContextInterface, id, ownerID, location, landUsePurpose, legalStatus, area, certificateID, legalInfo string, userID string) error {
+func (s *LandRegistryChaincode) CreateLandParcel(ctx contractapi.TransactionContextInterface, id, ownerID, location, landUsePurpose, legalStatus, area, certificateID, legalInfo, geometryCID string, userID string) error {
 	if err := CheckOrganization(ctx, []string{"Org1MSP"}); err != nil {
 		return err
 	}
@@ -213,6 +53,13 @@ func (s *LandRegistryChaincode) CreateLandParcel(ctx contractapi.TransactionCont
 		}
 	}
 
+	// Validate geometry CID nếu được cung cấp
+	if geometryCID != "" {
+		if err := ValidateIPFSHash(geometryCID); err != nil {
+			return fmt.Errorf("geometry CID không hợp lệ: %v", err)
+		}
+	}
+
 	land := Land{
 		ID:             id,
 		OwnerID:        ownerID,
@@ -222,6 +69,7 @@ func (s *LandRegistryChaincode) CreateLandParcel(ctx contractapi.TransactionCont
 		LegalStatus:    legalStatus,
 		CertificateID:  certificateID,
 		DocumentIDs:    []string{},
+		GeometryCID:    geometryCID,
 		CreatedAt:      txTime,
 		UpdatedAt:      txTime,
 	}
@@ -250,7 +98,7 @@ func (s *LandRegistryChaincode) CreateLandParcel(ctx contractapi.TransactionCont
 }
 
 // UpdateLandParcel - Cập nhật thông tin thửa đất
-func (s *LandRegistryChaincode) UpdateLandParcel(ctx contractapi.TransactionContextInterface, id, area, location, landUsePurpose, legalStatus, certificateID, legalInfo string) error {
+func (s *LandRegistryChaincode) UpdateLandParcel(ctx contractapi.TransactionContextInterface, id, area, location, landUsePurpose, legalStatus, certificateID, legalInfo, geometryCID string) error {
 	if err := CheckOrganization(ctx, []string{"Org1MSP"}); err != nil {
 		return err
 	}
@@ -282,6 +130,16 @@ func (s *LandRegistryChaincode) UpdateLandParcel(ctx contractapi.TransactionCont
 		}
 	}
 
+	// Xử lý geometry CID
+	if geometryCID != "" {
+		if err := ValidateIPFSHash(geometryCID); err != nil {
+			return fmt.Errorf("geometry CID không hợp lệ: %v", err)
+		}
+	} else {
+		// Giữ nguyên geometry CID hiện tại nếu không được cung cấp
+		geometryCID = existingLand.GeometryCID
+	}
+
 	updatedLand := Land{
 		ID:             id,
 		OwnerID:        existingLand.OwnerID,
@@ -290,6 +148,7 @@ func (s *LandRegistryChaincode) UpdateLandParcel(ctx contractapi.TransactionCont
 		LandUsePurpose: landUsePurpose,
 		LegalStatus:    legalStatus,
 		DocumentIDs:    existingLand.DocumentIDs,
+		GeometryCID:    geometryCID,
 		CreatedAt:      existingLand.CreatedAt,
 		UpdatedAt:      txTime,
 	}
@@ -970,9 +829,7 @@ func (s *LandRegistryChaincode) CreateChangePurposeRequest(ctx contractapi.Trans
 	if err := VerifyLandLegalStatus(ctx, landParcelID, []string{"Đang tranh chấp", "Đang thế chấp"}); err != nil {
 		return err
 	}
-	if err := ValidateLandUsePurpose(newPurpose); err != nil {
-		return err
-	}
+	// Removed ValidateLandUsePurpose validation as requested
 	txTime, err := GetTxTimestampAsTime(ctx)
 	if err != nil {
 		return fmt.Errorf("lỗi khi lấy timestamp: %v", err)
@@ -1399,7 +1256,7 @@ func (s *LandRegistryChaincode) ApproveReissueTransaction(ctx contractapi.Transa
 
 	// Sử dụng UpdateLandParcel để cập nhật GCN và thông tin pháp lý
 	legalInfo := fmt.Sprintf("Cấp đổi GCN cho thửa đất %s", tx.LandParcelID)
-	err = s.UpdateLandParcel(ctx, tx.LandParcelID, fmt.Sprintf("%.2f", land.Area), land.Location, land.LandUsePurpose, land.LegalStatus, newCertificateID, legalInfo)
+	err = s.UpdateLandParcel(ctx, tx.LandParcelID, fmt.Sprintf("%.2f", land.Area), land.Location, land.LandUsePurpose, land.LegalStatus, newCertificateID, legalInfo, land.GeometryCID)
 	if err != nil {
 		return fmt.Errorf("lỗi khi cập nhật thửa đất: %v", err)
 	}
@@ -1480,6 +1337,18 @@ func (s *LandRegistryChaincode) ApproveSplitTransaction(ctx contractapi.Transact
 		// Kế thừa mục đích sử dụng và vị trí từ thửa đất gốc
 		newLand.LandUsePurpose = originalLand.LandUsePurpose
 		newLand.Location = originalLand.Location
+		
+		// Xử lý geometry CID cho thửa đất mới
+		if newLand.GeometryCID != "" {
+			// Validate geometry CID nếu được cung cấp từ giao diện
+			if err := ValidateIPFSHash(newLand.GeometryCID); err != nil {
+				return fmt.Errorf("geometry CID không hợp lệ cho thửa đất %s: %v", newLand.ID, err)
+			}
+		} else if isUpdate {
+			// Nếu là cập nhật thửa đất gốc và không có geometry CID mới, giữ nguyên
+			newLand.GeometryCID = originalLand.GeometryCID
+		}
+		
 		// Invalidate certificate for all parcels
 		newLand.CertificateID = ""
 		newLand.IssueDate = time.Time{}
@@ -1562,10 +1431,11 @@ func (s *LandRegistryChaincode) ApproveMergeTransaction(ctx contractapi.Transact
 	if err := json.Unmarshal([]byte(landIdsStr), &landIds); err != nil {
 		return fmt.Errorf("lỗi khi giải mã danh sách landIds: %v", err)
 	}
-	// Chỉ lấy thông tin area từ newParcelStr
+	// Lấy thông tin area và geometryCID từ newParcelStr
 	var newParcelData struct {
-		ID   string  `json:"id"`
-		Area float64 `json:"area"`
+		ID          string  `json:"id"`
+		Area        float64 `json:"area"`
+		GeometryCID string  `json:"geometryCid"`
 	}
 	if err := json.Unmarshal([]byte(newParcelStr), &newParcelData); err != nil {
 		return fmt.Errorf("lỗi khi giải mã thông tin thửa đất mới: %v", err)
@@ -1622,6 +1492,15 @@ func (s *LandRegistryChaincode) ApproveMergeTransaction(ctx contractapi.Transact
 	existingLand.IssueDate = time.Time{}
 	existingLand.LegalInfo = "Giấy chứng nhận sẽ được cấp mới sau hợp thừa"
 	existingLand.LegalStatus = ""
+	
+	// Xử lý geometry CID cho thửa đất hợp nhất
+	if newParcelData.GeometryCID != "" {
+		if err := ValidateIPFSHash(newParcelData.GeometryCID); err != nil {
+			return fmt.Errorf("geometry CID không hợp lệ: %v", err)
+		}
+		existingLand.GeometryCID = newParcelData.GeometryCID
+	}
+	
 	landJSON, err := json.Marshal(existingLand)
 	if err != nil {
 		return fmt.Errorf("lỗi khi mã hóa thửa đất gốc %s: %v", selectedLandID, err)
@@ -1702,9 +1581,7 @@ func (s *LandRegistryChaincode) ApproveChangePurposeTransaction(ctx contractapi.
 
 	// Trích xuất mục đích sử dụng mới từ details
 	newPurpose := strings.Split(tx.Details, "sang ")[1]
-	if err := ValidateLandUsePurpose(newPurpose); err != nil {
-		return err
-	}
+	// Removed ValidateLandUsePurpose validation as requested
 
 	txTime, err := GetTxTimestampAsTime(ctx)
 	if err != nil {

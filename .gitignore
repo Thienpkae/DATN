@@ -5,3 +5,7 @@ report.md
 WARP.md
 final-output/
 1-Ban Do dia chinh/
+scripts/
+geogis-frontend/
+exports/
+ipfs_cid_mapping.json

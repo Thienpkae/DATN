@@ -15,9 +15,10 @@ type Land struct {
 	CertificateID  string    `json:"certificateId"`       // Mã giấy chứng nhận
 	IssueDate      time.Time `json:"issueDate,omitempty"` // Ngày cấp giấy chứng nhận
 	LegalInfo      string    `json:"legalInfo"`           // Thông tin pháp lý
-	DocumentIDs    []string  `json:"documentIds"`         // Danh sách ID tài liệu liên quan (chỉ verified documents)
-	CreatedAt      time.Time `json:"createdAt"`           // Thời gian tạo
-	UpdatedAt      time.Time `json:"updatedAt"`           // Thời gian cập nhật
+	DocumentIDs       []string  `json:"documentIds"`         // Danh sách ID tài liệu liên quan (chỉ verified documents)
+	GeometryCID       string    `json:"geometryCid"`         // IPFS CID của geometry data
+	CreatedAt         time.Time `json:"createdAt"`           // Thời gian tạo
+	UpdatedAt         time.Time `json:"updatedAt"`           // Thời gian cập nhật
 }
 
 // Document định nghĩa tài liệu độc lập

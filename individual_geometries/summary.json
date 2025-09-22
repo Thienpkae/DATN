@@ -1,0 +1,17 @@
+{
+  "totalGeometryFiles": 6910,
+  "createdAt": "2025-09-20",
+  "description": "Individual geometry files for each land parcel",
+  "structure": {
+    "dc1/": "Geometry files for map 1",
+    "dc2/": "Geometry files for map 2",
+    "...": "And so on for all 27 maps"
+  },
+  "fileFormat": {
+    "filename": "geometry_{landId}.json",
+    "content": {
+      "landId": "Map-Plot format (e.g., 1-209)",
+      "geometry": "GeoJSON geometry object with coordinates"
+    }
+  }
+}
