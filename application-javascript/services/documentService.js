@@ -22,6 +22,9 @@ const documentService = {
 
             const { contract } = await connectToNetwork(org, userID);
 
+            // Auto-generate document ID if not provided
+            const finalDocID = docID || `DOC-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+
             // Use description directly
             const finalDescription = description || '';
 
@@ -31,7 +34,7 @@ const documentService = {
             // Create document using existing function
             await contract.submitTransaction(
                 'CreateDocument',
-                docID,
+                finalDocID,
                 docType,
                 title,
                 finalDescription,
@@ -44,7 +47,7 @@ const documentService = {
 
             // Send notification to user
             try {
-                await notificationService.notifyDocumentCreated(userID, docID);
+                await notificationService.notifyDocumentCreated(userID, finalDocID);
             } catch (notificationError) {
                 console.error('Notification error:', notificationError);
             }
@@ -53,7 +56,7 @@ const documentService = {
                 success: true,
                 message: 'Tài liệu đã được tạo thành công và thông báo đã được gửi',
                 data: {
-                    docID,
+                    docID: finalDocID,
                     title,
                     description,
                     ipfsHash,
@@ -562,10 +565,22 @@ const documentService = {
                 }
             }
             
-            // Add other query params as filters
+            // Add other query params as filters with proper mapping
             Object.keys(otherParams).forEach(key => {
                 if (otherParams[key] !== undefined && otherParams[key] !== '') {
-                    filtersObj[key] = otherParams[key];
+                    // Map frontend parameters to chaincode expected parameters
+                    if (key === 'uploaderID') {
+                        filtersObj['uploadedBy'] = otherParams[key];
+                    } else if (key === 'verified') {
+                        // Map verified to status
+                        if (otherParams[key] === 'true') {
+                            filtersObj['status'] = 'VERIFIED';
+                        } else if (otherParams[key] === 'false') {
+                            filtersObj['status'] = 'PENDING'; // or any non-VERIFIED status
+                        }
+                    } else {
+                        filtersObj[key] = otherParams[key];
+                    }
                 }
             });
             

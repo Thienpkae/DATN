@@ -251,7 +251,7 @@ const OnchainGISPage = () => {
   }, []);
 
   return (
-    <Card title="Bản đồ GIS (On-chain, Org1)" bodyStyle={{ padding: 0 }}>
+    <Card title="Bản đồ GIS (On-chain, Org1)" styles={{ body: { padding: 0 } }}>
       <div ref={containerRef} />
     </Card>
   );

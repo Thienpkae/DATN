@@ -54,6 +54,11 @@ const LandManagementPage = () => {
     }
   }, []);
 
+  const onReload = React.useCallback(() => {
+    setFilters(defaultFilters);
+    loadList();
+  }, [loadList]);
+
   useEffect(() => {
     loadList();
   }, [loadList]);
@@ -160,7 +165,7 @@ const LandManagementPage = () => {
               ))}
             </Select>
             <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
-            <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
+            <Button icon={<ReloadOutlined />} onClick={onReload}>Tải lại</Button>
           </Space>
         }
       >

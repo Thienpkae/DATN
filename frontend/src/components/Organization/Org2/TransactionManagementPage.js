@@ -53,6 +53,11 @@ const TransactionManagementPage = () => {
     }
   };
 
+  const onReload = () => {
+    setFilters(defaultFilters);
+    loadList();
+  };
+
   useEffect(() => {
     loadList();
   }, []);
@@ -272,7 +277,7 @@ const TransactionManagementPage = () => {
             <Option value="SUPPLEMENT_REQUESTED">Yêu cầu bổ sung</Option>
           </Select>
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
-          <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
+          <Button icon={<ReloadOutlined />} onClick={onReload}>Tải lại</Button>
         </Space>
       }
     >

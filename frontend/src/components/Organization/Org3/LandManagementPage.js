@@ -46,6 +46,11 @@ const LandManagementPage = () => {
     }
   };
 
+  const onReload = () => {
+    setKeyword('');
+    loadMyLands();
+  };
+
   useEffect(() => { loadMyLands(); }, []);
 
   const onSearch = async () => {
@@ -244,7 +249,7 @@ const LandManagementPage = () => {
         <Space>
           <Input placeholder="Từ khóa" allowClear style={{ width: 240 }} value={keyword} onChange={(e) => setKeyword(e.target.value)} />
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
-          <Button icon={<ReloadOutlined />} onClick={loadMyLands}>Tải lại</Button>
+          <Button icon={<ReloadOutlined />} onClick={onReload}>Tải lại</Button>
         </Space>
       }
     >

@@ -25,17 +25,22 @@ const DocumentManagementPage = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileList, setFileList] = useState([]);
   const [documents, setDocuments] = useState([]);
-  const [filters, setFilters] = useState({
+  const defaultFilters = useMemo(() => ({
     keyword: '',
     docType: undefined,
-    verified: undefined
-  });
+    status: undefined
+  }), []);
+
+  const [filters, setFilters] = useState(defaultFilters);
   const [createOpen, setCreateOpen] = useState(false);
   const [editForm] = Form.useForm();
   const [form] = Form.useForm();
   const [analysis, setAnalysis] = useState(null);
   const [documentHistory, setDocumentHistory] = useState([]);
   const [onlineViewerOpen, setOnlineViewerOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadingDocId, setDownloadingDocId] = useState(null);
+  const [viewerLoading, setViewerLoading] = useState(false);
 
   const loadList = useCallback(async () => {
     try {
@@ -50,6 +55,11 @@ const DocumentManagementPage = () => {
       setLoading(false);
     }
   }, []);
+
+  const onReload = useCallback(() => {
+    setFilters(defaultFilters);
+    loadList();
+  }, [loadList, defaultFilters]);
 
   useEffect(() => {
     loadList();
@@ -87,7 +97,7 @@ const DocumentManagementPage = () => {
       const searchParams = {};
       if (filters.keyword) searchParams.keyword = filters.keyword;
       if (filters.docType) searchParams.type = filters.docType; // Backend dùng 'type'
-      if (filters.verified !== undefined) searchParams.verified = filters.verified;
+      if (filters.status !== undefined) searchParams.status = filters.status;
       
       const docs = await documentService.searchDocuments(searchParams);
       // Đảm bảo docs luôn là array
@@ -121,15 +131,11 @@ const DocumentManagementPage = () => {
       setUploading(true);
       setUploadProgress(0);
       
-      // Use docID from form
-      const docID = values.docID;
-      
       // Upload file to IPFS
       const ipfsHash = await ipfsService.uploadFileToIPFS(selectedFile, (progress) => setUploadProgress(progress));
       
-      // Create document (automatically verified by Org1)
-      await documentService.createDocument({
-        docID: docID,
+      // Create document (automatically verified by Org1) - docID will be auto-generated
+      const response = await documentService.createDocument({
         docType: values.docType,
         title: values.title,
         description: values.description,
@@ -148,7 +154,7 @@ const DocumentManagementPage = () => {
       
       // Dispatch custom event to notify other pages to refresh
       window.dispatchEvent(new CustomEvent('documentCreated', {
-        detail: { documentId: docID }
+        detail: { documentId: response.data.docID }
       }));
     } catch (e) {
       message.error(e.message || 'Tạo tài liệu thất bại');
@@ -210,6 +216,23 @@ const DocumentManagementPage = () => {
     }
   }, []);
 
+  const handleViewOnline = useCallback(async () => {
+    try {
+      setViewerLoading(true);
+      message.loading({ content: 'Đang tải tài liệu...', key: 'viewer', duration: 0 });
+      
+      // Add a small delay to show loading state
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setOnlineViewerOpen(true);
+      message.success({ content: 'Tải tài liệu thành công', key: 'viewer' });
+    } catch (e) {
+      message.error({ content: e.message || 'Không thể tải tài liệu', key: 'viewer' });
+    } finally {
+      setViewerLoading(false);
+    }
+  }, []);
+
   const handleDownload = useCallback(async (record) => {
     try {
       if (!record.ipfsHash) {
@@ -217,10 +240,17 @@ const DocumentManagementPage = () => {
         return;
       }
       
+      setDownloading(true);
+      setDownloadingDocId(record.docID);
+      message.loading({ content: 'Đang tải file...', key: 'download', duration: 0 });
+      
       await ipfsService.downloadFileFromIPFS(record.ipfsHash, record.title || 'document');
-      message.success('Tải file thành công');
+      message.success({ content: 'Tải file thành công', key: 'download' });
     } catch (e) {
-      message.error(e.message || 'Tải file thất bại');
+      message.error({ content: e.message || 'Tải file thất bại', key: 'download' });
+    } finally {
+      setDownloading(false);
+      setDownloadingDocId(null);
     }
   }, []);
 
@@ -288,6 +318,7 @@ const DocumentManagementPage = () => {
   const columns = useMemo(() => ([
     { title: 'Mã tài liệu', dataIndex: 'docID', key: 'docID', render: v => <code>{v}</code> },
     { title: 'Tiêu đề', dataIndex: 'title', key: 'title' },
+    { title: 'Mô tả', dataIndex: 'description', key: 'description', ellipsis: true },
     { title: 'Loại', dataIndex: 'type', key: 'type', render: v => <Tag color="blue">{v}</Tag> },
     { title: 'Trạng thái', dataIndex: 'status', key: 'status', render: v => {
         if (v === 'VERIFIED') return <Tag color="green">Đã thẩm định</Tag>;
@@ -295,14 +326,18 @@ const DocumentManagementPage = () => {
         return <Tag color="orange">Chờ xác thực</Tag>;
       }
     },
-    { title: 'Loại file', dataIndex: 'fileType', key: 'fileType', render: v => <Tag color="blue">{documentService.getDisplayFileType(v)}</Tag> },
     { title: 'Kích thước', dataIndex: 'fileSize', key: 'fileSize', render: v => v ? `${(v / 1024).toFixed(2)} KB` : 'N/A' },
     { title: 'Người upload', dataIndex: 'uploadedBy', key: 'uploadedBy' },
     {
       title: 'Thao tác', key: 'actions', fixed: 'right', render: (_, record) => (
         <Space>
           <Tooltip title="Tải về">
-            <Button icon={<DownloadOutlined />} onClick={() => handleDownload(record)} />
+            <Button 
+              icon={<DownloadOutlined />} 
+              onClick={() => handleDownload(record)}
+              loading={downloading && downloadingDocId === record.docID}
+              disabled={downloading && downloadingDocId === record.docID}
+            />
           </Tooltip>
           <Tooltip title="Xem chi tiết">
             <Button icon={<EyeOutlined />} onClick={() => openDetail(record)} />
@@ -338,7 +373,7 @@ const DocumentManagementPage = () => {
         </Space>
       )
     }
-  ]), [editForm, handleDelete, handleDownload, openDetail, user?.userId]);
+  ]), [editForm, handleDelete, handleDownload, openDetail, user?.userId, downloading, downloadingDocId]);
 
   return (
     <Card
@@ -359,12 +394,13 @@ const DocumentManagementPage = () => {
               </Option>
             ))}
           </Select>
-          <Select placeholder="Trạng thái xác thực" allowClear style={{ width: 150 }} value={filters.verified} onChange={(v) => setFilters({ ...filters, verified: v })}>
-            <Option value={true}>Đã thẩm định</Option>
-            <Option value={false}>Chờ xác thực</Option>
+          <Select placeholder="Trạng thái tài liệu" allowClear style={{ width: 150 }} value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })}>
+            <Option value="VERIFIED">Đã thẩm định</Option>
+            <Option value="PENDING">Chờ xác thực</Option>
+            <Option value="REJECTED">Bị từ chối</Option>
           </Select>
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
-          <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
+          <Button icon={<ReloadOutlined />} onClick={onReload}>Tải lại</Button>
           <Button type="primary" icon={<CloudUploadOutlined />} onClick={() => setCreateOpen(true)}>Upload tài liệu</Button>
         </Space>
       }
@@ -395,17 +431,10 @@ const DocumentManagementPage = () => {
         <Form layout="vertical" form={form}>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="docID" label="Mã tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
-                <Input placeholder="Nhập mã tài liệu" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
               <Form.Item name="title" label="Tiêu đề" rules={[{ required: true, message: 'Bắt buộc' }]}>
                 <Input placeholder="Nhập tiêu đề tài liệu" />
               </Form.Item>
             </Col>
-          </Row>
-          <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="docType" label="Loại tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
                 <Select placeholder="Chọn loại">
@@ -586,10 +615,11 @@ const DocumentManagementPage = () => {
                           <div style={{ textAlign: 'center', marginTop: 16 }}>
                             <Space size="large">
                               <Button 
-                                type="primary" 
+                                type="primary"
                                 icon={<EyeOutlined />}
-                                onClick={() => setOnlineViewerOpen(true)}
+                                onClick={handleViewOnline}
                                 disabled={!selected.ipfsHash}
+                                loading={viewerLoading}
                                 size="large"
                               >
                                 Xem trực tuyến
@@ -598,6 +628,7 @@ const DocumentManagementPage = () => {
                                 icon={<DownloadOutlined />}
                                 onClick={() => handleDownload(selected)}
                                 disabled={!selected.ipfsHash}
+                                loading={downloading && downloadingDocId === selected.docID}
                                 size="large"
                               >
                                 Tải về

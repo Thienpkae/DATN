@@ -7,7 +7,7 @@ const landService = {
     // Create a new land parcel
     async createLandParcel(req, res) {
         try {
-            const { id, ownerId, location, landUsePurpose, legalStatus, area, certificateId, legalInfo } = req.body;
+            const { id, ownerId, location, landUsePurpose, legalStatus, area, certificateId, legalInfo, geometryCID } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
@@ -37,6 +37,7 @@ const landService = {
                 areaStr,
                 certificateId || '',
                 legalInfo || '',
+                geometryCID || '',
                 userID
             );
 
@@ -73,7 +74,7 @@ const landService = {
     async updateLandParcel(req, res) {
         try {
             const { id } = req.params;
-            const { area, location, landUsePurpose, legalStatus, certificateId, legalInfo } = req.body;
+            const { area, location, landUsePurpose, legalStatus, certificateId, legalInfo, geometryCID } = req.body;
             const userID = req.user.cccd;
             const org = req.user.org;
 
@@ -90,6 +91,7 @@ const landService = {
             const finalLegalStatus = legalStatus !== undefined ? legalStatus : (currentLand.legalStatus || '');
             const finalCertificateId = certificateId !== undefined ? certificateId : (currentLand.certificateID || '');
             const finalLegalInfo = legalInfo !== undefined ? legalInfo : (currentLand.legalInfo || '');
+            const finalGeometryCID = geometryCID !== undefined ? geometryCID : (currentLand.geometryCID || '');
 
             // Validate area if provided
             if (area !== undefined && area !== null && (isNaN(parseFloat(finalArea)) || parseFloat(finalArea) < 0)) {
@@ -112,7 +114,8 @@ const landService = {
                 finalLandUsePurpose,
                 finalLegalStatus,
                 finalCertificateId,
-                finalLegalInfo
+                finalLegalInfo,
+                finalGeometryCID
             );
 
             // Get the updated land parcel to return as response data

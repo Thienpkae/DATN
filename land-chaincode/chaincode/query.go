@@ -838,7 +838,7 @@ func buildQueryStringForLands(keyword string, filters map[string]string, userID,
 	selector["landUsePurpose"] = map[string]interface{}{"$exists": true}
 	selector["legalStatus"] = map[string]interface{}{"$exists": true}
 
-	if keyword != "" {
+    if keyword != "" {
 		// For numeric searches, try to parse as number for area field
 		var areaConditions []map[string]interface{}
 		if areaValue, err := strconv.ParseFloat(keyword, 64); err == nil {
@@ -846,13 +846,14 @@ func buildQueryStringForLands(keyword string, filters map[string]string, userID,
 		}
 
 		// Create search conditions - CouchDB regex is case-sensitive by default
-		searchConditions := []map[string]interface{}{
-			{"id": map[string]interface{}{"$regex": keyword}},
-			{"ownerId": map[string]interface{}{"$regex": keyword}},
-			{"location": map[string]interface{}{"$regex": keyword}},
-			{"landUsePurpose": map[string]interface{}{"$regex": keyword}},
-			{"legalStatus": map[string]interface{}{"$regex": keyword}},
-		}
+        pattern := ".*" + escapeRegex(keyword) + ".*"
+        searchConditions := []map[string]interface{}{
+            {"id": map[string]interface{}{"$regex": pattern}},
+            {"ownerId": map[string]interface{}{"$regex": pattern}},
+            {"location": map[string]interface{}{"$regex": pattern}},
+            {"landUsePurpose": map[string]interface{}{"$regex": pattern}},
+            {"legalStatus": map[string]interface{}{"$regex": pattern}},
+        }
 
 		// Add area conditions if keyword is numeric
 		searchConditions = append(searchConditions, areaConditions...)
@@ -885,12 +886,16 @@ func buildQueryStringForTransactions(keyword string, filters map[string]string, 
 	selector["type"] = map[string]interface{}{"$exists": true, "$ne": "LOG"}
 
 	if keyword != "" {
-		// Create search conditions - CouchDB regex is case-sensitive by default
+		// Create search conditions - use contains-style regex with escaping
+		pattern := ".*" + escapeRegex(keyword) + ".*"
 		selector["$or"] = []map[string]interface{}{
-			{"txId": map[string]interface{}{"$regex": keyword}},
-			{"type": map[string]interface{}{"$regex": keyword}},
-			{"status": map[string]interface{}{"$regex": keyword}},
-			{"details": map[string]interface{}{"$regex": keyword}},
+			{"txId": map[string]interface{}{"$regex": pattern}},
+			{"type": map[string]interface{}{"$regex": pattern}},
+			{"status": map[string]interface{}{"$regex": pattern}},
+			{"details": map[string]interface{}{"$regex": pattern}},
+			{"fromOwnerId": map[string]interface{}{"$regex": pattern}},
+			{"toOwnerId": map[string]interface{}{"$regex": pattern}},
+			{"userID": map[string]interface{}{"$regex": pattern}},
 		}
 	}
 
@@ -936,13 +941,17 @@ func buildQueryStringForDocuments(keyword string, filters map[string]string, use
 
 	// Áp dụng các bộ lọc bổ sung
 	for key, value := range filters {
-		// Handle boolean fields
+		// Handle special filter fields
 		if key == "verified" {
 			if value == "true" {
-				selector[key] = true
+				selector["status"] = "VERIFIED"
 			} else if value == "false" {
-				selector[key] = false
+				selector["status"] = map[string]interface{}{"$ne": "VERIFIED"}
 			}
+		} else if key == "type" {
+			selector["type"] = value
+		} else if key == "status" {
+			selector["status"] = value
 		} else {
 			selector[key] = value
 		}
@@ -955,11 +964,13 @@ func buildQueryStringForDocuments(keyword string, filters map[string]string, use
 
 	// Nếu có keyword, thêm search conditions
 	if keyword != "" {
-		// Tìm kiếm theo từ khóa trong các trường liên quan
+		// Tìm kiếm theo từ khóa trong các trường liên quan (contains, escape special chars)
+		pattern := ".*" + escapeRegex(keyword) + ".*"
 		searchConditions := []map[string]interface{}{
-			{"docID": map[string]interface{}{"$regex": keyword}},
-			{"title": map[string]interface{}{"$regex": keyword}},
-			{"description": map[string]interface{}{"$regex": keyword}},
+			{"docID": map[string]interface{}{"$regex": pattern}},
+			{"title": map[string]interface{}{"$regex": pattern}},
+			{"description": map[string]interface{}{"$regex": pattern}},
+			{"uploadedBy": map[string]interface{}{"$regex": pattern}},
 		}
 		selector["$or"] = searchConditions
 	}
@@ -968,6 +979,27 @@ func buildQueryStringForDocuments(keyword string, filters map[string]string, use
 		"selector": selector,
 	})
 	return string(queryBytes)
+}
+
+// escapeRegex escapes special regex characters to safely build a contains pattern
+func escapeRegex(input string) string {
+    replacer := strings.NewReplacer(
+        "\\", "\\\\",
+        ".", "\\.",
+        "+", "\\+",
+        "*", "\\*",
+        "?", "\\?",
+        "^", "\\^",
+        "$", "\\$",
+        "(", "\\(",
+        ")", "\\)",
+        "[", "\\[",
+        "]", "\\]",
+        "{", "\\{",
+        "}", "\\}",
+        "|", "\\|",
+    )
+    return replacer.Replace(input)
 }
 
 // getQueryResultForLands - Executes the passed in query string and returns land results

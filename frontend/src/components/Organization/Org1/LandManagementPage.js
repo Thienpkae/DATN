@@ -94,6 +94,11 @@ const LandManagementPage = () => {
     }
   }, []);
 
+  const onReload = React.useCallback(() => {
+    setFilters(defaultFilters);
+    loadList();
+  }, [loadList]);
+
   useEffect(() => {
     loadList();
   }, [loadList]);
@@ -154,7 +159,8 @@ const LandManagementPage = () => {
         landUsePurpose: values.landUsePurpose,
         legalStatus: '', // Không có trạng thái pháp lý khi tạo mới
         certificateId: '', // Không có mã GCN khi tạo mới
-        legalInfo: ''     // Không có thông tin pháp lý khi tạo mới
+        legalInfo: '',     // Không có thông tin pháp lý khi tạo mới
+        geometryCID: values.geometryCID || '' // Geometry CID từ IPFS
       });
       message.success('Tạo thửa đất thành công');
       setCreateOpen(false);
@@ -176,7 +182,8 @@ const LandManagementPage = () => {
         location: values.location,
         landUsePurpose: values.landUsePurpose,
         legalStatus: '', // Không cho phép thay đổi trạng thái pháp lý
-        legalInfo: ''   // Không cho phép thay đổi thông tin pháp lý
+        legalInfo: '',   // Không cho phép thay đổi thông tin pháp lý
+        geometryCID: values.geometryCID || '' // Geometry CID từ IPFS
       });
       message.success('Cập nhật thửa đất thành công');
       setEditOpen(false);
@@ -360,7 +367,8 @@ const LandManagementPage = () => {
                 location: record.location,
                 landUsePurpose: record.landUsePurpose,
                 legalStatus: record.legalStatus,
-                legalInfo: record.legalInfo
+                legalInfo: record.legalInfo,
+                geometryCID: record.geometryCID || ''
               });
               setEditOpen(true);
             }} />
@@ -394,7 +402,7 @@ const LandManagementPage = () => {
               ))}
             </Select>
                       <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
-          <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
+          <Button icon={<ReloadOutlined />} onClick={onReload}>Tải lại</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>Tạo thửa đất</Button>
           </Space>
         }
@@ -461,6 +469,13 @@ const LandManagementPage = () => {
                 </Form.Item>
               </Col>
             </Row>
+            <Row gutter={16}>
+              <Col span={24}>
+                <Form.Item name="geometryCID" label="Geometry CID (IPFS)">
+                  <Input placeholder="Nhập IPFS CID cho geometry (tùy chọn)" />
+                </Form.Item>
+              </Col>
+            </Row>
 
           </Form>
         </Modal>
@@ -505,9 +520,16 @@ const LandManagementPage = () => {
                 </Form.Item>
               </Col>
             </Row>
+            <Row gutter={16}>
+              <Col span={24}>
+                <Form.Item name="geometryCID" label="Geometry CID (IPFS)">
+                  <Input placeholder="Nhập IPFS CID cho geometry (tùy chọn)" />
+                </Form.Item>
+              </Col>
+            </Row>
             <Alert
               message="Lưu ý"
-              description="Chỉ có thể cập nhật diện tích, vị trí và mục đích sử dụng đất. Để thay đổi trạng thái pháp lý, vui lòng sử dụng chức năng cấp GCN."
+              description="Chỉ có thể cập nhật diện tích, vị trí, mục đích sử dụng đất và geometry CID. Để thay đổi trạng thái pháp lý, vui lòng sử dụng chức năng cấp GCN."
               type="info"
               showIcon
               style={{ marginBottom: 16 }}

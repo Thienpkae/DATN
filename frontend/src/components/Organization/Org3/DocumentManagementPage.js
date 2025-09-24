@@ -16,12 +16,11 @@ const DocumentManagementPage = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [documents, setDocuments] = useState([]);
-  const defaultFilters = {
+  const defaultFilters = useMemo(() => ({
     keyword: '',
     docType: undefined,
-    status: undefined,
-    fileType: undefined
-  };
+    status: undefined
+  }), []);
   
   const [filters, setFilters] = useState(defaultFilters);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -65,6 +64,11 @@ const DocumentManagementPage = () => {
       setLoading(false);
     }
   }, [user?.userId]);
+
+  const onReload = useCallback(() => {
+    setFilters(defaultFilters);
+    loadList();
+  }, [loadList, defaultFilters]);
 
   useEffect(() => {
     if (user?.userId) {
@@ -115,8 +119,7 @@ const DocumentManagementPage = () => {
       // Thêm các filter khác nếu có
       if (filters.keyword) searchParams.keyword = filters.keyword;
       if (filters.docType) searchParams.type = filters.docType;
-      if (filters.status) searchParams.verified = filters.status === 'verified';
-      if (filters.fileType) searchParams.fileType = filters.fileType;
+      if (filters.status) searchParams.status = filters.status;
       
       const res = await documentService.searchDocuments(searchParams);
       const data = Array.isArray(res?.documents) ? res.documents : (Array.isArray(res) ? res : []);
@@ -283,6 +286,7 @@ const DocumentManagementPage = () => {
   const columns = useMemo(() => ([
     { title: 'Mã tài liệu', dataIndex: 'docID', key: 'docID' },
     { title: 'Tiêu đề', dataIndex: 'title', key: 'title' },
+    { title: 'Mô tả', dataIndex: 'description', key: 'description', ellipsis: true },
     { title: 'Loại', dataIndex: 'type', key: 'type', render: v => <Tag>{v}</Tag> },
     { 
       title: 'Trạng thái', 
@@ -294,7 +298,6 @@ const DocumentManagementPage = () => {
         return <Badge status="processing" text="Chờ xác thực" />;
       }
     },
-    { title: 'Loại file', dataIndex: 'fileType', key: 'fileType', render: v => <Tag color="blue">{documentService.getDisplayFileType(v)}</Tag> },
     { title: 'Kích thước', dataIndex: 'fileSize', key: 'fileSize', render: v => v ? `${(v / 1024).toFixed(2)} KB` : 'N/A' },
     { title: 'Người upload', dataIndex: 'uploadedBy', key: 'uploadedBy' },
     {
@@ -360,17 +363,12 @@ const DocumentManagementPage = () => {
             ))}
           </Select>
           <Select placeholder="Trạng thái" allowClear style={{ width: 150 }} value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })}>
-            {documentService.getDocumentStatuses().map(status => (
-              <Option key={status} value={status}>{status}</Option>
-            ))}
-          </Select>
-          <Select placeholder="Loại file" allowClear style={{ width: 150 }} value={filters.fileType} onChange={(v) => setFilters({ ...filters, fileType: v })}>
-            {documentService.getFileTypes().map(type => (
-              <Option key={type} value={type}>{type}</Option>
-            ))}
+            <Option value="PENDING">Chờ xác thực</Option>
+            <Option value="VERIFIED">Đã thẩm định</Option>
+            <Option value="REJECTED">Không hợp lệ</Option>
           </Select>
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
-          <Button icon={<ReloadOutlined />} onClick={loadList}>Tải lại</Button>
+          <Button icon={<ReloadOutlined />} onClick={onReload}>Tải lại</Button>
           <Button type="primary" icon={<CloudUploadOutlined />} onClick={() => setCreateOpen(true)}>Upload tài liệu</Button>
         </Space>
       }
@@ -689,17 +687,10 @@ const DocumentManagementPage = () => {
         <Form layout="vertical" form={form}>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="docID" label="Mã tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
-                <Input placeholder="Nhập mã tài liệu" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
               <Form.Item name="title" label="Tiêu đề" rules={[{ required: true, message: 'Bắt buộc' }]}>
                 <Input placeholder="Nhập tiêu đề tài liệu" />
               </Form.Item>
             </Col>
-          </Row>
-          <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="docType" label="Loại tài liệu" rules={[{ required: true, message: 'Bắt buộc' }]}>
                 <Select placeholder="Chọn loại">

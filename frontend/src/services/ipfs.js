@@ -1,9 +1,16 @@
 
 import axios from 'axios';
 
+// Helper function to sanitize environment variables
+const sanitizeApiKey = (key) => {
+  if (!key) return '';
+  // Remove any extra characters that might be concatenated (like "PORT=5000,")
+  return key.toString().split(',')[0].trim();
+};
+
 // Pinata API integration
-const PINATA_API_KEY = process.env.REACT_APP_PINATA_API_KEY || '3adaeba196b5d28c1b1b';
-const PINATA_SECRET_API_KEY = process.env.REACT_APP_PINATA_SECRET_API_KEY || 'e0922dbca4ab770a4d976363300e928dd69dc53f56f5d3b11dff67046e6520fb';
+const PINATA_API_KEY = sanitizeApiKey(process.env.REACT_APP_PINATA_API_KEY) || '3adaeba196b5d28c1b1b';
+const PINATA_SECRET_API_KEY = sanitizeApiKey(process.env.REACT_APP_PINATA_SECRET_API_KEY) || 'e0922dbca4ab770a4d976363300e928dd69dc53f56f5d3b11dff67046e6520fb';
 const PINATA_BASE_URL = 'https://api.pinata.cloud/pinning';
 const PINATA_GATEWAY = 'https://gateway.pinata.cloud/ipfs';
 
