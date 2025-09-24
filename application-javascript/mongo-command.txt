@@ -5,6 +5,9 @@ show collections
 
 db.logs.find().pretty()
 db.users.find().pretty()
+db.notifications.find().pretty()
+
 
 db.logs.drop()
 db.users.drop()
+db.notifications.drop()

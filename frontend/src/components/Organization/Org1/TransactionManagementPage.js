@@ -13,6 +13,7 @@ const { TextArea } = Input;
 const TransactionManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState([]);
+  const [pageSize, setPageSize] = useState(10);
   const defaultFilters = {
     keyword: '',
     type: undefined,
@@ -526,7 +527,19 @@ const TransactionManagementPage = () => {
           dataSource={transactions}
           columns={columns}
           scroll={{ x: 1200 }}
-          pagination={{ pageSize: 10, showSizeChanger: true }}
+        pagination={{ 
+          pageSize: pageSize, 
+          showSizeChanger: true,
+          showQuickJumper: false,
+          showTotal: false,
+          onChange: (page, newPageSize) => {
+            console.log('Transaction page changed:', page, newPageSize);
+          },
+          onShowSizeChange: (current, size) => {
+            console.log('Transaction page size changed:', current, size);
+            setPageSize(size);
+          }
+        }}
         />
 
         {/* Approve Transaction Modal */}
@@ -952,18 +965,8 @@ const TransactionManagementPage = () => {
                   notFoundContent={certificateLoading ? 'Loading...' : 'Không tìm thấy giấy chứng nhận nào'}
                 >
                   {certificateDocuments.map((doc) => (
-                    <Option key={doc.docID} value={doc.ipfsHash} title={doc.title}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: '500', color: '#1890ff' }}>
-                            {doc.title || doc.docID}
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#666' }}>
-                            IPFS: {doc.ipfsHash?.substring(0, 20)}...
-                          </div>
-                        </div>
-                        <Tag color="green" size="small">Xác thực</Tag>
-                      </div>
+                    <Option key={doc.docID} value={doc.ipfsHash} title={doc.title || doc.docID}>
+                      {doc.title || doc.docID}
                     </Option>
                   ))}
                 </Select>

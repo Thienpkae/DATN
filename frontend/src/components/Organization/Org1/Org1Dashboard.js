@@ -117,19 +117,6 @@ const Org1Dashboard = ({ user, onLogout }) => {
           <Tabs
             items={[
               {
-                key: 'land',
-                label: (
-                  <span>
-                    <AppstoreOutlined /> Quản lý thửa đất
-                  </span>
-                ),
-                children: (
-                  <Card variant="borderless" style={{ padding: 0 }}>
-                    <LandManagementPage />
-                  </Card>
-                )
-              },
-              {
                 key: 'gis',
                 label: (
                   <span>
@@ -139,6 +126,19 @@ const Org1Dashboard = ({ user, onLogout }) => {
                 children: (
                   <Card variant="borderless" style={{ padding: 0 }}>
                     <OnchainGISPage />
+                  </Card>
+                )
+              },
+              {
+                key: 'land',
+                label: (
+                  <span>
+                    <AppstoreOutlined /> Quản lý thửa đất
+                  </span>
+                ),
+                children: (
+                  <Card variant="borderless" style={{ padding: 0 }}>
+                    <LandManagementPage />
                   </Card>
                 )
               },

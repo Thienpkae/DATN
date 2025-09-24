@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Card } from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
+import { Card, Spin } from 'antd';
 import authService from '../../../services/auth';
 
 // On-chain GIS page for Org1 using MapLibre via CDN
@@ -9,6 +9,7 @@ const OnchainGISPage = () => {
   const mapRef = useRef(null);
   const containerRef = useRef(null);
   const cleanupRef = useRef({ scripts: [], links: [] });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Capture ref snapshot for cleanup
@@ -80,6 +81,47 @@ const OnchainGISPage = () => {
           return resp.json();
         };
         const data = await fetchGeojson();
+        
+        // Lọc ra chỉ những thửa đất có polygon data
+        const validFeatures = (data.features || []).filter(feature => {
+          return feature && 
+                 feature.geometry && 
+                 feature.geometry.coordinates && 
+                 feature.geometry.coordinates.length > 0;
+        });
+        
+        // Tạo GeoJSON với chỉ những features có polygon
+        const filteredData = {
+          ...data,
+          features: validFeatures
+        };
+        
+        // Nếu không có thửa đất nào có polygon, hiển thị thông báo
+        if (validFeatures.length === 0) {
+          const noDataOverlay = document.createElement('div');
+          noDataOverlay.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+          `;
+          noDataOverlay.innerHTML = `
+            <div style="font-size:32px;margin-bottom:12px;color:#ccc">🗺️</div>
+            <div style="font-size:16px;color:#666;margin-bottom:8px">Chưa có dữ liệu bản đồ GIS</div>
+            <div style="font-size:14px;color:#999">Hãy tạo thửa đất mới với dữ liệu geometry để hiển thị trên bản đồ</div>
+          `;
+          containerRef.current.appendChild(noDataOverlay);
+          
+          setLoading(false);
+          return;
+        }
+        
         const purposeDescriptions = {
           LUC: 'Đất chuyên trồng lúa nước',
           ONT: 'Đất ở tại nông thôn',
@@ -92,7 +134,7 @@ const OnchainGISPage = () => {
           TIN: 'Đất tín ngưỡng'
         };
         const counts = {};
-        (data.features || []).forEach(ft => {
+        validFeatures.forEach(ft => {
           const code = ft && ft.properties && ft.properties.usePurpose;
           if (!code) return;
           counts[code] = (counts[code] || 0) + 1;
@@ -100,7 +142,7 @@ const OnchainGISPage = () => {
 
         const addLayers = () => {
           if (map.getSource('parcels')) return;
-          map.addSource('parcels', { type: 'geojson', data, promoteId: 'id', generateId: true });
+          map.addSource('parcels', { type: 'geojson', data: filteredData, promoteId: 'id', generateId: true });
 
           // Color mapping similar to static map MDSD palette
           const colorExpr = [
@@ -213,7 +255,7 @@ const OnchainGISPage = () => {
           // Fit to data bounds if available
           try {
             const coords = [];
-            (data.features || []).forEach(ft => {
+            validFeatures.forEach(ft => {
               const geom = ft && ft.geometry;
               if (!geom) return;
               const scan = (arr) => {
@@ -232,10 +274,18 @@ const OnchainGISPage = () => {
           } catch (_) {}
         };
 
-        if (map.loaded()) addLayers();
-        else map.on('load', addLayers);
+        if (map.loaded()) {
+          addLayers();
+          setLoading(false);
+        } else {
+          map.on('load', () => {
+            addLayers();
+            setLoading(false);
+          });
+        }
       } catch (e) {
         console.error('OnchainGISPage error:', e);
+        setLoading(false);
       }
     };
 
@@ -252,7 +302,9 @@ const OnchainGISPage = () => {
 
   return (
     <Card title="Bản đồ GIS (On-chain, Org1)" styles={{ body: { padding: 0 } }}>
-      <div ref={containerRef} />
+      <Spin spinning={loading} tip="Đang tải bản đồ...">
+        <div ref={containerRef} style={{ minHeight: '600px' }} />
+      </Spin>
     </Card>
   );
 };

@@ -15,6 +15,7 @@ const defaultFilters = {
 const LandManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [lands, setLands] = useState([]);
+  const [pageSize, setPageSize] = useState(10);
   const [filters, setFilters] = useState(defaultFilters);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -175,7 +176,19 @@ const LandManagementPage = () => {
           dataSource={lands}
           columns={columns}
           scroll={{ x: 1200 }}
-          pagination={{ pageSize: 10, showSizeChanger: true }}
+          pagination={{ 
+            pageSize: pageSize, 
+            showSizeChanger: true,
+            showQuickJumper: false,
+            showTotal: false,
+            onChange: (page, newPageSize) => {
+              console.log('Org2 Land page changed:', page, newPageSize);
+            },
+            onShowSizeChange: (current, size) => {
+              console.log('Org2 Land page size changed:', current, size);
+              setPageSize(size);
+            }
+          }}
         />
         <Drawer title={`Chi tiết thửa đất: ${selected?.id}`} width={800} open={detailOpen} onClose={() => setDetailOpen(false)}>
           {selected && (

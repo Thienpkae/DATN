@@ -12,6 +12,7 @@ const { Option } = Select;
 const TransactionManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState([]);
+  const [pageSize, setPageSize] = useState(10);
   const defaultFilters = {
     keyword: '',
     type: undefined,
@@ -287,7 +288,19 @@ const TransactionManagementPage = () => {
         dataSource={transactions}
         columns={columns}
         scroll={{ x: 1400 }}
-        pagination={{ pageSize: 10, showSizeChanger: true }}
+        pagination={{ 
+          pageSize: pageSize, 
+          showSizeChanger: true,
+          showQuickJumper: false,
+          showTotal: false,
+          onChange: (page, pageSize) => {
+            console.log('Org2 Transaction page changed:', page, pageSize);
+          },
+          onShowSizeChange: (current, size) => {
+            console.log('Org2 Transaction page size changed:', current, size);
+            setPageSize(size);
+          }
+        }}
       />
 
       {/* Process Transaction with 3 decision states - UC-31 */}

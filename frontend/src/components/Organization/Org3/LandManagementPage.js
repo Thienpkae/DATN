@@ -15,6 +15,7 @@ const { Text } = Typography;
 const LandManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [lands, setLands] = useState([]);
+  const [pageSize, setPageSize] = useState(10);
   const [keyword, setKeyword] = useState('');
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -260,10 +261,17 @@ const LandManagementPage = () => {
         columns={columns}
         scroll={{ x: 900, y: 600 }}
         pagination={{
-          pageSize: 10,
+          pageSize: pageSize,
           showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} thửa đất`
+          showQuickJumper: false,
+          showTotal: false,
+          onChange: (page, newPageSize) => {
+            console.log('Org3 Land page changed:', page, newPageSize);
+          },
+          onShowSizeChange: (current, size) => {
+            console.log('Org3 Land page size changed:', current, size);
+            setPageSize(size);
+          }
         }}
         size="middle"
       />

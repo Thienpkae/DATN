@@ -885,6 +885,67 @@ const documentService = {
                 error: error.message
             });
         }
+    },
+
+    // Check if document is linked to any land parcels or transactions
+    async checkDocumentLinks(req, res) {
+        try {
+            const { docID } = req.params;
+            const userID = req.user.cccd;
+            const org = req.user.org;
+
+            const { contract } = await connectToNetwork(org, userID);
+
+            // Query all land parcels to check if document is linked
+            const landResult = await contract.evaluateTransaction('QueryAllLands', userID);
+            const lands = landResult ? JSON.parse(landResult.toString()) : [];
+            
+            // Query all transactions to check if document is linked
+            const txResult = await contract.evaluateTransaction('QueryAllTransactions', userID);
+            const transactions = txResult ? JSON.parse(txResult.toString()) : [];
+
+            const linkedTo = {
+                landParcels: [],
+                transactions: []
+            };
+
+            // Check land parcels
+            lands.forEach(land => {
+                if (land.documentIds && land.documentIds.includes(docID)) {
+                    linkedTo.landParcels.push({
+                        id: land.id || land.ID,
+                        owner: land.owner,
+                        area: land.area
+                    });
+                }
+            });
+
+            // Check transactions
+            transactions.forEach(tx => {
+                if (tx.documentIds && tx.documentIds.includes(docID)) {
+                    linkedTo.transactions.push({
+                        id: tx.id || tx.ID,
+                        type: tx.type,
+                        status: tx.status
+                    });
+                }
+            });
+
+            res.json({
+                success: true,
+                data: {
+                    isLinked: linkedTo.landParcels.length > 0 || linkedTo.transactions.length > 0,
+                    linkedTo
+                }
+            });
+        } catch (error) {
+            console.error('Error checking document links:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Lỗi khi kiểm tra liên kết tài liệu',
+                error: error.message
+            });
+        }
     }
 };
 

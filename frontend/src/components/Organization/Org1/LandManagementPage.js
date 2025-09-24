@@ -26,6 +26,7 @@ const defaultFilters = {
 const LandManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [lands, setLands] = useState([]);
+  const [pageSize, setPageSize] = useState(10);
   const [filters, setFilters] = useState(defaultFilters);
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -80,13 +81,24 @@ const LandManagementPage = () => {
   const loadList = React.useCallback(async () => {
     try {
       setLoading(true);
+      
+      // Prefetch: Tải dữ liệu cơ bản trước để hiển thị ngay
       let res = await landService.getAllLandParcels();
       let data = Array.isArray(res) ? res : (res?.data ?? []);
+      
+      // Nếu không có dữ liệu, thử tìm kiếm rỗng để lấy tất cả
       if (!data || data.length === 0) {
         const sres = await landService.searchLandParcels({ keyword: '' });
         data = Array.isArray(sres) ? sres : (sres?.data ?? []);
       }
-      setLands(sortLandIds(data));
+      
+      // Sắp xếp và hiển thị ngay
+      const sortedData = sortLandIds(data);
+      setLands(sortedData);
+      
+      // Log để debug
+      console.log('Land parcels loaded with prefetch:', sortedData.length);
+      
     } catch (e) {
       message.error(e.message || 'Không tải được danh sách thửa đất');
     } finally {
@@ -425,7 +437,19 @@ const LandManagementPage = () => {
           dataSource={lands}
           columns={columns}
           scroll={{ x: 1200 }}
-          pagination={{ pageSize: 10, showSizeChanger: true }}
+          pagination={{ 
+            pageSize: pageSize, 
+            showSizeChanger: true,
+            showQuickJumper: false,
+            showTotal: false,
+            onChange: (page, newPageSize) => {
+              console.log('Page changed:', page, newPageSize);
+            },
+            onShowSizeChange: (current, size) => {
+              console.log('Page size changed:', current, size);
+              setPageSize(size);
+            }
+          }}
         />
 
         {/* Create Land Parcel */}

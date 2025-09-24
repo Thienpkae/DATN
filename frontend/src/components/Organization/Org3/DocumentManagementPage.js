@@ -16,6 +16,7 @@ const DocumentManagementPage = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [documents, setDocuments] = useState([]);
+  const [pageSize, setPageSize] = useState(10);
   const defaultFilters = useMemo(() => ({
     keyword: '',
     docType: undefined,
@@ -191,6 +192,25 @@ const DocumentManagementPage = () => {
       cancelText: 'Hủy',
       async onOk() {
         try {
+          // Check if document is linked before deletion
+          const linkCheck = await documentService.checkDocumentLinks(record.docID);
+          if (linkCheck.data.isLinked) {
+            const { linkedTo } = linkCheck.data;
+            let errorMessage = 'Không thể xóa tài liệu vì đang được liên kết với:\n';
+            
+            if (linkedTo.landParcels.length > 0) {
+              errorMessage += `- ${linkedTo.landParcels.length} thửa đất: ${linkedTo.landParcels.map(l => l.id).join(', ')}\n`;
+            }
+            
+            if (linkedTo.transactions.length > 0) {
+              errorMessage += `- ${linkedTo.transactions.length} giao dịch: ${linkedTo.transactions.map(t => t.id).join(', ')}\n`;
+            }
+            
+            errorMessage += '\nVui lòng hủy liên kết trước khi xóa tài liệu.';
+            message.error(errorMessage);
+            return;
+          }
+
           await documentService.deleteDocument(record.docID);
           message.success('Xóa tài liệu thành công');
           loadList();
@@ -379,7 +399,19 @@ const DocumentManagementPage = () => {
         dataSource={documents}
         columns={columns}
         scroll={{ x: 1200 }}
-        pagination={{ pageSize: 10, showSizeChanger: true }}
+        pagination={{ 
+          pageSize: pageSize, 
+          showSizeChanger: true,
+          showQuickJumper: false,
+          showTotal: false,
+          onChange: (page, pageSize) => {
+            console.log('Org3 Document page changed:', page, pageSize);
+          },
+          onShowSizeChange: (current, size) => {
+            console.log('Org3 Document page size changed:', current, size);
+            setPageSize(size);
+          }
+        }}
         locale={{
           emptyText: (
             <div style={{ padding: '40px 0' }}>

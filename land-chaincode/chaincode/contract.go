@@ -317,6 +317,59 @@ func (s *LandRegistryChaincode) DeleteDocument(ctx contractapi.TransactionContex
 		return fmt.Errorf("người dùng %s không có quyền xóa tài liệu %s", userID, docID)
 	}
 
+	// Kiểm tra liên kết với thửa đất và giao dịch trước khi xóa
+	// Sử dụng query để tìm các thửa đất và giao dịch có chứa docID này
+	landQueryString := fmt.Sprintf(`{"selector":{"documentIds":{"$elemMatch":{"$eq":"%s"}}}}`, docID)
+	landIterator, err := ctx.GetStub().GetQueryResult(landQueryString)
+	if err != nil {
+		return fmt.Errorf("lỗi khi kiểm tra liên kết thửa đất: %v", err)
+	}
+	defer landIterator.Close()
+	
+	var linkedLandIDs []string
+	for landIterator.HasNext() {
+		landResponse, err := landIterator.Next()
+		if err != nil {
+			continue
+		}
+		var land Land
+		if err := json.Unmarshal(landResponse.Value, &land); err == nil {
+			linkedLandIDs = append(linkedLandIDs, land.ID)
+		}
+	}
+	
+	txQueryString := fmt.Sprintf(`{"selector":{"documentIds":{"$elemMatch":{"$eq":"%s"}},"type":{"$ne":"LOG"}}}`, docID)
+	txIterator, err := ctx.GetStub().GetQueryResult(txQueryString)
+	if err != nil {
+		return fmt.Errorf("lỗi khi kiểm tra liên kết giao dịch: %v", err)
+	}
+	defer txIterator.Close()
+	
+	var linkedTxIDs []string
+	for txIterator.HasNext() {
+		txResponse, err := txIterator.Next()
+		if err != nil {
+			continue
+		}
+		var tx Transaction
+		if err := json.Unmarshal(txResponse.Value, &tx); err == nil {
+			linkedTxIDs = append(linkedTxIDs, tx.TxID)
+		}
+	}
+
+	// Nếu có liên kết, không cho phép xóa
+	if len(linkedLandIDs) > 0 || len(linkedTxIDs) > 0 {
+		errorMsg := fmt.Sprintf("không thể xóa tài liệu %s vì đang được liên kết với:", docID)
+		if len(linkedLandIDs) > 0 {
+			errorMsg += fmt.Sprintf(" %d thửa đất (%s)", len(linkedLandIDs), strings.Join(linkedLandIDs, ", "))
+		}
+		if len(linkedTxIDs) > 0 {
+			errorMsg += fmt.Sprintf(" %d giao dịch (%s)", len(linkedTxIDs), strings.Join(linkedTxIDs, ", "))
+		}
+		errorMsg += ". Vui lòng hủy liên kết trước khi xóa tài liệu."
+		return fmt.Errorf(errorMsg)
+	}
+
 	// Xóa tài liệu
 	if err := ctx.GetStub().DelState(docID); err != nil {
 		return fmt.Errorf("lỗi khi xóa tài liệu: %v", err)
@@ -1706,3 +1759,4 @@ func (s *LandRegistryChaincode) RejectTransaction(ctx contractapi.TransactionCon
 	}
 	return RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "REJECT_TRANSACTION", userID, fmt.Sprintf("Từ chối giao dịch %s: %s", txID, reason))
 }
+

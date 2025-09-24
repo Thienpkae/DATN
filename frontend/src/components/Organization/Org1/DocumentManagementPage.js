@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Row, Col, Tooltip, Upload, Progress, Divider, Tabs, Typography, List } from 'antd';
-import { EditOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined, DownloadOutlined, UploadOutlined, FileTextOutlined, CloudUploadOutlined, HistoryOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Row, Col, Tooltip, Upload, Progress, Divider, Tabs, Typography } from 'antd';
+import { EditOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined, DownloadOutlined, UploadOutlined, FileTextOutlined, CloudUploadOutlined } from '@ant-design/icons';
 import documentService from '../../../services/documentService';
 import ipfsService from '../../../services/ipfs';
 import { useAuth } from '../../../hooks/useAuth';
@@ -22,6 +22,7 @@ const DocumentManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileList, setFileList] = useState([]);
   const [documents, setDocuments] = useState([]);
@@ -41,16 +42,21 @@ const DocumentManagementPage = () => {
   const [downloading, setDownloading] = useState(false);
   const [downloadingDocId, setDownloadingDocId] = useState(null);
   const [viewerLoading, setViewerLoading] = useState(false);
-  const [traceOpen, setTraceOpen] = useState(false);
-  const [traceDocId, setTraceDocId] = useState('');
-  const [traceLoading, setTraceLoading] = useState(false);
-  const [traceHistory, setTraceHistory] = useState([]);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
 
   const loadList = useCallback(async () => {
     try {
       setLoading(true);
-      const docs = await documentService.getAllDocumentsWithMetadata();
-      setDocuments(docs);
+      
+      // Prefetch: Tải dữ liệu cơ bản trước để hiển thị ngay
+      const basicDocs = await documentService.getAllDocumentsWithMetadata();
+      setDocuments(basicDocs);
+      
+      // Sau đó tải thêm metadata chi tiết nếu cần
+      if (basicDocs && basicDocs.length > 0) {
+        // Có thể thêm logic tải metadata chi tiết ở đây nếu cần
+        console.log('Documents loaded with prefetch:', basicDocs.length);
+      }
     } catch (e) {
       console.error('Error loading documents:', e);
       // Don't show error alert, just set empty documents - UI will show empty state
@@ -198,14 +204,14 @@ const DocumentManagementPage = () => {
 
   const onAnalyze = async (docID) => {
     try {
-      setLoading(true);
+      setAnalysisLoading(true);
       const result = await documentService.analyzeDocument(docID);
       setAnalysis(result);
       message.success('Phân tích tài liệu thành công');
     } catch (e) {
       message.error(e.message || 'Phân tích thất bại');
     } finally {
-      setLoading(false);
+      setAnalysisLoading(false);
     }
   };
 
@@ -287,6 +293,7 @@ const DocumentManagementPage = () => {
       cancelText: 'Hủy',
       async onOk() {
         try {
+          // Chaincode sẽ xử lý việc check links và trả về lỗi nếu cần
           await documentService.deleteDocument(record.docID);
           message.success('Xóa tài liệu thành công');
           loadList();
@@ -308,6 +315,8 @@ const DocumentManagementPage = () => {
   const openDetail = useCallback((record) => {
     setSelected(record);
     setDetailOpen(true);
+    // Reset analysis state when opening new document
+    setAnalysis(null);
     // Load document history when opening detail
     if (record.docID) {
       loadDocumentHistory(record.docID);
@@ -401,7 +410,6 @@ const DocumentManagementPage = () => {
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
           <Button icon={<ReloadOutlined />} onClick={onReload}>Tải lại</Button>
           <Button type="primary" icon={<CloudUploadOutlined />} onClick={() => setCreateOpen(true)}>Upload tài liệu</Button>
-          <Button onClick={() => setTraceOpen(true)} icon={<HistoryOutlined />}>Truy vết theo ID</Button>
         </Space>
       }
     >
@@ -411,7 +419,19 @@ const DocumentManagementPage = () => {
         dataSource={documents}
         columns={columns}
         scroll={{ x: 1200 }}
-        pagination={{ pageSize: 10, showSizeChanger: true }}
+        pagination={{ 
+          pageSize: pageSize, 
+          showSizeChanger: true,
+          showQuickJumper: false,
+          showTotal: false,
+          onChange: (page, newPageSize) => {
+            console.log('Page changed:', page, newPageSize);
+          },
+          onShowSizeChange: (current, size) => {
+            console.log('Page size changed:', current, size);
+            setPageSize(size);
+          }
+        }}
         locale={{
           emptyText: (
             <div style={{ padding: '40px 0' }}>
@@ -654,13 +674,17 @@ const DocumentManagementPage = () => {
                           type="primary" 
                           icon={<FileTextOutlined />}
                           onClick={() => onAnalyze(selected.docID)}
-                          loading={loading}
+                          loading={analysisLoading}
                         >
                           Phân tích tài liệu
                         </Button>
                       </div>
                       
-                      {analysis ? (
+                      {analysisLoading ? (
+                        <div style={{ textAlign: 'center', padding: 32 }}>
+                          <div>Đang phân tích tài liệu...</div>
+                        </div>
+                      ) : analysis ? (
                         <div>
                           <Row gutter={16}>
                             <Col span={12}>
@@ -869,91 +893,6 @@ const DocumentManagementPage = () => {
         onCancel={() => setOnlineViewerOpen(false)}
         document={selected}
       />
-      {/* Trace By ID Modal */}
-      <Modal
-        title="Truy vết tài liệu theo ID"
-        open={traceOpen}
-        onCancel={() => { setTraceOpen(false); setTraceDocId(''); setTraceHistory([]); }}
-        footer={null}
-        width={800}
-      >
-        <div style={{ marginBottom: 16 }}>
-          <Row gutter={12}>
-            <Col span={18}>
-              <Input placeholder="Nhập Document ID (kể cả đã xóa)" value={traceDocId} onChange={(e) => setTraceDocId(e.target.value)} />
-            </Col>
-            <Col span={6}>
-              <Button type="primary" block loading={traceLoading} onClick={async () => {
-                if (!traceDocId.trim()) { message.warning('Vui lòng nhập Document ID'); return; }
-                try {
-                  setTraceLoading(true);
-                  const history = await documentService.getDocumentAudit(traceDocId.trim());
-                  const items = Array.isArray(history) ? history : (history?.data ?? []);
-                  setTraceHistory(items);
-                  if (!items || items.length === 0) { message.info('Không tìm thấy lịch sử cho ID đã nhập'); }
-                } catch (e) {
-                  message.error(e.message || 'Không thể lấy lịch sử tài liệu');
-                  setTraceHistory([]);
-                } finally {
-                  setTraceLoading(false);
-                }
-              }}>Truy vấn</Button>
-            </Col>
-          </Row>
-        </div>
-        <Divider style={{ margin: '12px 0' }} />
-        {traceLoading ? (
-          <div style={{ textAlign: 'center', padding: 24 }}>Đang tải lịch sử...</div>
-        ) : (
-          <List
-            header={<div><strong>Kết quả lịch sử ({traceHistory?.length || 0})</strong></div>}
-            bordered
-            dataSource={traceHistory}
-            locale={{ emptyText: 'Chưa có dữ liệu' }}
-            renderItem={(item, index) => (
-              <List.Item>
-                <div style={{ width: '100%' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <Space>
-                      <Tag color={item.isDelete ? 'red' : 'blue'}>{item.isDelete ? 'Đã xóa' : 'Thay đổi'}</Tag>
-                      <span>#{traceHistory.length - index}</span>
-                    </Space>
-                    <span style={{ fontSize: 12, color: '#888' }}>{item.timestamp ? new Date((item.timestamp.seconds || 0) * 1000).toLocaleString('vi-VN') : 'N/A'}</span>
-                  </div>
-                  <div style={{ marginBottom: 6 }}>
-                    <Text strong>Transaction ID: </Text>
-                    <Text type="secondary" style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.txId || 'N/A'}</Text>
-                  </div>
-                  {item.userId && (
-                    <div style={{ marginBottom: 6 }}>
-                      <Text strong>Người thực hiện: </Text>
-                      <Text type="secondary">{item.userId}</Text>
-                    </div>
-                  )}
-                  <div style={{ marginBottom: 6 }}>
-                    <Text strong>Tiêu đề: </Text>
-                    <Text type="secondary">{item.document?.title || 'N/A'}</Text>
-                  </div>
-                  <div style={{ marginBottom: 6 }}>
-                    <Text strong>Trạng thái xác thực: </Text>
-                    {item.document?.status ? (
-                      <Tag color={item.document.status === 'VERIFIED' ? 'green' : item.document.status === 'REJECTED' ? 'red' : 'orange'}>{item.document.status}</Tag>
-                    ) : (
-                      <Text type="secondary">N/A</Text>
-                    )}
-                  </div>
-                  {item.document?.ipfsHash && (
-                    <div>
-                      <Text strong>IPFS Hash: </Text>
-                      <Text type="secondary" style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.document.ipfsHash}</Text>
-                    </div>
-                  )}
-                </div>
-              </List.Item>
-            )}
-          />
-        )}
-      </Modal>
     </Card>
   );
 };

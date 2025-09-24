@@ -601,6 +601,17 @@ const documentService = {
       // Return null if land not found, don't throw error
       return null;
     }
+  },
+
+  // Check if document is linked to land parcels or transactions
+  async checkDocumentLinks(docID) {
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.DOCUMENT.CHECK_LINKS.replace(':docID', docID));
+      return response.data;
+    } catch (error) {
+      console.error('checkDocumentLinks error:', error);
+      throw new Error(error.response?.data?.message || 'Lỗi khi kiểm tra liên kết tài liệu');
+    }
   }
 };
 
