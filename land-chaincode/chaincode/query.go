@@ -30,10 +30,14 @@ func (s *LandRegistryChaincode) QueryLandByID(ctx contractapi.TransactionContext
 		return nil, fmt.Errorf("thửa đất %s không tồn tại", landID)
 	}
 
-	var land Land
-	if err := json.Unmarshal(data, &land); err != nil {
+    var land Land
+    if err := json.Unmarshal(data, &land); err != nil {
 		return nil, fmt.Errorf("lỗi khi giải mã thửa đất: %v", err)
 	}
+    // Normalize null arrays
+    if land.DocumentIDs == nil {
+        land.DocumentIDs = []string{}
+    }
 
 	// Kiểm tra quyền truy cập cho Org3MSP (công dân)
 	mspID, err := GetCallerOrgMSP(ctx)
@@ -485,68 +489,80 @@ func (s *LandRegistryChaincode) QueryVerifiedDocuments(ctx contractapi.Transacti
 
 // QueryDocumentHistory - Truy vấn lịch sử thay đổi của tài liệu (sử dụng GetHistoryForKey)
 func (s *LandRegistryChaincode) QueryDocumentHistory(ctx contractapi.TransactionContextInterface, docID string) ([]map[string]interface{}, error) {
-	// Lấy userID từ context
-	userID, err := GetCallerID(ctx)
-	if err != nil {
-		return nil, err
-	}
+    // Lấy userID từ context
+    userID, err := GetCallerID(ctx)
+    if err != nil {
+        return nil, err
+    }
 
-	// Kiểm tra quyền truy cập
-	mspID, err := GetCallerOrgMSP(ctx)
-	if err != nil {
-		return nil, err
-	}
+    // Kiểm tra quyền truy cập
+    mspID, err := GetCallerOrgMSP(ctx)
+    if err != nil {
+        return nil, err
+    }
 
-	// Kiểm tra xem tài liệu có tồn tại không
-	doc, err := GetDocument(ctx, docID)
-	if err != nil {
-		return nil, fmt.Errorf("tài liệu %s không tồn tại: %v", docID, err)
-	}
+    // Lấy lịch sử thay đổi của tài liệu sử dụng GetHistoryForKey
+    resultsIterator, err := ctx.GetStub().GetHistoryForKey(docID)
+    if err != nil {
+        return nil, fmt.Errorf("lỗi khi lấy lịch sử tài liệu: %v", err)
+    }
+    defer resultsIterator.Close()
 
-	// Org3MSP chỉ có thể xem lịch sử tài liệu của chính mình
-	if mspID == "Org3MSP" && doc.UploadedBy != userID {
-		return nil, fmt.Errorf("người dùng %s không có quyền xem lịch sử tài liệu %s", userID, docID)
-	}
+    var history []map[string]interface{}
+    var firstSnapshot Document
+    hasSnapshot := false
 
-	// Lấy lịch sử thay đổi của tài liệu sử dụng GetHistoryForKey
-	resultsIterator, err := ctx.GetStub().GetHistoryForKey(docID)
-	if err != nil {
-		return nil, fmt.Errorf("lỗi khi lấy lịch sử tài liệu: %v", err)
-	}
-	defer resultsIterator.Close()
+    for resultsIterator.HasNext() {
+        response, err := resultsIterator.Next()
+        if err != nil {
+            return nil, fmt.Errorf("lỗi khi đọc kết quả lịch sử: %v", err)
+        }
 
-	var history []map[string]interface{}
-	for resultsIterator.HasNext() {
-		response, err := resultsIterator.Next()
-		if err != nil {
-			return nil, fmt.Errorf("lỗi khi đọc kết quả lịch sử: %v", err)
-		}
+        var docData Document
+        if len(response.Value) > 0 {
+            if err := json.Unmarshal(response.Value, &docData); err != nil {
+                return nil, fmt.Errorf("lỗi khi giải mã dữ liệu tài liệu: %v", err)
+            }
+            if !hasSnapshot {
+                firstSnapshot = docData
+                hasSnapshot = true
+            }
+        } else {
+            docData = Document{DocID: docID}
+        }
 
-		var docData Document
-		if len(response.Value) > 0 {
-			if err := json.Unmarshal(response.Value, &docData); err != nil {
-				return nil, fmt.Errorf("lỗi khi giải mã dữ liệu tài liệu: %v", err)
-			}
-		} else {
-			docData = Document{DocID: docID}
-		}
+        historyEntry := map[string]interface{}{
+            "txId":      response.TxId,
+            "timestamp": response.Timestamp,
+            "isDelete":  response.IsDelete,
+            "document":  docData,
+        }
+        history = append(history, historyEntry)
+    }
 
-		historyEntry := map[string]interface{}{
-			"txId":        response.TxId,
-			"timestamp":   response.Timestamp,
-			"isDelete":    response.IsDelete,
-			"document":    docData,
-		}
-		history = append(history, historyEntry)
-	}
+    if len(history) == 0 {
+        return nil, fmt.Errorf("không tìm thấy lịch sử cho tài liệu %s", docID)
+    }
 
-	// Ghi log giao dịch
-	logDetails := fmt.Sprintf("Truy vấn lịch sử tài liệu %s", docID)
-	if err := RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_DOCUMENT_HISTORY", userID, logDetails); err != nil {
-		log.Printf("Lỗi khi ghi log giao dịch: %v", err)
-	}
+    // Org3MSP chỉ có thể xem lịch sử tài liệu của chính mình
+    if mspID == "Org3MSP" {
+        if hasSnapshot {
+            if firstSnapshot.UploadedBy != userID {
+                return nil, fmt.Errorf("người dùng %s không có quyền xem lịch sử tài liệu %s", userID, docID)
+            }
+        } else {
+            // Không thể xác định chủ sở hữu từ lịch sử (hiếm gặp), từ chối để an toàn
+            return nil, fmt.Errorf("không thể xác minh quyền truy cập lịch sử tài liệu %s", docID)
+        }
+    }
 
-	return history, nil
+    // Ghi log giao dịch
+    logDetails := fmt.Sprintf("Truy vấn lịch sử tài liệu %s", docID)
+    if err := RecordTransactionLog(ctx, ctx.GetStub().GetTxID(), "QUERY_DOCUMENT_HISTORY", userID, logDetails); err != nil {
+        log.Printf("Lỗi khi ghi log giao dịch: %v", err)
+    }
+
+    return history, nil
 }
 
 // ========================================
@@ -1012,7 +1028,7 @@ func (s *LandRegistryChaincode) getQueryResultForLands(ctx contractapi.Transacti
 
 	results := []*Land{}
 
-	for resultsIterator.HasNext() {
+    for resultsIterator.HasNext() {
 		response, err := resultsIterator.Next()
 		if err != nil {
 			return nil, err
@@ -1023,6 +1039,10 @@ func (s *LandRegistryChaincode) getQueryResultForLands(ctx contractapi.Transacti
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal land JSON: %v", err)
 		}
+        // Normalize null arrays to empty arrays for backward compatibility
+        if land != nil && land.DocumentIDs == nil {
+            land.DocumentIDs = []string{}
+        }
 
 		results = append(results, land)
 	}

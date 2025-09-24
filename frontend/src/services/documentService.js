@@ -190,6 +190,17 @@ const documentService = {
     }
   },
 
+  // Get document audit (history + user/actions)
+  async getDocumentAudit(docID) {
+    try {
+      const url = API_ENDPOINTS.DOCUMENT.GET_AUDIT.replace(':docID', docID);
+      const response = await apiClient.get(url);
+      return response.data.data || response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Lỗi khi truy vết tài liệu');
+    }
+  },
+
   // Delete document
   async deleteDocument(docID) {
     try {

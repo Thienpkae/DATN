@@ -13,6 +13,7 @@ const PINATA_API_KEY = sanitizeApiKey(process.env.REACT_APP_PINATA_API_KEY) || '
 const PINATA_SECRET_API_KEY = sanitizeApiKey(process.env.REACT_APP_PINATA_SECRET_API_KEY) || 'e0922dbca4ab770a4d976363300e928dd69dc53f56f5d3b11dff67046e6520fb';
 const PINATA_BASE_URL = 'https://api.pinata.cloud/pinning';
 const PINATA_GATEWAY = 'https://gateway.pinata.cloud/ipfs';
+const INLINE_VIEW_GATEWAY = 'https://ipfs.io/ipfs';
 
 // Upload a file to IPFS via Pinata with progress tracking
 export async function uploadFileToPinata(file, onProgress) {
@@ -180,6 +181,11 @@ export function getPinataMetadataUrl(ipfsHash) {
   return `${PINATA_GATEWAY}/${ipfsHash}`;
 }
 
+// Get IPFS file URL from an inline-friendly gateway (use for iframe/img previews)
+export function getInlineFileUrl(ipfsHash) {
+  return `${INLINE_VIEW_GATEWAY}/${ipfsHash}`;
+}
+
 // Download file from IPFS
 export async function downloadFileFromIPFS(ipfsHash, fileName) {
   try {
@@ -254,6 +260,7 @@ const ipfsService = {
   uploadDocumentToIPFS,
   getPinataFileUrl,
   getPinataMetadataUrl,
+  getInlineFileUrl,
   downloadFileFromIPFS,
   getFileInfoFromIPFS,
   validateIPFSHash,

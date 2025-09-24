@@ -130,10 +130,12 @@ const LandManagementPage = () => {
       const res = await landService.getLandParcelHistory(record.id || record.ID || record.landId);
       setHistory(Array.isArray(res) ? res : (res?.data ?? []));
       
-      // Load linked documents
-      if (record.documentIds && record.documentIds.length > 0) {
-        setLinkedDocuments(record.documentIds);
-      } else {
+      // Refresh linked documents from backend to avoid stale UI
+      try {
+        const docs = await documentService.getDocumentsByLandParcel(record.id || record.ID || record.landId);
+        const docIds = Array.isArray(docs) ? docs.map(d => d.docID || d.docId || d.id).filter(Boolean) : [];
+        setLinkedDocuments(docIds);
+      } catch (e) {
         setLinkedDocuments([]);
       }
       
@@ -301,6 +303,16 @@ const LandManagementPage = () => {
     }
   };
   
+  const refreshLinkedDocuments = React.useCallback(async (landId) => {
+    try {
+      const docs = await documentService.getDocumentsByLandParcel(landId);
+      const docIds = Array.isArray(docs) ? docs.map(d => d.docID || d.docId || d.id).filter(Boolean) : [];
+      setLinkedDocuments(docIds);
+    } catch (e) {
+      // swallow error and keep current list
+    }
+  }, []);
+  
   const handleLinkSelectedDocuments = async () => {
     if (!selectedDocumentsForLinking.length) {
       message.warning('Vui lòng chọn ít nhất một tài liệu');
@@ -312,8 +324,8 @@ const LandManagementPage = () => {
       await documentService.linkDocumentToLand(selectedDocumentsForLinking, selected.id);
       message.success('Liên kết tài liệu thành công');
       setSelectedDocumentsForLinking([]);
-      // Refresh land detail to show updated linked documents
-      await openDetail(selected);
+      // Refresh linked documents list immediately
+      await refreshLinkedDocuments(selected.id);
     } catch (e) {
       message.error(e.message || 'Liên kết thất bại');
     } finally {

@@ -36,32 +36,32 @@ const OnlineDocumentViewer = ({
         // Tạo URL để xem file
         if (docType.includes('pdf')) {
           console.log('📄 Detected PDF file');
-          const pdfUrl = ipfsService.getPinataFileUrl(hash);
+          const pdfUrl = ipfsService.getInlineFileUrl(hash);
           setViewerUrl(pdfUrl);
         } else if (docType.includes('image')) {
           console.log('🖼️ Detected Image file');
-          const imageUrl = ipfsService.getPinataFileUrl(hash);
+          const imageUrl = ipfsService.getInlineFileUrl(hash);
           setViewerUrl(imageUrl);
         } else if (docType.includes('word') || docType.includes('docx') || docType.includes('doc') || 
                    docType.includes('openxmlformats-officedocument.wordprocessingml.document')) {
           console.log('📘 Detected Word file - Using Microsoft Office Online Viewer');
-          const fileUrl = ipfsService.getPinataFileUrl(hash);
+          const fileUrl = ipfsService.getInlineFileUrl(hash);
           const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
           console.log('🔗 Office Online URL:', officeUrl);
           setViewerUrl(officeUrl);
         } else if (docType.includes('excel') || docType.includes('xlsx') || docType.includes('xls') ||
                    docType.includes('openxmlformats-officedocument.spreadsheetml.sheet')) {
           console.log('📊 Detected Excel file - Using Microsoft Office Online Viewer');
-          const fileUrl = ipfsService.getPinataFileUrl(hash);
+          const fileUrl = ipfsService.getInlineFileUrl(hash);
           const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
           setViewerUrl(officeUrl);
         } else if (docType.includes('text') || docType.includes('json') || docType.includes('xml')) {
           console.log('📝 Detected Text/JSON/XML file');
-          const textUrl = ipfsService.getPinataFileUrl(hash);
+          const textUrl = ipfsService.getInlineFileUrl(hash);
           setViewerUrl(textUrl);
         } else {
           console.log('❓ Unknown file type - Using Google Docs Viewer');
-          const fileUrl = ipfsService.getPinataFileUrl(hash);
+          const fileUrl = ipfsService.getInlineFileUrl(hash);
           const googleDocsUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`;
           setViewerUrl(googleDocsUrl);
         }
@@ -83,7 +83,7 @@ const OnlineDocumentViewer = ({
       setLoading(true);
       const fileName = document?.title || document?.docID || 'document';
       await ipfsService.downloadFileFromIPFS(hash, fileName);
-      message.success('Tải file thành công');
+      // Silent success to avoid intrusive toasts when previewing
     } catch (e) {
       message.error(e.message || 'Tải file thất bại');
     } finally {

@@ -53,6 +53,7 @@ export const API_ENDPOINTS = {
     GET_BY_TRANSACTION: '/documents/transaction/:txID',
     GET_BY_UPLOADER: '/documents/uploader/:uploaderID',
     GET_HISTORY: '/documents/history/:docID',
+    GET_AUDIT: '/documents/audit/:docID',
     VERIFY: '/documents/:docID/verify',
     REJECT: '/documents/:docID/reject',
     ANALYZE: '/documents/:docID/analyze',

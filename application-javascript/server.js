@@ -164,6 +164,7 @@ app.get('/api/documents/land-parcel/:landParcelID', authenticateJWT, documentSer
 app.get('/api/documents/transaction/:txID', authenticateJWT, documentService.getDocumentsByTransaction);
 app.get('/api/documents/uploader/:uploaderID', authenticateJWT, documentService.getDocumentsByUploader);
 app.get('/api/documents/history/:docID', authenticateJWT, documentService.getDocumentHistory);
+app.get('/api/documents/audit/:docID', authenticateJWT, documentService.getDocumentAudit);
 app.get('/api/documents', authenticateJWT, checkOrg(['Org1', 'Org2']), documentService.getAllDocuments);
 app.get('/api/documents/:docID/analyze', authenticateJWT, checkOrg(['Org1', 'Org2']), documentService.analyzeDocument);
 app.get('/api/documents/:docID', authenticateJWT, documentService.getDocument);

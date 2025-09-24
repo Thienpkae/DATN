@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Row, Col, Tooltip, Upload, Progress, Divider, Tabs, Typography } from 'antd';
-import { EditOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined, DownloadOutlined, UploadOutlined, FileTextOutlined, CloudUploadOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Modal, Form, Input, Select, Space, Tag, message, Row, Col, Tooltip, Upload, Progress, Divider, Tabs, Typography, List } from 'antd';
+import { EditOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined, DownloadOutlined, UploadOutlined, FileTextOutlined, CloudUploadOutlined, HistoryOutlined } from '@ant-design/icons';
 import documentService from '../../../services/documentService';
 import ipfsService from '../../../services/ipfs';
 import { useAuth } from '../../../hooks/useAuth';
@@ -41,6 +41,10 @@ const DocumentManagementPage = () => {
   const [downloading, setDownloading] = useState(false);
   const [downloadingDocId, setDownloadingDocId] = useState(null);
   const [viewerLoading, setViewerLoading] = useState(false);
+  const [traceOpen, setTraceOpen] = useState(false);
+  const [traceDocId, setTraceDocId] = useState('');
+  const [traceLoading, setTraceLoading] = useState(false);
+  const [traceHistory, setTraceHistory] = useState([]);
 
   const loadList = useCallback(async () => {
     try {
@@ -219,15 +223,10 @@ const DocumentManagementPage = () => {
   const handleViewOnline = useCallback(async () => {
     try {
       setViewerLoading(true);
-      message.loading({ content: 'Đang tải tài liệu...', key: 'viewer', duration: 0 });
-      
-      // Add a small delay to show loading state
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      // Open viewer directly without showing notification toasts
       setOnlineViewerOpen(true);
-      message.success({ content: 'Tải tài liệu thành công', key: 'viewer' });
     } catch (e) {
-      message.error({ content: e.message || 'Không thể tải tài liệu', key: 'viewer' });
+      message.error(e.message || 'Không thể mở xem trực tuyến');
     } finally {
       setViewerLoading(false);
     }
@@ -402,6 +401,7 @@ const DocumentManagementPage = () => {
           <Button icon={<SearchOutlined />} onClick={onSearch}>Tìm kiếm</Button>
           <Button icon={<ReloadOutlined />} onClick={onReload}>Tải lại</Button>
           <Button type="primary" icon={<CloudUploadOutlined />} onClick={() => setCreateOpen(true)}>Upload tài liệu</Button>
+          <Button onClick={() => setTraceOpen(true)} icon={<HistoryOutlined />}>Truy vết theo ID</Button>
         </Space>
       }
     >
@@ -548,8 +548,10 @@ const DocumentManagementPage = () => {
                             <Text strong>Trạng thái</Text>
                             <br />
                             <div style={{ marginTop: 6 }}>
-                              {selected.verified ? (
+                              {selected.status === 'VERIFIED' ? (
                                 <Tag color="green">Đã thẩm định</Tag>
+                              ) : selected.status === 'REJECTED' ? (
+                                <Tag color="red">Không hợp lệ</Tag>
                               ) : (
                                 <Tag color="orange">Chờ xác thực</Tag>
                               )}
@@ -769,8 +771,8 @@ const DocumentManagementPage = () => {
                                 <Col span={12}>
                                   <Text strong>Trạng thái xác thực:</Text>
                                   <br />
-                                  <Tag color={item.document?.verified ? 'green' : 'orange'}>
-                                    {item.document?.verified ? 'Đã xác thực' : 'Chờ xác thực'}
+                                  <Tag color={item.document?.status === 'VERIFIED' ? 'green' : (item.document?.status === 'REJECTED' ? 'red' : 'orange')}>
+                                    {item.document?.status === 'VERIFIED' ? 'Đã thẩm định' : (item.document?.status === 'REJECTED' ? 'Không hợp lệ' : 'Chờ xác thực')}
                                   </Tag>
                                 </Col>
                               </Row>
@@ -867,6 +869,91 @@ const DocumentManagementPage = () => {
         onCancel={() => setOnlineViewerOpen(false)}
         document={selected}
       />
+      {/* Trace By ID Modal */}
+      <Modal
+        title="Truy vết tài liệu theo ID"
+        open={traceOpen}
+        onCancel={() => { setTraceOpen(false); setTraceDocId(''); setTraceHistory([]); }}
+        footer={null}
+        width={800}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Row gutter={12}>
+            <Col span={18}>
+              <Input placeholder="Nhập Document ID (kể cả đã xóa)" value={traceDocId} onChange={(e) => setTraceDocId(e.target.value)} />
+            </Col>
+            <Col span={6}>
+              <Button type="primary" block loading={traceLoading} onClick={async () => {
+                if (!traceDocId.trim()) { message.warning('Vui lòng nhập Document ID'); return; }
+                try {
+                  setTraceLoading(true);
+                  const history = await documentService.getDocumentAudit(traceDocId.trim());
+                  const items = Array.isArray(history) ? history : (history?.data ?? []);
+                  setTraceHistory(items);
+                  if (!items || items.length === 0) { message.info('Không tìm thấy lịch sử cho ID đã nhập'); }
+                } catch (e) {
+                  message.error(e.message || 'Không thể lấy lịch sử tài liệu');
+                  setTraceHistory([]);
+                } finally {
+                  setTraceLoading(false);
+                }
+              }}>Truy vấn</Button>
+            </Col>
+          </Row>
+        </div>
+        <Divider style={{ margin: '12px 0' }} />
+        {traceLoading ? (
+          <div style={{ textAlign: 'center', padding: 24 }}>Đang tải lịch sử...</div>
+        ) : (
+          <List
+            header={<div><strong>Kết quả lịch sử ({traceHistory?.length || 0})</strong></div>}
+            bordered
+            dataSource={traceHistory}
+            locale={{ emptyText: 'Chưa có dữ liệu' }}
+            renderItem={(item, index) => (
+              <List.Item>
+                <div style={{ width: '100%' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <Space>
+                      <Tag color={item.isDelete ? 'red' : 'blue'}>{item.isDelete ? 'Đã xóa' : 'Thay đổi'}</Tag>
+                      <span>#{traceHistory.length - index}</span>
+                    </Space>
+                    <span style={{ fontSize: 12, color: '#888' }}>{item.timestamp ? new Date((item.timestamp.seconds || 0) * 1000).toLocaleString('vi-VN') : 'N/A'}</span>
+                  </div>
+                  <div style={{ marginBottom: 6 }}>
+                    <Text strong>Transaction ID: </Text>
+                    <Text type="secondary" style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.txId || 'N/A'}</Text>
+                  </div>
+                  {item.userId && (
+                    <div style={{ marginBottom: 6 }}>
+                      <Text strong>Người thực hiện: </Text>
+                      <Text type="secondary">{item.userId}</Text>
+                    </div>
+                  )}
+                  <div style={{ marginBottom: 6 }}>
+                    <Text strong>Tiêu đề: </Text>
+                    <Text type="secondary">{item.document?.title || 'N/A'}</Text>
+                  </div>
+                  <div style={{ marginBottom: 6 }}>
+                    <Text strong>Trạng thái xác thực: </Text>
+                    {item.document?.status ? (
+                      <Tag color={item.document.status === 'VERIFIED' ? 'green' : item.document.status === 'REJECTED' ? 'red' : 'orange'}>{item.document.status}</Tag>
+                    ) : (
+                      <Text type="secondary">N/A</Text>
+                    )}
+                  </div>
+                  {item.document?.ipfsHash && (
+                    <div>
+                      <Text strong>IPFS Hash: </Text>
+                      <Text type="secondary" style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.document.ipfsHash}</Text>
+                    </div>
+                  )}
+                </div>
+              </List.Item>
+            )}
+          />
+        )}
+      </Modal>
     </Card>
   );
 };

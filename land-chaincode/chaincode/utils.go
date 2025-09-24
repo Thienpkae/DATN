@@ -34,15 +34,37 @@ var requiredDocuments = map[string][]string{
 	"REISSUE":        {"Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo Mẫu số 18 ban hành kèm theo Nghị định số 151/2025/NĐ-CP", "Giấy chứng nhận quyền sử dụng đất", "Mảnh trích đo bản đồ địa chính thửa đất"},
 }
 
-// ValidateIPFSHash kiểm tra định dạng hash IPFS
+// NormalizeIPFSHash chuẩn hóa input về CID thuần (không prefix ipfs:// hay /ipfs/ hoặc URL gateway)
+func NormalizeIPFSHash(input string) string {
+    s := strings.TrimSpace(input)
+    // Strip query/hash fragments
+    if idx := strings.IndexAny(s, "?#"); idx >= 0 {
+        s = s[:idx]
+    }
+    // Remove protocol prefixes
+    s = strings.TrimPrefix(s, "ipfs://")
+    s = strings.TrimPrefix(s, "IPFS://")
+    // Extract after /ipfs/
+    if idx := strings.Index(s, "/ipfs/"); idx >= 0 {
+        s = s[idx+len("/ipfs/"):]
+    }
+    // If still contains slashes (gateway/path), take last segment
+    if strings.Contains(s, "/") {
+        parts := strings.Split(s, "/")
+        s = parts[len(parts)-1]
+    }
+    return s
+}
+
+// ValidateIPFSHash kiểm tra định dạng hash IPFS (chấp nhận cả URL/gateway và chuẩn hóa)
 func ValidateIPFSHash(hash string) error {
-	if len(hash) != 46 && len(hash) != 59 { // CIDv0 (46) hoặc CIDv1 (59)
-		return fmt.Errorf("hash IPFS %s không hợp lệ: độ dài không đúng", hash)
-	}
-	if matched, _ := regexp.MatchString(`^Qm[1-9A-Za-z]{44}$|^bafy[0-9A-Za-z]+`, hash); !matched {
-		return fmt.Errorf("hash IPFS %s không đúng định dạng", hash)
-	}
-	return nil
+    cid := NormalizeIPFSHash(hash)
+    // Accept CIDv0 (Qm...) và CIDv1 (bafy...)
+    matched, _ := regexp.MatchString(`^Qm[1-9A-Za-z]{44}$|^bafy[0-9A-Za-z]+$`, cid)
+    if !matched {
+        return fmt.Errorf("hash IPFS %s không đúng định dạng", hash)
+    }
+    return nil
 }
 
 // GetTxTimestampAsTime lấy timestamp của transaction và chuyển đổi thành time.Time ở múi giờ Việt Nam (+07:00)

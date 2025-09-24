@@ -441,8 +441,10 @@ const DocumentManagementPage = () => {
                             <Text strong>Trạng thái</Text>
                             <br />
                             <div style={{ marginTop: 6 }}>
-                              {selected.verified ? (
+                              {selected.status === 'VERIFIED' ? (
                                 <Tag color="green">Đã thẩm định</Tag>
+                              ) : selected.status === 'REJECTED' ? (
+                                <Tag color="red">Không hợp lệ</Tag>
                               ) : (
                                 <Tag color="orange">Chờ xác thực</Tag>
                               )}
@@ -584,8 +586,8 @@ const DocumentManagementPage = () => {
                                 <Col span={12}>
                                   <Text strong>Trạng thái xác thực:</Text>
                                   <br />
-                                  <Tag color={item.document?.verified ? 'green' : 'orange'}>
-                                    {item.document?.verified ? 'Đã xác thực' : 'Chờ xác thực'}
+                                  <Tag color={item.document?.status === 'VERIFIED' ? 'green' : (item.document?.status === 'REJECTED' ? 'red' : 'orange')}>
+                                    {item.document?.status === 'VERIFIED' ? 'Đã thẩm định' : (item.document?.status === 'REJECTED' ? 'Không hợp lệ' : 'Chờ xác thực')}
                                   </Tag>
                                 </Col>
                               </Row>

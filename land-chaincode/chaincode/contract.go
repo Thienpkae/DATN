@@ -1068,16 +1068,16 @@ func (s *LandRegistryChaincode) ProcessTransaction(ctx contractapi.TransactionCo
 	case "APPROVE":
 		// Xác nhận đạt yêu cầu và chuyển sang trạng thái VERIFIED để Org1 xử lý
 		if len(rejectedDocs) > 0 {
-			return fmt.Errorf("không thể phê duyệt vì có tài liệu không hợp lệ: %v", rejectedDocs)
+			return fmt.Errorf("không thể thẩm định đạt yêu cầu vì có tài liệu không hợp lệ: %v", rejectedDocs)
+		}
+		if len(pendingDocs) > 0 {
+			return fmt.Errorf("không thể thẩm định đạt yêu cầu vì còn tài liệu chưa được xác thực: %v", pendingDocs)
 		}
 		// Chuyển sang VERIFIED thay vì FORWARDED - loại bỏ bước chuyển tiếp thủ công
 		tx.Status = "VERIFIED"
 		statusDetails = fmt.Sprintf("Hồ sơ đạt yêu cầu.")
 		if len(verifiedDocs) > 0 {
 			statusDetails += fmt.Sprintf(" Tài liệu đã xác thực: %v.", verifiedDocs)
-		}
-		if len(pendingDocs) > 0 {
-			statusDetails += fmt.Sprintf(" Tài liệu chưa xác thực: %v.", pendingDocs)
 		}
 		statusDetails += " Sẵn sàng cho Sở TN&MT xử lý."
 		if reason != "" {
@@ -1120,8 +1120,12 @@ func (s *LandRegistryChaincode) ProcessTransaction(ctx contractapi.TransactionCo
 		return fmt.Errorf("quyết định không hợp lệ. Sử dụng: APPROVE, SUPPLEMENT, hoặc REJECT")
 	}
 
-	// Cập nhật thông tin giao dịch
-	tx.Details = statusDetails
+    // Cập nhật thông tin giao dịch, giữ nguyên chi tiết ban đầu để Org1 có thể trích xuất tham số
+    if strings.TrimSpace(tx.Details) != "" {
+        tx.Details = fmt.Sprintf("%s. %s", tx.Details, statusDetails)
+    } else {
+        tx.Details = statusDetails
+    }
 	tx.UpdatedAt = txTime
 
 	txJSON, err := json.Marshal(tx)
@@ -1579,8 +1583,57 @@ func (s *LandRegistryChaincode) ApproveChangePurposeTransaction(ctx contractapi.
 		return fmt.Errorf("người dùng %s không sở hữu thửa đất %s", tx.FromOwnerID, tx.LandParcelID)
 	}
 
-	// Trích xuất mục đích sử dụng mới từ details
-	newPurpose := strings.Split(tx.Details, "sang ")[1]
+    // Trích xuất mục đích sử dụng mới từ details một cách an toàn
+    // Helper: lấy nội dung sau "sang " đến trước dấu kết câu tiếp theo
+    extractPurpose := func(source string) string {
+        idx := strings.LastIndex(source, "sang ")
+        if idx == -1 {
+            return ""
+        }
+        rest := strings.TrimSpace(source[idx+len("sang "):])
+        // Cắt đến dấu phân cách đầu tiên (., ;, , hoặc xuống dòng)
+        cut := len(rest)
+        for _, d := range []string{".", ";", ",", "\n"} {
+            if i := strings.Index(rest, d); i != -1 && i < cut {
+                cut = i
+            }
+        }
+        return strings.TrimSpace(rest[:cut])
+    }
+
+    var newPurpose string
+    // 1) Thử trích trực tiếp từ chi tiết hiện tại
+    newPurpose = extractPurpose(tx.Details)
+
+    // 2) Nếu không có, backfill từ lịch sử giao dịch (snapshot đầu tiên thường chứa câu gốc có "sang <mục đích>")
+    if newPurpose == "" {
+        resultsIterator, err := ctx.GetStub().GetHistoryForKey(txID)
+        if err != nil {
+            return fmt.Errorf("lỗi khi lấy lịch sử giao dịch: %v", err)
+        }
+        defer resultsIterator.Close()
+        for resultsIterator.HasNext() {
+            response, err := resultsIterator.Next()
+            if err != nil {
+                return fmt.Errorf("lỗi khi đọc lịch sử giao dịch: %v", err)
+            }
+            if len(response.Value) == 0 {
+                continue
+            }
+            var snap Transaction
+            if err := json.Unmarshal(response.Value, &snap); err != nil {
+                continue
+            }
+            if p := extractPurpose(snap.Details); p != "" {
+                newPurpose = p
+                break
+            }
+        }
+    }
+
+    if newPurpose == "" {
+        return fmt.Errorf("không tìm thấy mục đích sử dụng mới trong chi tiết giao dịch hiện tại hoặc lịch sử: %s", tx.Details)
+    }
 	// Removed ValidateLandUsePurpose validation as requested
 
 	txTime, err := GetTxTimestampAsTime(ctx)
@@ -1596,7 +1649,7 @@ func (s *LandRegistryChaincode) ApproveChangePurposeTransaction(ctx contractapi.
 	}
 
 	// Cập nhật mục đích sử dụng
-	land.LandUsePurpose = newPurpose
+    land.LandUsePurpose = newPurpose
 	land.UpdatedAt = txTime
 	landJSON, err := json.Marshal(land)
 	if err != nil {
@@ -1608,7 +1661,7 @@ func (s *LandRegistryChaincode) ApproveChangePurposeTransaction(ctx contractapi.
 
 	// Cập nhật trạng thái giao dịch
 	tx.Status = "APPROVED"
-	tx.Details = fmt.Sprintf("%s; Đã phê duyệt thay đổi mục đích sử dụng", tx.Details)
+    tx.Details = fmt.Sprintf("%s; Đã phê duyệt thay đổi mục đích sử dụng sang %s", tx.Details, newPurpose)
 	tx.UpdatedAt = txTime
 	txJSON, err := json.Marshal(tx)
 	if err != nil {

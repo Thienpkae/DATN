@@ -415,7 +415,7 @@ const TransactionManagementPage = () => {
       'VERIFIED': 'blue',
       'APPROVED': 'green',
       'REJECTED': 'red',
-      'CONFIRMED': 'green',
+      'CONFIRMED': 'purple',
       'SUPPLEMENT_REQUESTED': 'gold'
     };
     return <Tag color={statusColors[status] || 'default'}>{transactionService.getTransactionStatusText(status)}</Tag>;
@@ -424,9 +424,9 @@ const TransactionManagementPage = () => {
   const getStatusColor = (status) => {
     const statusColors = {
       'PENDING': 'orange',
-      'CONFIRMED': 'blue',
-      'VERIFIED': 'green',
-      'SUPPLEMENT_REQUESTED': 'purple',
+      'CONFIRMED': 'purple',
+      'VERIFIED': 'blue',
+      'SUPPLEMENT_REQUESTED': 'gold',
       'APPROVED': 'green',
       'REJECTED': 'red'
     };

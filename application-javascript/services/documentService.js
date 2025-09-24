@@ -5,6 +5,24 @@ const notificationService = require('./notificationService');
 
 // Document Service - Handles all document operations
 const documentService = {
+    async getDocumentAudit(req, res) {
+        try {
+            const { docID } = req.params;
+            const userID = req.user.cccd;
+            const org = req.user.org;
+
+            const { contract } = await connectToNetwork(org, userID);
+            const result = await contract.evaluateTransaction(
+                'QueryDocumentAuditByDocID',
+                docID
+            );
+
+            const audit = JSON.parse(result.toString());
+            res.json({ success: true, data: audit });
+        } catch (error) {
+            res.status(500).json({ success: false, message: 'Lỗi khi truy vết tài liệu', error: error.message });
+        }
+    },
     // Create document
     async createDocument(req, res) {
         try {

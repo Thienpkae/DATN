@@ -2,6 +2,20 @@
 const { connectToNetwork } = require('./networkService');
 const notificationService = require('./notificationService');
 
+// Ensure land object has consistent shapes expected by frontend
+function normalizeLandObject(land) {
+    if (!land || typeof land !== 'object') return land;
+    if (!Array.isArray(land.documentIds)) {
+        land.documentIds = [];
+    }
+    return land;
+}
+
+function normalizeLandList(lands) {
+    if (!Array.isArray(lands)) return [];
+    return lands.map(normalizeLandObject);
+}
+
 // Land Service - Handles all land parcel operations
 const landService = {
     // Create a new land parcel
@@ -201,7 +215,7 @@ const landService = {
                 userID
             );
 
-            const land = result ? JSON.parse(result.toString()) : null;
+            const land = result ? normalizeLandObject(JSON.parse(result.toString())) : null;
             res.json({
                 success: true,
                 data: land
@@ -231,7 +245,7 @@ const landService = {
                 userID
             );
 
-            const lands = result ? JSON.parse(result.toString()) : [];
+            const lands = result ? normalizeLandList(JSON.parse(result.toString())) : [];
             res.json({
                 success: true,
                 data: lands
@@ -270,7 +284,7 @@ const landService = {
                 userID
             );
 
-            const lands = result ? JSON.parse(result.toString()) : [];
+            const lands = result ? normalizeLandList(JSON.parse(result.toString())) : [];
             res.json({
                 success: true,
                 data: lands
@@ -298,7 +312,7 @@ const landService = {
                 userID
             );
 
-            const lands = result ? JSON.parse(result.toString()) : [];
+            const lands = result ? normalizeLandList(JSON.parse(result.toString())) : [];
             res.json({
                 success: true,
                 data: lands

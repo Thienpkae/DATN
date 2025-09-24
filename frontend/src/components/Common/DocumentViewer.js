@@ -48,7 +48,7 @@ const DocumentViewer = ({
     
     try {
       await ipfsService.downloadFileFromIPFS(document.ipfsHash, document.title || document.docID);
-      message.success('Tải file thành công');
+      // Silent success to avoid showing toast when user is focused on preview
     } catch (e) {
       message.error(e.message || 'Tải file thất bại');
     }
